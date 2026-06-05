@@ -1,0 +1,16 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+
+# Agent scratch — never commit
+plan.md
+TECHNICAL_DEBT_LOG.md
+pr_description.txt
+*.orig

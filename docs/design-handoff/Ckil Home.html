@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ckil — home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* App UI register — FormationFlow tokens */
+    --app-bg:#F2F2F7; --surface:#FFFFFF; --surface-2:#FBFBFD;
+    --label:#000; --label2:rgba(60,60,67,.6); --label3:rgba(60,60,67,.3);
+    --sep:rgba(60,60,67,.16); --hairline:rgba(0,0,0,.06); --grid:#C7C7CC;
+    --accent:#007AFF; --accent-press:#0062CC; --accent-tint:rgba(0,122,255,.12);
+    --destructive:#FF3B30; --warning:#FF9500; --success:#34C759;
+    --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.16);
+    --shadow-card:0 1px 3px rgba(0,0,0,.06);
+    --shadow-float:0 8px 24px rgba(0,0,0,.16);
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",sans-serif;
+    --rounded:-apple-system,ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+    /* Brand register — share-card "court at night" */
+    --navy:#0A0F1E; --navy-deep:#06090F; --navy-mid:#111827; --navy-light:#1C2A40;
+    --coral:#FF4757; --coral-light:#FF6B7A; --electric:#00D4FF; --electric-dim:#0099CC;
+    --gold:#FFD43B; --brand-green:#51CF66; --brand-purple:#9775FA;
+    --display:"Space Grotesk",system-ui,sans-serif;
+    --body:"Inter",-apple-system,system-ui,sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    font-family:var(--font);
+    background:
+      radial-gradient(120% 80% at 50% -10%, #fbfbfd 0%, #e9e9ef 55%, #e3e3ea 100%);
+    -webkit-font-smoothing:antialiased;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  #stage{ transform-origin:center center; }
+  #root{ display:flex; align-items:center; justify-content:center; }
+
+  /* ---- mechanical counter ---- */
+  .odo{ display:flex; align-items:center; justify-content:center; }
+  .odo-col{
+    position:relative; overflow:hidden;
+    width:var(--dw); height:var(--dh);
+  }
+  .odo-reel{
+    position:absolute; left:0; top:0; width:100%;
+    will-change:transform;
+  }
+  .odo-cell{
+    height:var(--dh); width:100%;
+    display:flex; align-items:center; justify-content:center;
+    font:800 var(--ds)/1 var(--rounded);
+    font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+    color:var(--label);
+  }
+  .odo-col.ghost .odo-cell{ color:var(--label3); }
+
+  /* subtle mechanical seam across the number window */
+  .odo-window{ position:relative; }
+  .odo-window::after{
+    content:""; position:absolute; left:6%; right:6%; top:50%; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(0,0,0,.07) 18%,rgba(0,0,0,.07) 82%,transparent);
+    pointer-events:none;
+  }
+
+  /* flip + pop styles share the single-number node */
+  .flipnum, .popnum{
+    font:800 var(--ds)/1 var(--rounded);
+    font-variant-numeric:tabular-nums; letter-spacing:-.03em; color:var(--label);
+    display:inline-block;
+  }
+  @keyframes flipIn{
+    0%{ transform:rotateX(-90deg); opacity:0; }
+    100%{ transform:rotateX(0deg); opacity:1; }
+  }
+  .flip-anim{ animation:flipIn .26s cubic-bezier(.2,.7,.2,1); transform-origin:center top; }
+  @keyframes popIn{
+    0%{ transform:scale(.6); opacity:.2; }
+    60%{ transform:scale(1.12); opacity:1; }
+    100%{ transform:scale(1); }
+  }
+  .pop-anim{ animation:popIn .26s cubic-bezier(.2,.8,.2,1); }
+
+  /* tap pad press feedback */
+  .pad{ -webkit-tap-highlight-color:transparent; user-select:none; cursor:pointer; touch-action:manipulation; }
+  .pad.press{ transform:scale(.975); }
+
+  @keyframes ringFlash{
+    0%{ filter:drop-shadow(0 0 0 rgba(52,199,89,0)); }
+    35%{ filter:drop-shadow(0 0 10px rgba(52,199,89,.7)); }
+    100%{ filter:drop-shadow(0 0 0 rgba(52,199,89,0)); }
+  }
+  .ring-flash{ animation:ringFlash .7s ease-out; }
+
+  @keyframes risePip{ from{ transform:translateY(14px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .rise{ animation:risePip .32s cubic-bezier(.2,.7,.2,1); }
+
+  /* sheet */
+  .sheet-scrim{ position:absolute; inset:0; background:rgba(0,0,0,.28); z-index:80;
+    opacity:0; transition:opacity .26s ease; }
+  .sheet-scrim.in{ opacity:1; }
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0; z-index:81;
+    background:var(--surface); border-radius:22px 22px 0 0;
+    box-shadow:0 -8px 40px rgba(0,0,0,.22);
+    transform:translateY(100%); transition:transform .3s cubic-bezier(.2,.8,.2,1);
+    padding:10px 18px calc(18px + env(safe-area-inset-bottom));
+    max-height:88%; overflow:auto;
+  }
+  .sheet.in{ transform:translateY(0); }
+  .grabber{ width:38px; height:5px; border-radius:3px; background:var(--label3); margin:0 auto 8px; }
+
+  .field{
+    width:100%; font:400 17px/1.3 var(--font); padding:11px 13px;
+    border:1px solid var(--sep); border-radius:10px; background:var(--surface-2);
+    color:var(--label); resize:none; outline:none;
+  }
+  .field:focus{ border-color:var(--accent); background:#fff; }
+
+  .scrollfeed{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .scrollfeed::-webkit-scrollbar{ width:0; height:0; }
+
+  button{ font-family:var(--font); }
+  .no-tap{ -webkit-tap-highlight-color:transparent; }
+
+  /* ============================ Pokémon-style holo share cards ========= */
+  .share-cover{ position:absolute; inset:0; z-index:90; overflow:hidden;
+    background:
+      radial-gradient(120% 70% at 50% -8%, #1b2335 0%, #0c1120 46%, #06080f 100%);
+    opacity:0; transition:opacity .32s ease; }
+  .share-cover.in{ opacity:1; }
+  .share-cover::before{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(var(--brand-grid,rgba(255,255,255,.05)) 1px, transparent 1px) 0 0/30px 30px,
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px) 0 0/30px 30px;
+    mask:radial-gradient(120% 90% at 50% 30%, #000 35%, transparent 78%);
+    -webkit-mask:radial-gradient(120% 90% at 50% 30%, #000 35%, transparent 78%); }
+  .share-cover::after{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(40% 30% at 18% 14%, rgba(255,71,87,.30), transparent 70%),
+      radial-gradient(44% 32% at 86% 80%, rgba(0,212,255,.24), transparent 72%); }
+
+  .holo-rail{ display:flex; gap:18px; overflow-x:auto; scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch; padding:0 56px; align-items:center; }
+  .holo-rail::-webkit-scrollbar{ display:none; }
+  .holo-slide{ scroll-snap-align:center; flex:0 0 auto; }
+
+  .holo-shell{ perspective:900px; width:290px; height:430px; }
+  .holo-card{ position:relative; width:100%; height:100%; border-radius:20px;
+    transform-style:preserve-3d; transition:transform .25s cubic-bezier(.2,.7,.2,1);
+    will-change:transform; }
+  .holo-frame{ position:absolute; inset:0; border-radius:20px; padding:8px;
+    box-shadow:0 22px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06);
+    background-size:300% 300%; animation:foilEdge 7s linear infinite; }
+  @keyframes foilEdge{ 0%{background-position:0% 50%} 100%{background-position:300% 50%} }
+  .holo-inner{ position:relative; width:100%; height:100%; border-radius:13px; overflow:hidden;
+    background:linear-gradient(160deg, #141a2b 0%, #0d1322 55%, #0a0f1e 100%);
+    display:flex; flex-direction:column; }
+  .holo-inner::before{ content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+    background:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px) 0 0/22px 22px,
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px) 0 0/22px 22px;
+    mask:radial-gradient(80% 60% at 50% 38%, #000 30%, transparent 75%);
+    -webkit-mask:radial-gradient(80% 60% at 50% 38%, #000 30%, transparent 75%); }
+
+  /* foil sheen — position driven by --mx/--my, intensity by --foil */
+  .holo-foil{ position:absolute; inset:0; border-radius:13px; pointer-events:none; z-index:6;
+    mix-blend-mode:color-dodge; opacity:calc(.30 + var(--foil,0)*.55); transition:opacity .25s;
+    background:
+      linear-gradient(115deg, transparent 22%, rgba(255,255,255,.45) 42%, rgba(255,120,180,.4) 50%,
+        rgba(120,220,255,.4) 58%, transparent 78%);
+    background-size:230% 230%;
+    background-position:calc(var(--mx,50%)*1) calc(var(--my,50%)*1); }
+  .holo-foil.tier-legendary{ background:
+      linear-gradient(115deg, transparent 18%, rgba(255,235,140,.6) 38%, rgba(255,255,255,.7) 50%,
+        rgba(255,200,90,.6) 62%, transparent 82%); }
+  .holo-foil.tier-holo{ background:
+      conic-gradient(from 210deg at var(--mx,50%) var(--my,50%), #ff4d6d, #ffd43b, #51ff9f, #00d4ff, #9775fa, #ff4d6d); }
+  .holo-glare{ position:absolute; inset:0; border-radius:13px; pointer-events:none; z-index:7;
+    mix-blend-mode:screen; opacity:var(--foil,0); transition:opacity .25s;
+    background:radial-gradient(120px 120px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.55), transparent 60%); }
+  .holo-sparkle{ position:absolute; inset:0; border-radius:13px; pointer-events:none; z-index:5;
+    mix-blend-mode:overlay; opacity:calc(.25 + var(--foil,0)*.4);
+    background-image:radial-gradient(rgba(255,255,255,.9) 1px, transparent 1.4px);
+    background-size:14px 14px;
+    mask:linear-gradient(115deg, transparent 30%, #000 48%, transparent 66%);
+    -webkit-mask:linear-gradient(115deg, transparent 30%, #000 48%, transparent 66%);
+    -webkit-mask-position:calc(var(--mx,50%)*1) 0; mask-position:calc(var(--mx,50%)*1) 0; }
+
+  @media (prefers-reduced-motion: reduce){ .holo-frame{ animation:none; } }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="stage"><div id="root"></div></div>
+
+  <script type="text/babel" data-src="ios-frame.jsx">
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// iOS.jsx — Simplified iOS 26 (Liquid Glass) device frame
+// Based on the iOS 26 UI Kit + Figma status bar spec. No assets, no deps.
+// Exports (to window): IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
+//
+// Usage — wrap your screen content in <IOSDevice> to get the bezel, status bar
+// and home indicator (props: title, dark, keyboard):
+//
+//   <IOSDevice title="Settings">
+//     ...your screen content...
+//   </IOSDevice>
+//   <IOSDevice dark title="Search" keyboard>…</IOSDevice>
+/* END USAGE */
+
+// ─────────────────────────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────────────────────────
+function IOSStatusBar({ dark = false, time = '9:41' }) {
+  const c = dark ? '#fff' : '#000';
+  return (
+    <div style={{
+      display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
+      padding: '21px 24px 19px', boxSizing: 'border-box',
+      position: 'relative', zIndex: 20, width: '100%',
+    }}>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+        <span style={{
+          fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590,
+          fontSize: 17, lineHeight: '22px', color: c,
+        }}>{time}</span>
+      </div>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+        <svg width="19" height="12" viewBox="0 0 19 12">
+          <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
+          <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
+          <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill={c}/>
+          <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill={c}/>
+        </svg>
+        <svg width="17" height="12" viewBox="0 0 17 12">
+          <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill={c}/>
+          <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill={c}/>
+          <circle cx="8.5" cy="10.5" r="1.5" fill={c}/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13">
+          <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={c} strokeOpacity="0.35" fill="none"/>
+          <rect x="2" y="2" width="20" height="9" rx="2" fill={c}/>
+          <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill={c} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Liquid glass pill — blur + tint + shine
+// ─────────────────────────────────────────────────────────────
+function IOSGlassPill({ children, dark = false, style = {} }) {
+  return (
+    <div style={{
+      height: 44, minWidth: 44, borderRadius: 9999,
+      position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: dark
+        ? '0 2px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2)'
+        : '0 1px 3px rgba(0,0,0,0.07), 0 3px 10px rgba(0,0,0,0.06)',
+      ...style,
+    }}>
+      {/* blur + tint */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.28)' : 'rgba(255,255,255,0.5)',
+      }} />
+      {/* shine */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15), inset -1px -1px 1px rgba(255,255,255,0.08)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Navigation bar — glass pills + large title
+// ─────────────────────────────────────────────────────────────
+function IOSNavBar({ title = 'Title', dark = false, trailingIcon = true }) {
+  const muted = dark ? 'rgba(255,255,255,0.6)' : '#404040';
+  const text = dark ? '#fff' : '#000';
+  const pillIcon = (content) => (
+    <IOSGlassPill dark={dark}>
+      <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {content}
+      </div>
+    </IOSGlassPill>
+  );
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      paddingTop: 62, paddingBottom: 10, position: 'relative', zIndex: 5,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+      }}>
+        {/* back chevron */}
+        {pillIcon(
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="none" style={{ marginLeft: -1 }}>
+            <path d="M10 2L2 10l8 8" stroke={muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+        {/* trailing ellipsis */}
+        {trailingIcon && pillIcon(
+          <svg width="22" height="6" viewBox="0 0 22 6">
+            <circle cx="3" cy="3" r="2.5" fill={muted}/>
+            <circle cx="11" cy="3" r="2.5" fill={muted}/>
+            <circle cx="19" cy="3" r="2.5" fill={muted}/>
+          </svg>
+        )}
+      </div>
+      {/* large title */}
+      <div style={{
+        padding: '0 16px',
+        fontFamily: '-apple-system, system-ui',
+        fontSize: 34, fontWeight: 700, lineHeight: '41px',
+        color: text, letterSpacing: 0.4,
+      }}>{title}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Grouped list (inset card, r:26) + row (52px)
+// ─────────────────────────────────────────────────────────────
+function IOSListRow({ title, detail, icon, chevron = true, isLast = false, dark = false }) {
+  const text = dark ? '#fff' : '#000';
+  const sec = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const ter = dark ? 'rgba(235,235,245,0.3)' : 'rgba(60,60,67,0.3)';
+  const sep = dark ? 'rgba(84,84,88,0.65)' : 'rgba(60,60,67,0.12)';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', minHeight: 52,
+      padding: '0 16px', position: 'relative',
+      fontFamily: '-apple-system, system-ui', fontSize: 17,
+      letterSpacing: -0.43,
+    }}>
+      {icon && (
+        <div style={{
+          width: 30, height: 30, borderRadius: 7, background: icon,
+          marginRight: 12, flexShrink: 0,
+        }} />
+      )}
+      <div style={{ flex: 1, color: text }}>{title}</div>
+      {detail && <span style={{ color: sec, marginRight: 6 }}>{detail}</span>}
+      {chevron && (
+        <svg width="8" height="14" viewBox="0 0 8 14" style={{ flexShrink: 0 }}>
+          <path d="M1 1l6 6-6 6" stroke={ter} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {!isLast && (
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0,
+          left: icon ? 58 : 16, height: 0.5, background: sep,
+        }} />
+      )}
+    </div>
+  );
+}
+
+function IOSList({ header, children, dark = false }) {
+  const hc = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const bg = dark ? '#1C1C1E' : '#fff';
+  return (
+    <div>
+      {header && (
+        <div style={{
+          fontFamily: '-apple-system, system-ui', fontSize: 13,
+          color: hc, textTransform: 'uppercase',
+          padding: '8px 36px 6px', letterSpacing: -0.08,
+        }}>{header}</div>
+      )}
+      <div style={{
+        background: bg, borderRadius: 26,
+        margin: '0 16px', overflow: 'hidden',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Device frame
+// ─────────────────────────────────────────────────────────────
+function IOSDevice({
+  children, width = 402, height = 874, dark = false,
+  title, keyboard = false,
+}) {
+  return (
+    <div style={{
+      width, height, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: dark ? '#000' : '#F2F2F7',
+      boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
+      fontFamily: '-apple-system, system-ui, sans-serif',
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+      }} />
+      {/* status bar (absolute) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <IOSStatusBar dark={dark} />
+      </div>
+      {/* nav + content */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {title !== undefined && <IOSNavBar title={title} dark={dark} />}
+        <div style={{ flex: 1, overflow: 'auto' }}>{children}</div>
+        {keyboard && <IOSKeyboard dark={dark} />}
+      </div>
+      {/* home indicator — always on top */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
+        height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+        paddingBottom: 8, pointerEvents: 'none',
+      }}>
+        <div style={{
+          width: 139, height: 5, borderRadius: 100,
+          background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Keyboard — iOS 26 liquid glass
+// ─────────────────────────────────────────────────────────────
+function IOSKeyboard({ dark = false }) {
+  const glyph = dark ? 'rgba(255,255,255,0.7)' : '#595959';
+  const sugg = dark ? 'rgba(255,255,255,0.6)' : '#333';
+  const keyBg = dark ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.85)';
+
+  // special-key icons
+  const icons = {
+    shift: <svg width="19" height="17" viewBox="0 0 19 17"><path d="M9.5 1L1 9.5h4.5V16h8V9.5H18L9.5 1z" fill={glyph}/></svg>,
+    del: <svg width="23" height="17" viewBox="0 0 23 17"><path d="M7 1h13a2 2 0 012 2v11a2 2 0 01-2 2H7l-6-7.5L7 1z" fill="none" stroke={glyph} strokeWidth="1.6" strokeLinejoin="round"/><path d="M10 5l7 7M17 5l-7 7" stroke={glyph} strokeWidth="1.6" strokeLinecap="round"/></svg>,
+    ret: <svg width="20" height="14" viewBox="0 0 20 14"><path d="M18 1v6H4m0 0l4-4M4 7l4 4" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  };
+
+  const key = (content, { w, flex, ret, fs = 25, k } = {}) => (
+    <div key={k} style={{
+      height: 42, borderRadius: 8.5,
+      flex: flex ? 1 : undefined, width: w, minWidth: 0,
+      background: ret ? '#08f' : keyBg,
+      boxShadow: '0 1px 0 rgba(0,0,0,0.075)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, "SF Compact", system-ui',
+      fontSize: fs, fontWeight: 458, color: ret ? '#fff' : glyph,
+    }}>{content}</div>
+  );
+
+  const row = (keys, pad = 0) => (
+    <div style={{ display: 'flex', gap: 6.5, justifyContent: 'center', padding: `0 ${pad}px` }}>
+      {keys.map(l => key(l, { flex: true, k: l }))}
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 15, borderRadius: 27, overflow: 'hidden',
+      padding: '11px 0 2px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      boxShadow: dark
+        ? '0 -2px 20px rgba(0,0,0,0.09)'
+        : '0 -1px 6px rgba(0,0,0,0.018), 0 -3px 20px rgba(0,0,0,0.012)',
+    }}>
+      {/* liquid glass bg — same recipe as nav pills */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.14)' : 'rgba(255,255,255,0.25)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* autocorrect bar */}
+      <div style={{
+        display: 'flex', gap: 20, alignItems: 'center',
+        padding: '8px 22px 13px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {['"The"', 'the', 'to'].map((w, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <div style={{ width: 1, height: 25, background: '#ccc', opacity: 0.3 }} />}
+            <div style={{
+              flex: 1, textAlign: 'center',
+              fontFamily: '-apple-system, system-ui', fontSize: 17,
+              color: sugg, letterSpacing: -0.43, lineHeight: '22px',
+            }}>{w}</div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* key layout */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 13,
+        padding: '0 6.5px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {row(['q','w','e','r','t','y','u','i','o','p'])}
+        {row(['a','s','d','f','g','h','j','k','l'], 20)}
+        <div style={{ display: 'flex', gap: 14.25, alignItems: 'center' }}>
+          {key(icons.shift, { w: 45, k: 'shift' })}
+          <div style={{ display: 'flex', gap: 6.5, flex: 1 }}>
+            {['z','x','c','v','b','n','m'].map(l => key(l, { flex: true, k: l }))}
+          </div>
+          {key(icons.del, { w: 45, k: 'del' })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {key('ABC', { w: 92.25, fs: 18, k: 'abc' })}
+          {key('', { flex: true, k: 'space' })}
+          {key(icons.ret, { w: 92.25, ret: true, k: 'ret' })}
+        </div>
+      </div>
+
+      {/* bottom spacer (emoji+mic area, icons omitted) */}
+      <div style={{ height: 56, width: '100%', position: 'relative' }} />
+    </div>
+  );
+}
+
+Object.assign(window, {
+  IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
+});
+
+</script>
+  <script type="text/babel" data-src="tweaks-panel.jsx">
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+// Exports (to window): useTweaks, TweaksPanel, TweakSection, TweakRow, TweakSlider,
+//   TweakToggle, TweakRadio, TweakSelect, TweakText, TweakNumber, TweakColor, TweakButton.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// TweakRadio is the segmented control for 2–3 short options (auto-falls-back to
+// TweakSelect past ~16/~10 chars per label); reach for TweakSelect directly when
+// options are many or long. For color tweaks always curate 3-4 options rather than
+// a free picker; an option can also be a whole 2–5 color palette (the stored value
+// is the array). The Tweak* controls are a floor, not a ceiling — build custom
+// controls inside the panel if a tweak calls for UI they don't cover.
+/* END USAGE */
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+  <script type="text/babel" data-src="ckil-review-core.jsx">
+// ckil-review-core.jsx — mechanical numbers, the bar, icons + the reconciled
+// mock dataset that every section of the Review screen reads from.
+const { useState, useEffect, useRef, useLayoutEffect, useMemo } = React;
+
+/* ===================================================== Odometer reel ===== */
+function OdoDigit({ n, h, w, fs, color, rep = 18 }) {
+  const REP = rep;
+  const BASE = 10 * Math.floor(REP / 2);
+  const reelRef = useRef(null);
+  const prevN = useRef(n);
+  const pos = useRef(BASE + ((n % 10) + 10) % 10);
+  useLayoutEffect(() => {
+    const el = reelRef.current; if (!el) return;
+    const delta = n - prevN.current; prevN.current = n;
+    if (delta === 0) { el.style.transition = 'none'; el.style.transform = `translateY(${-pos.current * h}px)`; return; }
+    pos.current += delta;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.style.transition = reduce ? 'none' : `transform .5s cubic-bezier(.2,.85,.25,1)`;
+    el.style.transform = `translateY(${-pos.current * h}px)`;
+    if (pos.current < 30 || pos.current > REP * 10 - 30) {
+      const rebase = () => {
+        const base = BASE + ((pos.current % 10) + 10) % 10;
+        el.style.transition = 'none'; el.style.transform = `translateY(${-base * h}px)`;
+        pos.current = base; void el.offsetHeight; el.removeEventListener('transitionend', rebase);
+      };
+      el.addEventListener('transitionend', rebase);
+    }
+  }, [n, h]);
+  const cells = [];
+  for (let i = 0; i < REP * 10; i++)
+    cells.push(<div key={i} className="odo-cell" style={{ height: h, fontSize: fs, color }}>{i % 10}</div>);
+  return (
+    <div className="odo-col" style={{ width: w, height: h, '--dh': h + 'px' }}>
+      <div className="odo-reel" ref={reelRef} style={{ transform: `translateY(${-pos.current * h}px)` }}>{cells}</div>
+    </div>
+  );
+}
+
+function NumberDisplay({ value, size = 34, color = 'var(--label)', minDigits = 1, style = 'Odometer', weight, rep }) {
+  const v = Math.max(0, Math.round(value || 0));
+  const str = String(v);
+  const digits = Math.max(minDigits, str.length);
+  if (style === 'Odometer') {
+    const h = Math.round(size * 1.16), w = Math.round(size * 0.62), fs = size;
+    const cols = [];
+    for (let p = digits - 1; p >= 0; p--) {
+      const placeN = Math.floor(v / Math.pow(10, p));
+      const isLeadGhost = p > 0 && v < Math.pow(10, p);
+      cols.push(
+        <div key={p} className={'odo-col-wrap' + (isLeadGhost ? ' ghost' : '')} style={{ opacity: isLeadGhost ? 0.22 : 1, transition: 'opacity .3s' }}>
+          <OdoDigit n={placeN} h={h} w={w} fs={fs} color={color} rep={rep} />
+        </div>
+      );
+    }
+    return <div className="odo odo-window" style={{ height: h }}>{cols}</div>;
+  }
+  const cls = style === 'Pop' ? 'popnum pop-anim' : 'flipnum flip-anim';
+  return (
+    <span key={v} className={cls} style={{ fontSize: size, color, fontWeight: weight || 800, lineHeight: 1, perspective: 400 }}>
+      {str.padStart(digits, '0').split('').map((d, i) => (
+        <span key={i} style={{ opacity: (i < digits - str.length) ? 0.22 : 1 }}>{d}</span>
+      ))}
+    </span>
+  );
+}
+
+/* ================================================== Stacked dist. bar ===== */
+function StackedBar({ outcomes, counts, total, height = 13, radius = 999 }) {
+  return (
+    <div style={{ height, borderRadius: radius, background: 'var(--fill)', overflow: 'hidden', display: 'flex', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.04)' }}>
+      {total === 0 ? null : outcomes.map(o => {
+        const w = (counts[o.id] || 0) / total;
+        if (w === 0) return null;
+        return <div key={o.id} style={{ width: (w * 100) + '%', background: o.color, transition: 'width .5s cubic-bezier(.2,.8,.25,1)' }} />;
+      })}
+    </div>
+  );
+}
+
+/* =============================================================== icons ==== */
+function Icon({ name, size = 22, color = 'currentColor', sw = 2 }) {
+  const p = { fill: 'none', stroke: color, strokeWidth: sw, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const paths = {
+    chevL: <g {...p}><path d="m15 6-6 6 6 6" /></g>,
+    chevR: <g {...p}><path d="m9 6 6 6-6 6" /></g>,
+    share: <g {...p}><path d="M12 3v13M8 7l4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></g>,
+    download: <g {...p}><path d="M12 3v12M8 11l4 4 4-4M5 19h14" /></g>,
+    ellipsis: <g fill={color}><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></g>,
+    up: <g {...p}><path d="M12 19V5M6 11l6-6 6 6" /></g>,
+    down: <g {...p}><path d="M12 5v14M6 13l6 6 6-6" /></g>,
+    flame: <g {...p}><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .5-2 1-2.5C9 11 9 9 12 3Z" /></g>,
+    alert: <g {...p}><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v4M12 17.5v.2" /></g>,
+    trophy: <g {...p}><path d="M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M9 18h6M10 18v-2M14 18v-2M8 21h8" /></g>,
+    clock: <g {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></g>,
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block' }}>{paths[name]}</svg>;
+}
+
+/* ============================================== reconciled mock data ====== */
+const OUTCOMES = [
+  { id: 'hit', label: 'Hit', short: 'HIT', color: '#34C759', isHit: true },
+  { id: 'bob', label: 'Bobble', short: 'BOB', color: '#FFCC00', isHit: false },
+  { id: 'bf', label: 'Building fall', short: 'BF', color: '#FF9500', isHit: false },
+  { id: 'mf', label: 'Major fall', short: 'MF', color: '#FF3B30', isHit: false },
+];
+const GCOLORS = ['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#5AC8FA', '#FFCC00'];
+// base = TODAY. Each row: [hit, bobble, building fall, major fall] + last-session delta.
+const BASE = [
+  { n: 1, name: 'Group 1', c: [23, 2, 0, 0], d: +2 },
+  { n: 2, name: 'Group 2', c: [22, 4, 1, 1], d: +5 },
+  { n: 3, name: 'Group 3', c: [21, 3, 2, 1], d: -1 },
+  { n: 4, name: 'Group 4', c: [15, 4, 2, 1], d: +4 },
+  { n: 5, name: 'Group 5', c: [11, 5, 4, 2], d: -6 },
+  { n: 6, name: 'Group 6', c: [19, 4, 2, 1], d: -2 },
+  { n: 7, name: 'Group 7', c: [16, 3, 1, 1], d: +3 },
+];
+const TF = {
+  today: { factor: 1, label: 'Today', range: 'last 8 sessions', delta: '+6', dnote: 'vs last session',
+           trend: [60, 66, 63, 70, 69, 72, 71, 74] },
+  week:  { factor: 3.75, label: 'This week', range: 'last 4 weeks', delta: '+3', dnote: 'vs last week',
+           trend: [66, 70, 68, 71] },
+  all:   { factor: 14.6, label: 'All season', range: 'all season', delta: '+8', dnote: 'since Sept',
+           trend: [57, 60, 62, 61, 65, 66, 68, 69] },
+};
+
+function buildData(tf) {
+  const f = TF[tf].factor;
+  const groups = BASE.map((g, i) => {
+    const c = g.c.map(x => Math.round(x * f));
+    const total = c.reduce((a, b) => a + b, 0);
+    const hits = c[0];
+    const counts = {}; OUTCOMES.forEach((o, k) => counts[o.id] = c[k]);
+    return { ...g, idx: i, color: GCOLORS[i % GCOLORS.length], c, counts, total, hits,
+             rate: total ? Math.round(hits / total * 100) : 0 };
+  });
+  const overall = {}; OUTCOMES.forEach(o => overall[o.id] = 0);
+  let total = 0, hits = 0;
+  groups.forEach(g => { OUTCOMES.forEach(o => overall[o.id] += g.counts[o.id]); total += g.total; hits += g.hits; });
+  const rate = total ? Math.round(hits / total * 100) : 0;
+  const falls = overall.bf + overall.mf;
+  const worstFalls = groups.slice().sort((a, b) => (b.counts.bf + b.counts.mf) - (a.counts.bf + a.counts.mf))[0];
+  const topMiss = OUTCOMES.filter(o => !o.isHit).sort((a, b) => overall[b.id] - overall[a.id])[0];
+  const ranked = groups.slice().sort((a, b) => b.rate - a.rate);
+  return { groups, ranked, overall, total, hits, rate, falls, worstFalls, topMiss,
+           best: ranked[0], worst: ranked[ranked.length - 1], ...TF[tf] };
+}
+
+const rateColor = (r, has = true) => !has ? 'var(--label3)' : r >= 75 ? '#34C759' : r >= 55 ? '#FF9500' : '#FF3B30';
+
+window.CkilReview = { NumberDisplay, OdoDigit, StackedBar, Icon, OUTCOMES, GCOLORS, buildData, rateColor, TF };
+  </script>
+  <script type="text/babel" data-src="ckil-share-cards.jsx">
+// ckil-share-cards.jsx — Pokémon-style holographic "stunt cards". A swipeable
+// set: one team card + one per group. Foil tilt on hover, rarity by hit rate,
+// built for screenshotting straight to Instagram.
+const { useState: useS2, useRef: useR2, useEffect: useE2 } = React;
+const { OUTCOMES: SC_OUT, buildData: scBuild } = window.CkilReview;
+
+const TEAM = 'Senior Coed';
+const ORG  = 'Cheer Force San Diego';
+const SEASON = "’25–’26";
+
+function rarityOf(rate){
+  if(rate>=90) return { tier:'LEGENDARY', stars:3, foilClass:'tier-legendary', tag:'#FFD43B',
+    edge:'linear-gradient(120deg,#FFB02E,#FFF3B0,#FFD43B,#FF9F1C,#FFF6C8,#FFD43B,#FFB02E)',
+    flavor:'Untouchable. Cleanest group on the floor.' };
+  if(rate>=78) return { tier:'HOLO RARE', stars:2, foilClass:'tier-holo', tag:'#00D4FF',
+    edge:'linear-gradient(120deg,#00D4FF,#9775FA,#FF4D6D,#FFD43B,#51FF9F,#00D4FF)',
+    flavor:'Locked in — hits land with room to spare.' };
+  if(rate>=60) return { tier:'RARE', stars:1, foilClass:'', tag:'#5AC8FA',
+    edge:'linear-gradient(120deg,#22344e,#4a6a93,#22344e,#33506f,#22344e)',
+    flavor:'Solid base — a few bobbles to tighten.' };
+  return { tier:'COMMON', stars:0, foilClass:'', tag:'#FF6B7A',
+    edge:'linear-gradient(120deg,#3a2026,#6a2f38,#3a2026)',
+    flavor:'Work in progress — spot the falls.' };
+}
+
+/* circular hit-rate gauge over the court grid */
+function Gauge({ rate, color }){
+  const R=44, C=2*Math.PI*R, off=C*(1-rate/100);
+  const gid = 'g'+Math.round(rate)+color.replace(/[^a-z0-9]/gi,'');
+  return (
+    <svg viewBox="0 0 120 120" width="116" height="116" style={{display:'block'}}>
+      <defs>
+        <filter id={gid} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3.2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="9"/>
+      <circle cx="60" cy="60" r={R} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round"
+        strokeDasharray={C} strokeDashoffset={off} filter={`url(#${gid})`}
+        transform="rotate(-90 60 60)"/>
+      <text x="60" y="56" textAnchor="middle" style={{font:'800 35px/1 var(--display)', fill:'#fff'}}>{rate}</text>
+      <text x="60" y="77" textAnchor="middle" style={{font:'700 9px/1 var(--display)', fill:'rgba(255,255,255,.55)', letterSpacing:'.16em'}}>HIT RATE</text>
+    </svg>
+  );
+}
+
+function Stars({ n }){
+  return (
+    <span style={{display:'inline-flex', gap:2}}>
+      {[0,1,2].map(i=>(
+        <svg key={i} width="11" height="11" viewBox="0 0 24 24">
+          <path d="M12 2l2.9 6.3 6.9.7-5.1 4.7 1.4 6.8L12 17.8 5.9 21.2l1.4-6.8L2.2 9.7l6.9-.7z"
+            fill={i<n ? '#FFD43B' : 'none'} stroke={i<n ? '#FFD43B' : 'rgba(255,255,255,.3)'} strokeWidth="1.4" strokeLinejoin="round"/>
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+function HoloCard({ card, idx, count }){
+  const cardRef = useR2(null);
+  const r = rarityOf(card.rate);
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const total = card.total || 1;
+  const up = card.delta >= 0;
+
+  const onMove = (e)=>{
+    if(e.pointerType === 'touch') return;
+    const el = cardRef.current; if(!el) return;
+    const box = el.getBoundingClientRect();
+    const x = (e.clientX - box.left)/box.width, y = (e.clientY - box.top)/box.height;
+    el.style.transform = `rotateX(${(0.5-y)*15}deg) rotateY(${(x-0.5)*15}deg)`;
+    el.style.setProperty('--mx', (x*100)+'%');
+    el.style.setProperty('--my', (y*100)+'%');
+    el.style.setProperty('--foil', '1');
+  };
+  const onLeave = ()=>{
+    const el = cardRef.current; if(!el) return;
+    el.style.transform = '';
+    el.style.setProperty('--foil', '0');
+    el.style.setProperty('--mx','50%'); el.style.setProperty('--my','50%');
+  };
+
+  return (
+    <div className="holo-slide">
+      <div className="holo-shell" onPointerMove={onMove} onPointerLeave={onLeave}>
+        <div className="holo-card" ref={cardRef}>
+          <div className="holo-frame" style={{ backgroundImage:r.edge }}>
+            <div className="holo-inner">
+              {/* delta stamp */}
+              <div style={{ position:'absolute', top:11, right:11, zIndex:8, display:'flex', alignItems:'center', gap:3,
+                padding:'3px 7px', borderRadius:999, background:up?'rgba(81,207,102,.16)':'rgba(255,71,87,.16)',
+                border:`1px solid ${up?'rgba(81,207,102,.5)':'rgba(255,71,87,.5)'}` }}>
+                <span style={{ color:up?'#51CF66':'#FF6B7A', font:'800 11px/1 var(--display)' }}>{up?'▲':'▼'} {Math.abs(card.delta)}</span>
+              </div>
+
+              {/* header */}
+              <div style={{ display:'flex', alignItems:'flex-start', gap:9, padding:'14px 52px 8px 13px', position:'relative', zIndex:2 }}>
+                <div style={{ width:30, height:30, borderRadius:9, background:card.color, flexShrink:0,
+                  display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', font:'800 14px/1 var(--display)',
+                  boxShadow:`0 0 14px ${card.color}88` }}>{card.badge}</div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ font:'700 9px/1 var(--display)', letterSpacing:'.16em', color:'rgba(255,255,255,.5)' }}>{card.kicker}</div>
+                  <div style={{ font:'700 19px/1.05 var(--display)', color:'#fff', letterSpacing:'-.01em', marginTop:3,
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{card.name}</div>
+                </div>
+              </div>
+
+              {/* hero gauge */}
+              <div style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', padding:'2px 0 0' }}>
+                <div style={{ position:'absolute', width:126, height:126, borderRadius:'50%',
+                  background:`radial-gradient(circle, ${card.color}33 0%, transparent 65%)` }} />
+                <Gauge rate={card.rate} color={card.color} />
+              </div>
+
+              {/* power bar */}
+              <div style={{ padding:'0 13px' }}>
+                <div style={{ height:7, borderRadius:999, overflow:'hidden', display:'flex', background:'rgba(255,255,255,.08)' }}>
+                  {SC_OUT.map(o=>{ const w=(card.counts[o.id]||0)/total; return w?<div key={o.id} style={{ width:(w*100)+'%', background:o.color }}/>:null; })}
+                </div>
+              </div>
+
+              {/* type / energy chips */}
+              <div style={{ display:'flex', gap:6, padding:'8px 13px 2px' }}>
+                {SC_OUT.map(o=>(
+                  <div key={o.id} style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+                    padding:'6px 2px 5px', borderRadius:9, background:o.color+'1a', border:`1px solid ${o.color}40` }}>
+                    <span style={{ font:'800 16px/1 var(--display)', color:'#fff', fontVariantNumeric:'tabular-nums' }}>{card.counts[o.id]}</span>
+                    <span style={{ font:'700 8px/1 var(--display)', letterSpacing:'.06em', color:o.color }}>{o.short}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* flavor */}
+              <div style={{ flex:1 }} />
+              <div style={{ padding:'2px 14px 0' }}>
+                <span style={{ display:'inline-block', font:'700 8px/1 var(--display)', letterSpacing:'.14em', color:r.tag,
+                  padding:'3px 7px', borderRadius:999, background:r.tag+'1f', border:`1px solid ${r.tag}55` }}>{r.tier}</span>
+                <div style={{ font:'400 11px/1.3 var(--body)', fontStyle:'italic', color:'rgba(255,255,255,.62)', textWrap:'pretty', marginTop:4 }}>{r.flavor}</div>
+              </div>
+
+              {/* footer */}
+              <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:10,
+                margin:'6px 12px 9px', paddingTop:6, borderTop:'1px solid rgba(255,255,255,.10)' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ font:'700 9px/1.2 var(--display)', letterSpacing:'.18em', color:'rgba(255,255,255,.5)', whiteSpace:'nowrap' }}>CFSD</div>
+                  <div style={{ font:'600 10px/1.2 var(--body)', color:'rgba(255,255,255,.6)', marginTop:3, whiteSpace:'nowrap' }}>{dateStr} · {SEASON}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:5, justifyContent:'flex-end' }}>
+                    <Stars n={r.stars} />
+                  </div>
+                  <div style={{ font:'700 9px/1 var(--display)', letterSpacing:'.08em', color:'rgba(255,255,255,.55)', marginTop:5, whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>
+                    {String(idx+1).padStart(3,'0')}/{String(count).padStart(3,'0')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="holo-sparkle" />
+          <div className={'holo-foil '+r.foilClass} />
+          <div className="holo-glare" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareCardSheet({ open, tf, onClose }){
+  const railRef = useR2(null);
+  const [active, setActive] = useS2(0);
+  const [toast, setToast] = useS2('');
+  const [mounted, setMounted] = useS2(false);
+
+  const d = scBuild(tf);
+  const cards = [
+    { kicker:'FULL FLOOR', name:TEAM, badge:'★', color:'#00D4FF',
+      rate:d.rate, counts:d.overall, total:d.total, delta:Number(String(d.delta).replace('+','')) },
+    ...d.ranked.map(g=>({ kicker:`GROUP ${g.n}`, name:g.name, badge:g.n, color:g.color,
+      rate:g.rate, counts:g.counts, total:g.total, delta:g.d })),
+  ];
+
+  useE2(()=>{ if(open){ setMounted(true); setActive(0);
+    requestAnimationFrame(()=>{ if(railRef.current) railRef.current.scrollLeft = 0; }); } }, [open]);
+
+  const onScroll = ()=>{
+    const el = railRef.current; if(!el) return;
+    const step = 290 + 18;
+    setActive(Math.max(0, Math.min(cards.length-1, Math.round(el.scrollLeft/step))));
+  };
+  const fireToast = (m)=>{ setToast(m); clearTimeout(window.__sct); window.__sct = setTimeout(()=>setToast(''), 1900); };
+
+  if(!mounted && !open) return null;
+
+  return (
+    <div className={'share-cover'+(open?' in':'')} onTransitionEnd={()=>{ if(!open) setMounted(false); }}>
+      <div style={{ position:'absolute', top:11, left:'50%', transform:'translateX(-50%)', width:126, height:37, borderRadius:24, background:'#000', zIndex:9 }} />
+      <div style={{ height:'100%', display:'flex', flexDirection:'column', paddingTop:54 }}>
+        {/* header */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'2px 18px 4px', position:'relative', zIndex:3 }}>
+          <div>
+            <div style={{ font:'700 10px/1 var(--display)', letterSpacing:'.18em', color:'rgba(255,255,255,.5)' }}>SHARE</div>
+            <div style={{ font:'700 21px/1.1 var(--display)', color:'#fff', marginTop:3 }}>Stunt Cards</div>
+          </div>
+          <button className="no-tap" onClick={onClose} style={{ width:34, height:34, borderRadius:'50%', border:'1px solid rgba(255,255,255,.18)',
+            background:'rgba(255,255,255,.06)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+
+        {/* card rail */}
+        <div style={{ flex:1, minHeight:0, display:'flex', alignItems:'center' }}>
+          <div className="holo-rail" ref={railRef} onScroll={onScroll} style={{ width:'100%' }}>
+            {cards.map((c,i)=><HoloCard key={i} card={c} idx={i} count={cards.length} />)}
+          </div>
+        </div>
+
+        {/* dots */}
+        <div style={{ display:'flex', gap:6, justifyContent:'center', padding:'4px 0 12px', position:'relative', zIndex:3 }}>
+          {cards.map((c,i)=>(
+            <span key={i} style={{ width: i===active?18:6, height:6, borderRadius:999,
+              background: i===active? (cards[active].color) : 'rgba(255,255,255,.25)', transition:'all .25s' }} />
+          ))}
+        </div>
+
+        {/* actions */}
+        <div style={{ padding:'0 18px calc(20px + env(safe-area-inset-bottom))', position:'relative', zIndex:3 }}>
+          <button className="no-tap" onClick={()=>fireToast('Saved card to Photos — open Instagram to post')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:9,
+            padding:'15px', borderRadius:15, border:'none', cursor:'pointer', color:'#fff', font:'700 16px/1 var(--display)',
+            background:'linear-gradient(95deg, #515BD4 0%, #8134AF 28%, #DD2A7B 60%, #F58529 100%)',
+            boxShadow:'0 10px 30px rgba(221,42,123,.4)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="#fff" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#fff" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.4" fill="#fff"/></svg>
+            Share to Instagram
+          </button>
+          <div style={{ display:'flex', gap:10, marginTop:10 }}>
+            <button className="no-tap" onClick={()=>fireToast('Saved to Photos')} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+              padding:'12px', borderRadius:13, border:'1px solid rgba(255,255,255,.16)', background:'rgba(255,255,255,.06)', color:'#fff', font:'600 14px/1 var(--display)', cursor:'pointer' }}>
+              <svg width="17" height="17" viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 19h14" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Save image
+            </button>
+            <button className="no-tap" onClick={()=>fireToast('Card link copied')} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+              padding:'12px', borderRadius:13, border:'1px solid rgba(255,255,255,.16)', background:'rgba(255,255,255,.06)', color:'#fff', font:'600 14px/1 var(--display)', cursor:'pointer' }}>
+              <svg width="17" height="17" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Copy link
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* toast */}
+      <div style={{ position:'absolute', left:'50%', bottom:128, transform:'translateX(-50%)',
+        padding:'10px 16px', borderRadius:12, background:'rgba(20,26,40,.92)', border:'1px solid rgba(255,255,255,.14)',
+        color:'#fff', font:'600 13px/1 var(--display)', whiteSpace:'nowrap', pointerEvents:'none',
+        opacity: toast?1:0, transition:'opacity .25s', boxShadow:'0 10px 30px rgba(0,0,0,.5)' }}>{toast}</div>
+    </div>
+  );
+}
+
+window.CkilShare = { ShareCardSheet };
+  </script>
+  <script type="text/babel" data-src="ckil-review-app.jsx">
+// ckil-review-app.jsx — the merged Review screen. Six lenses, one scroll, no
+// number shown twice: Summary (rate+bar+counts) · Trend · Groups (ranked⇄grid)
+// · Takeaways · Timeline.
+const { useState, useMemo, useRef, useEffect } = React;
+const { NumberDisplay, StackedBar, Icon, OUTCOMES, buildData, rateColor } = window.CkilReview;
+const { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor } = window;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "timeframe": "today",
+  "groupView": "Ranked",
+  "counterStyle": "Odometer",
+  "accent": "#007AFF"
+}/*EDITMODE-END*/;
+
+/* ----------------------------------------------------------- atoms ------- */
+function Card({ children, style }) {
+  return <div style={{ background: 'var(--surface)', borderRadius: 16, boxShadow: 'var(--shadow-card)', padding: 14, ...style }}>{children}</div>;
+}
+function CardHead({ title, right }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <span style={{ font: '700 11px/1 var(--font)', letterSpacing: '.08em', color: 'var(--label2)' }}>{title}</span>
+      {right}
+    </div>
+  );
+}
+function Seg({ options, value, onChange, small }) {
+  return (
+    <div style={{ display: 'flex', background: 'var(--fill)', borderRadius: 9, padding: 2, gap: 2 }}>
+      {options.map(o => {
+        const on = value === (o.v ?? o);
+        return (
+          <button key={o.v ?? o} onClick={() => onChange(o.v ?? o)} className="no-tap"
+            style={{ flex: small ? '0 0 auto' : 1, border: 'none', borderRadius: 7, cursor: 'pointer',
+              padding: small ? '5px 11px' : '6px 10px', font: '600 13px/1 var(--font)',
+              background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--label)' : 'var(--label2)',
+              boxShadow: on ? '0 1px 2px rgba(0,0,0,.13)' : 'none', transition: 'background .15s' }}>
+            {o.l ?? o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------- line chart ----- */
+function LineChart({ data, accent }) {
+  const W = 340, H = 116, padX = 10, padTop = 12, padBot = 22;
+  const min = Math.min(...data) - 5, max = Math.max(...data) + 5;
+  const n = data.length;
+  const X = i => padX + (i / (n - 1)) * (W - padX * 2);
+  const Y = v => padTop + (1 - (v - min) / (max - min)) * (H - padTop - padBot);
+  const line = data.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const area = `M${X(0)},${H - padBot} L` + data.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' L') + ` L${X(n - 1)},${H - padBot} Z`;
+  const lo = Math.min(...data), hi = Math.max(...data);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', overflow: 'visible' }}>
+      {[0, 0.5, 1].map(g => { const y = padTop + g * (H - padTop - padBot); return <line key={g} x1={padX} y1={y} x2={W - padX} y2={y} stroke="var(--sep)" strokeWidth="1" strokeDasharray="2 5" />; })}
+      <path d={area} fill={accent} opacity="0.08" />
+      <polyline points={line} fill="none" stroke={accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {data.map((v, i) => {
+        const last = i === n - 1;
+        return <circle key={i} cx={X(i)} cy={Y(v)} r={last ? 4.5 : 2.6} fill={last ? accent : 'var(--surface)'} stroke={accent} strokeWidth={last ? 2 : 2} />;
+      })}
+      <text x={X(n - 1)} y={Y(hi) - 9} textAnchor="end" style={{ font: '800 13px/1 var(--rounded)', fill: accent }}>{data[n - 1]}%</text>
+    </svg>
+  );
+}
+
+/* ------------------------------------------------- groups: ranked -------- */
+function RankedRow({ g, rank, last }) {
+  const arrowUp = g.d >= 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', boxShadow: last ? 'none' : 'inset 0 -1px 0 var(--sep)' }}>
+      <span style={{ width: 18, font: '800 13px/1 var(--rounded)', color: rank === 1 ? '#FF9500' : 'var(--label3)', textAlign: 'center' }}>{rank}</span>
+      <span style={{ width: 24, height: 24, borderRadius: 7, background: g.color, color: '#fff', font: '800 12px/1 var(--rounded)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{g.n}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ font: '600 13px/1.1 var(--font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 5 }}>{g.name}</div>
+        <StackedBar outcomes={OUTCOMES} counts={g.counts} total={g.total} height={7} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, width: 30, justifyContent: 'flex-end' }}>
+        <Icon name={arrowUp ? 'up' : 'down'} size={12} color={arrowUp ? '#34C759' : '#FF3B30'} sw={2.6} />
+        <span style={{ font: '700 11px/1 var(--mono)', color: arrowUp ? '#34C759' : '#FF3B30' }}>{Math.abs(g.d)}</span>
+      </div>
+      <span style={{ width: 40, textAlign: 'right', font: '800 17px/1 var(--rounded)', color: rateColor(g.rate), fontVariantNumeric: 'tabular-nums' }}>{g.rate}<span style={{ fontSize: 10, fontWeight: 700 }}>%</span></span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------- groups: heatmap ------- */
+function Heatmap({ groups }) {
+  const maxByCol = {};
+  OUTCOMES.forEach(o => { maxByCol[o.id] = Math.max(1, ...groups.map(g => g.counts[o.id])); });
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '26px repeat(4, 1fr)', gap: 4, marginBottom: 4 }}>
+        <span />
+        {OUTCOMES.map(o => (
+          <div key={o.id} style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: o.color }} />
+            <span style={{ font: '700 9px/1 var(--font)', letterSpacing: '.03em', color: 'var(--label2)' }}>{o.short}</span>
+          </div>
+        ))}
+      </div>
+      {groups.map(g => (
+        <div key={g.n} style={{ display: 'grid', gridTemplateColumns: '26px repeat(4, 1fr)', gap: 4, marginBottom: 4 }}>
+          <span style={{ font: '800 13px/1 var(--rounded)', color: g.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{g.n}</span>
+          {OUTCOMES.map(o => {
+            const v = g.counts[o.id];
+            const t = v / maxByCol[o.id];
+            const bg = v === 0 ? 'var(--surface-2)' : o.color + Math.round(28 + t * 227).toString(16).padStart(2, '0');
+            return (
+              <div key={o.id} style={{ height: 26, borderRadius: 5, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                font: '700 12px/1 var(--mono)', color: v === 0 ? 'var(--label3)' : (t > 0.55 ? '#fff' : 'var(--label)') }}>{v || '·'}</div>
+            );
+          })}
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 8 }}>
+        <span style={{ font: '600 10px/1 var(--font)', color: 'var(--label3)' }}>fewer</span>
+        {[0.15, 0.4, 0.65, 0.9].map((t, i) => <span key={i} style={{ width: 18, height: 14, borderRadius: 3, background: '#8E8E93' + Math.round(28 + t * 227).toString(16).padStart(2, '0') }} />)}
+        <span style={{ font: '600 10px/1 var(--font)', color: 'var(--label3)' }}>more misses</span>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- tape -------- */
+const TAPE = (() => {
+  // a representative chronology of the latest session, one rough patch mid-way
+  const seq = [];
+  const pick = () => { const r = Math.random(); return r < 0.72 ? 'hit' : r < 0.85 ? 'bob' : r < 0.94 ? 'bf' : 'mf'; };
+  for (let i = 0; i < 46; i++) {
+    let id = pick();
+    if (i >= 24 && i < 31) id = Math.random() < 0.62 ? (Math.random() < 0.5 ? 'bf' : 'mf') : 'bob';
+    seq.push(id);
+  }
+  return seq;
+})();
+function Tape() {
+  const cmap = Object.fromEntries(OUTCOMES.map(o => [o.id, o]));
+  const hgt = { hit: 34, bob: 26, bf: 22, mf: 18 };
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 36 }}>
+        {TAPE.map((id, i) => (
+          <div key={i} style={{ flex: 1, minWidth: 0, height: hgt[id], borderRadius: 2, background: cmap[id].color, opacity: cmap[id].isHit ? 0.9 : 1 }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', height: 8, marginTop: 3 }}>
+        <span style={{ flex: '0 0 ' + (24 / 46 * 100) + '%' }} />
+        <span style={{ flex: '0 0 ' + (7 / 46 * 100) + '%', border: '2px solid #FF9500', borderTop: 'none', borderRadius: '0 0 5px 5px' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ font: '400 11px/1 var(--mono)', color: 'var(--label2)' }}>6:41p</span>
+        <span style={{ font: '600 11px/1 var(--font)', color: '#FF9500' }}>rough patch · 6:58p</span>
+        <span style={{ font: '400 11px/1 var(--mono)', color: 'var(--label2)' }}>7:24p</span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', marginTop: 11 }}>
+        {OUTCOMES.map(o => (
+          <span key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: o.color }} />
+            <span style={{ font: '500 11px/1 var(--font)', color: 'var(--label2)' }}>{o.label}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------- insights ------- */
+function Insight({ icon, color, children }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', boxShadow: 'inset 0 -1px 0 var(--sep)' }}>
+      <span style={{ width: 26, height: 26, borderRadius: 8, background: color + '1f', color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon name={icon} size={15} color={color} />
+      </span>
+      <span style={{ font: '400 14px/1.35 var(--font)', color: 'var(--label)', paddingTop: 2 }}>{children}</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ app -------- */
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [tf, setTf] = useState(t.timeframe);
+  const [gv, setGv] = useState(t.groupView);
+  const [shareOpen, setShareOpen] = useState(false);
+  const { ShareCardSheet } = window.CkilShare;
+  useEffect(() => { setTf(t.timeframe); }, [t.timeframe]);
+  useEffect(() => { setGv(t.groupView); }, [t.groupView]);
+  useEffect(() => { const r = document.documentElement; r.style.setProperty('--accent', t.accent); r.style.setProperty('--accent-tint', t.accent + '1f'); }, [t.accent]);
+
+  const d = useMemo(() => buildData(tf), [tf]);
+  const cs = t.counterStyle;
+
+  return (
+    <div style={{ position: 'relative', width: 402, height: 874 }}>
+    <IOSDevice width={402} height={874}>
+      <div style={{ position: 'relative', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingTop: 52, background: 'var(--app-bg)' }}>
+
+        {/* home header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '2px 16px 12px' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 13, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(150deg, #FF4757, #FF6B7A)', color: '#fff', font: '800 15px/1 var(--display)',
+            boxShadow: '0 4px 14px rgba(255,71,87,.4)', letterSpacing: '.02em' }}>SC</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ font: '700 9px/1 var(--display)', letterSpacing: '.14em', color: 'var(--label2)' }}>CHEER FORCE SAN DIEGO</div>
+            <div style={{ font: '700 22px/1.05 var(--font)', letterSpacing: '-.02em', marginTop: 3 }}>Senior Coed</div>
+          </div>
+          <button className="no-tap" onClick={() => setShareOpen(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--fill)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <Icon name="share" size={18} color="var(--accent)" />
+          </button>
+        </div>
+
+        {/* timeframe */}
+        <div style={{ padding: '0 16px 10px' }}>
+          <Seg options={[{ v: 'today', l: 'Today' }, { v: 'week', l: 'This week' }, { v: 'all', l: 'All-time' }]} value={tf} onChange={setTf} />
+        </div>
+
+        {/* scroll */}
+        <div className="scrollfeed" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* SUMMARY — owns rate, delta, attempts, the bar, outcome counts */}
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+                <NumberDisplay value={d.rate} size={52} style={cs} color={rateColor(d.rate)} rep={14} />
+                <span style={{ font: '800 26px/1.55 var(--rounded)', color: rateColor(d.rate) }}>%</span>
+              </div>
+              <div style={{ textAlign: 'right', paddingBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+                  <Icon name="up" size={14} color="#34C759" sw={2.6} />
+                  <span style={{ font: '800 18px/1 var(--rounded)', color: '#34C759' }}>{d.delta}</span>
+                </div>
+                <div style={{ font: '400 11px/1.2 var(--font)', color: 'var(--label2)', marginTop: 2 }}>{d.dnote}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
+              <span style={{ font: '700 10px/1 var(--font)', letterSpacing: '.08em', color: 'var(--label2)' }}>FLOOR HIT RATE</span>
+              <span style={{ font: '500 12px/1 var(--font)', color: 'var(--label2)' }}>{d.total} reps · {d.groups.length} groups</span>
+            </div>
+            <StackedBar outcomes={OUTCOMES} counts={d.overall} total={d.total} height={14} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '8px 16px', marginTop: 13 }}>
+              {OUTCOMES.map(o => (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: o.color, flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 0, font: '500 13px/1.1 var(--font)', color: 'var(--label)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.label}</span>
+                  <span style={{ font: '700 14px/1 var(--rounded)', color: 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>{d.overall[o.id]}</span>
+                  <span style={{ font: '500 11px/1 var(--font)', color: 'var(--label3)', width: 30, textAlign: 'right' }}>{Math.round(d.overall[o.id] / d.total * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* TREND — owns the over-time line */}
+          <Card>
+            <CardHead title="HIT RATE OVER TIME" right={<span style={{ font: '500 11px/1 var(--font)', color: 'var(--label2)' }}>{d.range}</span>} />
+            <LineChart data={d.trend} accent={t.accent} />
+          </Card>
+
+          {/* GROUPS — merges leaderboard + per-group trend + heatmap */}
+          <Card>
+            <CardHead title="GROUPS" right={<Seg small options={['Ranked', 'Grid']} value={gv} onChange={setGv} />} />
+            {gv === 'Ranked'
+              ? <div>{d.ranked.map((g, i) => <RankedRow key={g.n} g={g} rank={i + 1} last={i === d.ranked.length - 1} />)}</div>
+              : <Heatmap groups={d.groups} />}
+          </Card>
+
+          {/* TAKEAWAYS — common miss + the story sentences */}
+          <Card>
+            <CardHead title="TAKEAWAYS" />
+            <Insight icon="trophy" color="#FF9500"><b style={{ fontWeight: 700 }}>{d.best.name}</b> led the floor at <b style={{ fontWeight: 700 }}>{d.best.rate}%</b> — cleanest group of the {tf === 'today' ? 'day' : tf === 'week' ? 'week' : 'season'}.</Insight>
+            <Insight icon="alert" color="#FF3B30"><b style={{ fontWeight: 700 }}>{d.worstFalls.name}</b> owns <b style={{ fontWeight: 700 }}>{d.worstFalls.counts.bf + d.worstFalls.counts.mf} of {d.falls}</b> floor falls — spot it next.</Insight>
+            <div style={{ boxShadow: 'none' }}>
+              <Insight icon="flame" color="#007AFF"><b style={{ fontWeight: 700 }}>{d.topMiss.label}</b> is your top miss at <b style={{ fontWeight: 700 }}>{d.overall[d.topMiss.id]}</b> reps — most fixable error.</Insight>
+            </div>
+          </Card>
+
+          {/* TIMELINE — the chronological replay */}
+          <Card>
+            <CardHead title="LATEST SESSION" right={<span style={{ font: '500 11px/1 var(--mono)', color: 'var(--label2)' }}>6:41–7:24p</span>} />
+            <Tape />
+          </Card>
+
+          {/* actions */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="no-tap" onClick={() => setShareOpen(true)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '13px', borderRadius: 13, border: 'none', background: 'var(--accent)', color: '#fff', font: '600 15px/1 var(--font)', cursor: 'pointer' }}>
+              <Icon name="share" size={17} color="#fff" /> Create share cards
+            </button>
+            <button className="no-tap" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '13px 16px', borderRadius: 13, border: 'none', background: 'var(--fill)', color: 'var(--label)', font: '600 15px/1 var(--font)', cursor: 'pointer' }}>
+              <Icon name="download" size={17} color="var(--label)" /> CSV
+            </button>
+          </div>
+          <div style={{ height: 6 }} />
+        </div>
+      </div>
+
+      <TweaksPanel>
+        <TweakSection label="Lens" />
+        <TweakRadio label="Timeframe" value={t.timeframe} options={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'Week' }, { value: 'all', label: 'All' }]} onChange={v => setTweak('timeframe', v)} />
+        <TweakRadio label="Groups view" value={t.groupView} options={['Ranked', 'Grid']} onChange={v => setTweak('groupView', v)} />
+        <TweakSection label="Display" />
+        <TweakRadio label="Counter" value={t.counterStyle} options={['Odometer', 'Flip', 'Pop']} onChange={v => setTweak('counterStyle', v)} />
+        <TweakColor label="App accent" value={t.accent} options={['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55']} onChange={v => setTweak('accent', v)} />
+      </TweaksPanel>
+    </IOSDevice>
+    <div style={{ position: 'absolute', inset: 0, borderRadius: 48, overflow: 'hidden', pointerEvents: shareOpen ? 'auto' : 'none' }}>
+      <ShareCardSheet open={shareOpen} tf={tf} onClose={() => setShareOpen(false)} />
+    </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+
+  <script>
+    // fit the 402x874 device into any viewport
+    function fitStage(){
+      const stage = document.getElementById('stage');
+      if(!stage) return;
+      const W = 402, H = 874, pad = 24;
+      const s = Math.min((window.innerWidth - pad)/W, (window.innerHeight - pad)/H, 1.18);
+      stage.style.transform = 'scale(' + s + ')';
+    }
+    window.addEventListener('resize', fitStage);
+    // re-fit after React mounts
+    const _t = setInterval(fitStage, 250);
+    setTimeout(()=>clearInterval(_t), 2500);
+    fitStage();
+  </script>
+</body>
+</html>
