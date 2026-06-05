@@ -1,0 +1,132 @@
+default_platform(:ios)
+
+APP_IDENTIFIER = "com.ianrichardson.HitRate"
+XCODE_PROJECT = "HitRate.xcodeproj"
+SCHEME = "HitRate"
+TEAM_ID = "WC46K49VFA"
+
+# App Store Connect API key loader (ported from CoachCard).
+# Ruby 4.0 + OpenSSL 3.x breaks key_content loading ("invalid curve name") —
+# always load the raw .p8 via key_filepath.
+def app_store_api_key
+  p8_path = ENV["APP_STORE_CONNECT_API_KEY_JSON_PATH"] ||
+            File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+  UI.user_error!("Missing .p8 at #{p8_path}") unless File.exist?(p8_path)
+  app_store_connect_api_key(
+    key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"] || "6H24WZ2RQ5",
+    issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"] || "7642a25e-aca7-402d-8b7d-de18dfef1756",
+    key_filepath: p8_path,
+    duration: 1200,
+    in_house: false
+  )
+end
+
+platform :ios do
+  # --------------------------------------------------------------------------
+  # openrsync-safe build helper (ported from CoachCard/FormationFlow).
+  # /usr/bin/rsync is openrsync, which lacks the `-E` flag Xcode's
+  # `-exportArchive` uses -> "Copy failed". Archive works; export is broken.
+  # So: archive normally, then hand-assemble + re-sign the IPA.
+  # NOTE: HitRate is xcodegen-managed — build number lives in project.yml.
+  # No increment_build_number here; /ship bumps project.yml + regenerates.
+  # --------------------------------------------------------------------------
+  desc "Archive + hand-sign an App Store IPA without the broken -exportArchive. Returns IPA path."
+  private_lane :build_signed_ipa do
+    scheme    = ENV["SHIP_SCHEME"] || SCHEME
+    cert_sha1 = ENV["SHIP_DIST_CERT_SHA1"] || "910B65DB392314A8F3FE252F5A8BB096D566FBB1"
+    prof_name = ENV["SHIP_APPSTORE_PROFILE_NAME"] || "HitRate AppStore"
+
+    repo    = File.expand_path("..", __dir__)
+    project = File.join(repo, "#{scheme}.xcodeproj")
+    work    = "/tmp/#{scheme}_ship"
+    archive = "#{work}/#{scheme}.xcarchive"
+    payload = "#{work}/Payload"
+    app     = "#{payload}/#{scheme}.app"
+    ipa     = "#{work}/#{scheme}.ipa"
+    ent     = "#{work}/entitlements.plist"
+
+    prof_dirs = [
+      File.expand_path("~/Library/Developer/Xcode/UserData/Provisioning Profiles"),
+      File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
+    ]
+    profile = prof_dirs.flat_map { |d| Dir["#{d}/*.mobileprovision"] }.find do |p|
+      `security cms -D -i "#{p}" 2>/dev/null | plutil -extract Name raw - 2>/dev/null`.strip == prof_name
+    end
+    UI.user_error!("App Store profile '#{prof_name}' is not installed — run `fastlane sigh --app_identifier #{APP_IDENTIFIER}` first") if profile.nil?
+    UI.message("Using App Store profile #{File.basename(profile)} (#{prof_name})")
+
+    sh("rm -rf #{work.shellescape} && mkdir -p #{payload.shellescape}")
+
+    # 1. Archive — this works; only `-exportArchive` is broken.
+    sh("xcodebuild -project #{project.shellescape} -scheme #{scheme.shellescape} " \
+       "-configuration Release -destination 'generic/platform=iOS' " \
+       "-archivePath #{archive.shellescape} -allowProvisioningUpdates archive")
+
+    # 2. Hand-assemble + re-sign the IPA (documented openrsync workaround).
+    sh("cp -R #{"#{archive}/Products/Applications/#{scheme}.app".shellescape} #{payload.shellescape}/")
+    sh("cp #{profile.shellescape} #{"#{app}/embedded.mobileprovision".shellescape}")
+    sh("codesign -d --entitlements - --xml #{app.shellescape} > #{ent.shellescape}")
+    sh("plutil -remove get-task-allow #{ent.shellescape} || true")
+    sh("codesign --force --sign #{cert_sha1.shellescape} " \
+       "--entitlements #{ent.shellescape} --generate-entitlement-der #{app.shellescape}")
+    sh("codesign --verify --strict --verbose=2 #{app.shellescape}")
+    sh("cd #{work.shellescape} && rm -f #{"#{scheme}.ipa".shellescape} && zip -qr #{"#{scheme}.ipa".shellescape} Payload")
+
+    UI.success("Signed App Store IPA ready: #{ipa}")
+    ipa
+  end
+
+  desc "Build + upload binary to App Store Connect. Does NOT submit. (openrsync-safe)"
+  lane :ship_upload do
+    ipa = build_signed_ipa
+    upload_to_app_store(
+      api_key: app_store_api_key,
+      ipa: ipa,
+      force: true,
+      skip_metadata: true,      # listing is managed via the ASC API, not fastlane
+      skip_screenshots: true,
+      submit_for_review: false  # upload only — gate before submit
+    )
+    UI.message("ship_upload produced IPA at #{ipa}")
+  end
+
+  desc "Submit an already-uploaded build for review with auto-release after approval."
+  lane :ship_submit do
+    upload_to_app_store(
+      api_key: app_store_api_key,
+      app_identifier: APP_IDENTIFIER,
+      build_number: ENV["SHIP_BUILD_NUMBER"],
+      skip_binary_upload: true,    # binary already uploaded by ship_upload
+      skip_screenshots: true,
+      skip_metadata: true,
+      force: true,
+      run_precheck_before_submit: false,  # precheck needs Apple ID auth, not API key
+      submit_for_review: true,
+      automatic_release: false,
+      automatic_release_after_approval: true,
+      submission_information: { export_compliance_uses_encryption: false }
+    )
+  end
+
+  desc "Print current/latest App Store build status as JSON (read-only). Used by /ship pre-flight."
+  lane :asc_build_status do
+    require "spaceship"
+    p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: "6H24WZ2RQ5", issuer_id: "7642a25e-aca7-402d-8b7d-de18dfef1756",
+      key: File.read(p8_path)
+    )
+    app = Spaceship::ConnectAPI::App.find(ENV["SHIP_BUNDLE_ID"] || APP_IDENTIFIER)
+    if app.nil?
+      UI.message("ASC_BUILD_STATUS_JSON=null  # app record does not exist in ASC")
+    else
+      builds = app.get_builds(limit: 25, sort: "-uploadedDate",
+                              includes: "preReleaseVersion")
+      rows = builds.map do |b|
+        { build: b.version, processingState: b.processing_state,
+          uploaded: b.uploaded_date }
+      end
+      UI.message("ASC_BUILD_STATUS_JSON=" + rows.to_json)
+    end
+  end
+end

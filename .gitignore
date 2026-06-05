@@ -14,3 +14,10 @@ plan.md
 TECHNICAL_DEBT_LOG.md
 pr_description.txt
 *.orig
+
+## fastlane
+fastlane/AuthKey.json
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+fastlane/README.md
