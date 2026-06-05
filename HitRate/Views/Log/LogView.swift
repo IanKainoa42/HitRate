@@ -8,9 +8,13 @@ struct LogView: View {
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
     @Query private var sessions: [PracticeSession]
 
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+
     @State private var selectedGroup: StuntGroup?
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
+
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
     private var activeSession: PracticeSession? {
         sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
@@ -30,7 +34,7 @@ struct LogView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Groups") { showGroupsEditor = true }
+                    Button(mode.nounPluralTitle) { showGroupsEditor = true }
                 }
             }
             .sheet(isPresented: $showGroupsEditor) {
@@ -50,7 +54,7 @@ struct LogView: View {
                 .foregroundStyle(Theme.accent)
             Text("Ready to count")
                 .font(.system(size: 22, weight: .bold))
-            Text("Start a practice, pick a group, and log every stunt rep as it lands.")
+            Text("Start a practice, pick a \(mode.noun), and log every stunt rep as it lands.")
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.label2)
                 .multilineTextAlignment(.center)
@@ -189,7 +193,7 @@ struct LogView: View {
                 }
                 .padding(.horizontal, 16)
             } else {
-                Text("Add a group first (Groups, top right).")
+                Text("Add a \(mode.noun) first (\(mode.nounPluralTitle), top right).")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.label2)
                     .padding(.top, 30)

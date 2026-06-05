@@ -2,27 +2,30 @@ import SwiftUI
 
 /// One card's worth of data, derived from FloorStats.
 struct CardSpec: Identifiable {
-    let id: Int          // index in the deck (0 = team card)
-    let kicker: String   // "FULL FLOOR" / "GROUP N"
+    let id: Int          // index in the deck (0 = team/season card)
+    let kicker: String   // "FULL FLOOR"/"ALL SKILLS" / "GROUP N"/"SKILL N"
     let name: String
-    let badge: String    // "★" for team, group number otherwise
+    let badge: String    // "★" for the overall card, bucket number otherwise
     let color: Color     // identity color
     let rate: Int
     let counts: [Int]
     let total: Int
     let delta: Int?
+    var flavorNoun = "group"   // word used in rarity flavor text
 
-    static func deck(from stats: FloorStats, teamName: String) -> [CardSpec] {
+    static func deck(from stats: FloorStats, teamName: String, mode: AppMode) -> [CardSpec] {
         var cards: [CardSpec] = [
-            CardSpec(id: 0, kicker: "FULL FLOOR", name: teamName, badge: "★",
+            CardSpec(id: 0, kicker: mode == .athlete ? "ALL SKILLS" : "FULL FLOOR",
+                     name: teamName, badge: "★",
                      color: Theme.electric, rate: stats.rate, counts: stats.overall,
-                     total: stats.total, delta: stats.delta)
+                     total: stats.total, delta: stats.delta, flavorNoun: mode.noun)
         ]
         for (i, g) in stats.ranked.enumerated() where g.total > 0 {
             cards.append(CardSpec(
-                id: i + 1, kicker: "GROUP \(g.number)", name: g.name, badge: "\(g.number)",
+                id: i + 1, kicker: "\(mode.nounTitle.uppercased()) \(g.number)",
+                name: g.name, badge: "\(g.number)",
                 color: Theme.groupColor(g.colorIndex), rate: g.rate, counts: g.counts,
-                total: g.total, delta: g.delta))
+                total: g.total, delta: g.delta, flavorNoun: mode.noun))
         }
         return cards
     }
@@ -39,7 +42,7 @@ struct HoloCardView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var rarity: Rarity { Rarity.of(rate: spec.rate) }
+    private var rarity: Rarity { Rarity.of(rate: spec.rate, noun: spec.flavorNoun) }
     private var animated: Bool { !isSnapshot && !reduceMotion }
 
     var body: some View {

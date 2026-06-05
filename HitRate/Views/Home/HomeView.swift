@@ -6,12 +6,29 @@ struct HomeView: View {
     @Query private var sessions: [PracticeSession]
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
 
-    @AppStorage("orgName") private var orgName = "Cheer Force San Diego"
-    @AppStorage("teamName") private var teamName = "Senior Coed"
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    @AppStorage("athleteName") private var athleteName = ""
+    @AppStorage("orgName") private var orgName = ""
+    @AppStorage("teamName") private var teamName = ""
 
     @State private var timeframe: Timeframe = .today
     @State private var groupView = "Ranked"
     @State private var shareOpen = false
+
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
+    /// Header + share-card identity per mode.
+    private var displayTitle: String {
+        mode == .athlete
+            ? (athleteName.isEmpty ? "Me" : athleteName)
+            : (teamName.isEmpty ? "My Team" : teamName)
+    }
+
+    private var displayKicker: String {
+        mode == .athlete
+            ? "\(seasonString()) season"
+            : (orgName.isEmpty ? "My program" : orgName)
+    }
 
     private var stats: FloorStats {
         StatsEngine.compute(sessions: sessions, groups: groups, timeframe: timeframe)
@@ -53,7 +70,9 @@ struct HomeView: View {
         }
         .background(Theme.appBG)
         .fullScreenCover(isPresented: $shareOpen) {
-            ShareCardsSheet(stats: stats, teamName: teamName, orgName: orgName)
+            ShareCardsSheet(stats: stats, teamName: displayTitle,
+                            orgName: mode == .athlete ? displayTitle : displayKicker,
+                            mode: mode)
         }
     }
 
@@ -61,8 +80,8 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(spacing: 11) {
-            // Team crest
-            Text(initials(of: teamName, max: 2))
+            // Identity crest (team in coach mode, the athlete in athlete mode)
+            Text(initials(of: displayTitle, max: 2))
                 .font(Theme.grotesk(15))
                 .tracking(0.3)
                 .foregroundStyle(.white)
@@ -74,11 +93,11 @@ struct HomeView: View {
                 .shadow(color: Theme.coral.opacity(0.4), radius: 7, y: 4)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(orgName.uppercased())
+                Text(displayKicker.uppercased())
                     .font(Theme.grotesk(9))
                     .tracking(1.26)
                     .foregroundStyle(Theme.label2)
-                Text(teamName)
+                Text(displayTitle)
                     .font(.system(size: 22, weight: .bold))
                     .tracking(-0.44)
                     .foregroundStyle(Theme.label)
@@ -158,24 +177,29 @@ struct HomeView: View {
                 Text("No reps logged yet")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.label)
-                Text("Log stunt outcomes from the Log tab during practice. The floor dashboard builds itself from every rep.")
+                Text(mode == .athlete
+                     ? "Log your stunt reps from the Log tab during practice. Your dashboard builds itself from every rep."
+                     : "Log stunt outcomes from the Log tab during practice. The floor dashboard builds itself from every rep.")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.label2)
                     .multilineTextAlignment(.center)
 
-                Button {
-                    DemoData.seed(context: context)
-                } label: {
-                    Text("Load demo data")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                        .contentShape(Rectangle())
+                // Demo data mirrors the handoff's coach dataset — coach mode only.
+                if mode == .coach {
+                    Button {
+                        DemoData.seed(context: context)
+                    } label: {
+                        Text("Load demo data")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Theme.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 26)

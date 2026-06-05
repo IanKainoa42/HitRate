@@ -4,6 +4,9 @@ import SwiftUI
 struct SummaryCard: View {
     let stats: FloorStats
 
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
     var body: some View {
         FeedCard {
             HStack(alignment: .bottom) {
@@ -36,12 +39,12 @@ struct SummaryCard: View {
             .padding(.bottom, 13)
 
             HStack(alignment: .firstTextBaseline) {
-                Text("FLOOR HIT RATE")
+                Text(mode == .athlete ? "MY HIT RATE" : "FLOOR HIT RATE")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.8)
                     .foregroundStyle(Theme.label2)
                 Spacer()
-                Text("\(stats.total) reps · \(stats.groups.count) groups")
+                Text("\(stats.total) reps · \(stats.groups.count) \(stats.groups.count == 1 ? mode.noun : mode.nounPlural)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.label2)
             }

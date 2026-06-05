@@ -7,13 +7,14 @@ struct ShareCardsSheet: View {
     let stats: FloorStats
     let teamName: String
     let orgName: String
+    let mode: AppMode
 
     @Environment(\.dismiss) private var dismiss
     @State private var activeIndex: Int? = 0
     @State private var toast = ""
     @State private var toastTask: Task<Void, Never>?
 
-    private var cards: [CardSpec] { CardSpec.deck(from: stats, teamName: teamName) }
+    private var cards: [CardSpec] { CardSpec.deck(from: stats, teamName: teamName, mode: mode) }
 
     var body: some View {
         let deck = cards

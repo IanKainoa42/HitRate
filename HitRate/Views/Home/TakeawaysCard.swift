@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// "TAKEAWAYS" — three story sentences: best group, worst-falls group, top miss.
+/// "TAKEAWAYS" — three story sentences: best bucket, worst-falls bucket, top miss.
 struct TakeawaysCard: View {
     let stats: FloorStats
+
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
     private var periodWord: String {
         switch stats.timeframe {
@@ -18,12 +21,14 @@ struct TakeawaysCard: View {
             VStack(spacing: 0) {
                 if let best = stats.best {
                     InsightRow(icon: "trophy", color: Theme.buildingFall, divider: true) {
-                        Text("\(Text(best.name).fontWeight(.bold)) led the floor at \(Text("\(best.rate)%").fontWeight(.bold)) — cleanest group of the \(periodWord).")
+                        Text("\(Text(best.name).fontWeight(.bold)) led the \(mode == .athlete ? "way" : "floor") at \(Text("\(best.rate)%").fontWeight(.bold)) — cleanest \(mode.noun) of the \(periodWord).")
                     }
                 }
                 if let worst = stats.worstFalls, stats.falls > 0 {
                     InsightRow(icon: "exclamationmark.triangle.fill", color: Theme.majorFall, divider: true) {
-                        Text("\(Text(worst.name).fontWeight(.bold)) owns \(Text("\(worst.falls) of \(stats.falls)").fontWeight(.bold)) floor falls — spot it next.")
+                        Text(mode == .athlete
+                             ? "\(Text(worst.name).fontWeight(.bold)) owns \(Text("\(worst.falls) of \(stats.falls)").fontWeight(.bold)) falls — tighten it next."
+                             : "\(Text(worst.name).fontWeight(.bold)) owns \(Text("\(worst.falls) of \(stats.falls)").fontWeight(.bold)) floor falls — spot it next.")
                     }
                 }
                 if let miss = stats.topMiss {

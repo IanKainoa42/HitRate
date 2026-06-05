@@ -5,6 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Cheer stunt-outcome tracker (counter + dashboard + share cards). SwiftUI,
 iOS 17+, iPhone-only, SwiftData. Bundle id `com.ianrichardson.HitRate`.
 
+Athlete-first with a coach mode: `AppMode` (athlete/coach, AppStorage key
+`appMode`) changes only language ("skill" vs "group"), identity (athlete name
+vs program/team), and card kickers — both modes store buckets as `StuntGroup`.
+Nothing is pre-seeded; users create their own skills/groups in onboarding or
+the editor.
+
 ## Project mechanics
 
 - **xcodegen owns the project AND Info.plist.** Edit `project.yml` (the `info:`
@@ -38,6 +44,11 @@ Key invariants:
     → `Rarity.of(rate:)`.
 - Outcome enum order is load-bearing: hit, bobble, buildingFall, majorFall —
   `counts` arrays are indexed by `Outcome.rawValue` everywhere.
+- Outcome labels are renameable (UserDefaults keys `outcomeLabel0–3`, blank =
+  default), but slots/severity/colors are fixed. `Outcome.label`/`short` MUST
+  read through `OutcomeNames.shared` (@Observable) — never raw UserDefaults.
+  Raw reads are invisible to SwiftUI and shipped stale labels on the Log pad
+  and tape legend; the observable read is what re-renders views after a rename.
 - Card set numbers (`001/00N`) are dynamic: groups with data + 1 team card
   (`CardSpec.deck` — team card is id 0, groups follow in ranked order).
 - Two visual registers: app UI = iOS light (locked via `.preferredColorScheme`
@@ -47,9 +58,14 @@ Key invariants:
 
 ## Architecture
 
-- `HitRateApp.swift` — entry; `RootView` is a two-tab TabView (Home/Log) and
-  seeds 5 default "Group N" groups on first launch (empty-state testing must
-  account for this — groups are never empty after first render).
+- `HitRateApp.swift` — entry; `RootView` shows `OnboardingView` until
+  `didOnboard`, then a two-tab TabView (Home/Log). NO group seeding — first
+  launch goes through the onboarding chooser (athlete vs coach) where the user
+  creates their own buckets. Installs that predate onboarding (have groups but
+  no `didOnboard`) are migrated to coach mode silently.
+- `Views/Onboarding/OnboardingView.swift` — brand-register (navy) chooser +
+  identity + quick-add first skills/groups. Suggestion chips create buckets;
+  they are not pre-made.
 - `Models/Models.swift` — SwiftData: StuntGroup, PracticeSession, Attempt.
   An "active" session is `endedAt == nil`; LogView assumes at most one.
 - `Stats/StatsEngine.swift` — ALL derived numbers (rates, deltas, trend,
@@ -68,7 +84,8 @@ Key invariants:
   animation; without it renders are nondeterministic.
 - `Utilities/DemoData.swift` — seeds the handoff's exact BASE dataset
   (74% / 171 reps today, 7 groups) via a seeded RNG — used to visually diff
-  against handoff screenshots. Triggered from the empty-state Home button.
+  against handoff screenshots. Triggered from the empty-state Home button,
+  which is shown in coach mode only (the dataset is coach-shaped).
 
 ## Gotchas discovered
 

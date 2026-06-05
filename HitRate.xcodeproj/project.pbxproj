@@ -17,6 +17,7 @@
 		7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B8E106687D6F5AA09DD3A66E /* Assets.xcassets */; };
 		80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */; };
 		86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD99E08D7FCE2602733C7EF /* CSVExport.swift */; };
+		B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */; };
 		BA5DE252AC6CBCD0335F8489 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */; };
 		BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD34ACD23F8DA7A6168614F /* Components.swift */; };
 		BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */; };
@@ -48,6 +49,7 @@
 		B8E106687D6F5AA09DD3A66E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BC4A053415866660A35A4745 /* SummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryCard.swift; sourceTree = "<group>"; };
 		BCD1AA942B68F4E661CF6471 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 				E896CA2164EF2ED583B1623A /* Components */,
 				2536EE1F284E212EB3F82F36 /* Home */,
 				3AC68232E63884599DDC59F7 /* Log */,
+				52BC2444AF9AB2D57B440DCC /* Onboarding */,
 				0DADB79C19E5F443BE08334D /* Share */,
 			);
 			path = Views;
@@ -105,6 +108,14 @@
 				9CBF43E65D81D52A8C010E7C /* HitRate */,
 				F668D95A08DD886D33B73867 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		52BC2444AF9AB2D57B440DCC /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		5E8EC41B6CFC1F5105B6C73E /* Resources */ = {
@@ -274,6 +285,7 @@
 				32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */,
 				273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */,
 				D9E1104B0EB188559FA6F688 /* Models.swift in Sources */,
+				B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,
 				E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */,

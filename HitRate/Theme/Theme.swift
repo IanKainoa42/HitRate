@@ -78,13 +78,13 @@ struct Rarity {
     let foil: Foil
     let flavor: String
 
-    static func of(rate: Int) -> Rarity {
+    static func of(rate: Int, noun: String = "group") -> Rarity {
         if rate >= 90 {
             return Rarity(
                 tier: "LEGENDARY", stars: 3, tag: Theme.gold,
                 edgeColors: [0xFFB02E, 0xFFF3B0, 0xFFD43B, 0xFF9F1C, 0xFFF6C8, 0xFFD43B, 0xFFB02E].map { Color(hex: $0) },
                 foil: .legendary,
-                flavor: "Untouchable. Cleanest group on the floor.")
+                flavor: "Untouchable. Cleanest \(noun) on the floor.")
         }
         if rate >= 78 {
             return Rarity(

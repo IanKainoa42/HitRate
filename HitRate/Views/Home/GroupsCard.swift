@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// "GROUPS" — ranked leaderboard ⇄ outcome heatmap, toggled in place.
+/// "GROUPS"/"SKILLS" — ranked leaderboard ⇄ outcome heatmap, toggled in place.
 struct GroupsCard: View {
     let stats: FloorStats
     @Binding var view: String
 
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
     var body: some View {
         FeedCard {
-            CardHead("GROUPS") {
+            CardHead(mode.nounPluralTitle.uppercased()) {
                 MiniSeg(options: ["Ranked", "Grid"], selection: $view)
             }
             if view == "Ranked" {

@@ -23,26 +23,32 @@ struct HitRateApp: App {
 }
 
 struct RootView: View {
-    @Environment(\.modelContext) private var context
     @Query private var groups: [StuntGroup]
+    @AppStorage("didOnboard") private var didOnboard = false
+    @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
 
     var body: some View {
-        TabView {
-            HomeView()
-                .tabItem { Label("Home", systemImage: "chart.bar.fill") }
-            LogView()
-                .tabItem { Label("Log", systemImage: "plus.circle.fill") }
+        Group {
+            if didOnboard {
+                TabView {
+                    HomeView()
+                        .tabItem { Label("Home", systemImage: "chart.bar.fill") }
+                    LogView()
+                        .tabItem { Label("Log", systemImage: "plus.circle.fill") }
+                }
+                .tint(Theme.accent)
+            } else {
+                OnboardingView()
+            }
         }
-        .tint(Theme.accent)
-        .onAppear { seedDefaultGroupsIfNeeded() }
+        .onAppear { migrateExistingInstallIfNeeded() }
     }
 
-    /// First launch: give the coach a starting roster of groups to rename.
-    private func seedDefaultGroupsIfNeeded() {
-        guard groups.isEmpty else { return }
-        for i in 1...5 {
-            context.insert(StuntGroup(name: "Group \(i)", number: i, orderIndex: i - 1))
-        }
-        try? context.save()
+    /// Pre-onboarding installs already have groups (the old seeded roster).
+    /// Treat them as coach installs instead of re-onboarding over their data.
+    private func migrateExistingInstallIfNeeded() {
+        guard !didOnboard, !groups.isEmpty else { return }
+        appModeRaw = AppMode.coach.rawValue
+        didOnboard = true
     }
 }
