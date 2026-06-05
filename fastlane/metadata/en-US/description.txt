@@ -1,0 +1,28 @@
+Count every stunt rep. Know your hit rate.
+
+HitRate is the stunt-outcome counter for cheerleading. Tap once per rep — hit, bobble, building fall, or major fall — and your dashboard builds itself.
+
+FOR ATHLETES
+Track the skills YOU'RE working on. Create your own list — lib, stretch, full up, anything — and log every rep at practice. Watch your hit rate climb across the season.
+
+FOR COACHES
+Switch to coach mode and track every stunt group on the floor. See which groups are locked in and which need reps, ranked automatically.
+
+THE DASHBOARD
+• Hit rate at a glance — today, this week, or all-time
+• Trend line across your recent sessions
+• Skills and groups ranked by hit rate, with movement vs last session
+• Auto-written takeaways: what led the way, what to tighten next
+• Session tape: every rep of your latest practice on one strip
+
+STUNT CARDS
+Turn your numbers into holographic trading cards — rarity tiers from COMMON to LEGENDARY based on your hit rate. Save them, copy them, or share straight to Instagram.
+
+BUILT FOR THE GYM
+• One-tap logging with big targets — made for fast hands at practice
+• Rename outcomes to match your gym's language
+• Undo mis-taps instantly
+• CSV export of every rep
+• Works completely offline — your data never leaves your phone
+
+No accounts. No ads. No tracking. Just counts.
