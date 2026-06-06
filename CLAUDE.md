@@ -37,24 +37,37 @@ listed in the repo `README.md` — don't "fix" them back toward the prototype.
 
 Key invariants:
 
-- **Two threshold systems — do not conflate** (both live in `Theme/Theme.swift`):
+- **Two systems that look alike — do not conflate** (both in `Theme/Theme.swift`):
   - Rate band colors (big numbers, ranked %): ≥75 green / 55–74 amber / <55 red
     → `Theme.rateColor`.
-  - Card rarity tiers: ≥90 LEGENDARY / ≥78 HOLO RARE / ≥60 RARE / <60 COMMON
-    → `Rarity.of(rate:)`.
+  - Card rarity = milestone **difficulty** (`Milestone.Tier` → `Rarity.of(tier:)`),
+    NOT hit rate. Stat cards are deliberately flat (`Rarity.stats`: static navy
+    edge, no foil, no stars; flavor text is the only rate-based remnant). The
+    old rate-derived rarity (≥90/≥78/≥60) was retired with the milestone deck —
+    don't reintroduce a `Rarity.of(rate:)`.
 - Outcome enum order is load-bearing: hit, bobble, buildingFall, majorFall —
   `counts` arrays are indexed by `Outcome.rawValue` everywhere.
-- Outcome labels are renameable (UserDefaults keys `outcomeLabel0–3`, blank =
-  default), but slots/severity/colors are fixed. `Outcome.label`/`short` MUST
-  read through `OutcomeNames.shared` (@Observable) — never raw UserDefaults.
-  Raw reads are invisible to SwiftUI and shipped stale labels on the Log pad
-  and tape legend; the observable read is what re-renders views after a rename.
+- Outcome labels are renameable per skill kind (UserDefaults keys
+  `outcomeLabel0–3` for stunt, `tumblingOutcomeLabel0–3` for tumbling; blank =
+  default), but slots/severity/colors are fixed and shared across kinds.
+  `Outcome.label(_:)`/`short(_:)` MUST read through `OutcomeNames.shared`
+  (@Observable) — never raw UserDefaults. Raw reads are invisible to SwiftUI
+  and shipped stale labels on the Log pad and tape legend; the observable read
+  is what re-renders views after a rename.
+- `SkillKind` (stunt/tumbling, `StuntGroup.kindRaw`) changes outcome *words
+  only* — never slot indexing. Aggregate views (summary legend, tape, team
+  card, heatmap headers) use `FloorStats.aggregateKind`: tumbling wording only
+  when every bucket with data is tumbling, stunt otherwise. Coach mode is all
+  stunt.
 - Card set numbers (`001/00N`) are dynamic: groups with data + 1 team card
   (`CardSpec.deck` — team card is id 0, groups follow in ranked order).
-- Two visual registers: app UI = iOS light (locked via `.preferredColorScheme`
-  in `HitRateApp`); share cards = "court at night" navy + Space Grotesk
-  (bundled fonts, PostScript names `SpaceGrotesk-Regular/Medium/Bold`,
-  accessed via `Theme.grotesk()`).
+- ONE visual register since 2026-06-06: the whole app lives in the brand
+  "court at night" navy (locked via `.preferredColorScheme(.dark)` in
+  `HitRateApp`; `CourtBackdrop` in Components.swift is the shared backdrop;
+  Theme app tokens are glass-on-navy). Space Grotesk = display font (bundled,
+  PostScript names `SpaceGrotesk-Regular/Medium/Bold`, via `Theme.grotesk()`).
+  The original handoff's iOS-light app UI was retired deliberately — don't
+  reintroduce it.
 
 ## Architecture
 
@@ -74,14 +87,25 @@ Key invariants:
   timeframe: today = last prior-day session, week = previous calendar week,
   all-time = first session of the season. Rough patch = worst sliding window
   of 7 attempts with ≥4 misses.
-- `Theme/Theme.swift` — every design token (both registers), rate bands,
-  `Rarity`, fonts, season string. No colors/fonts hardcoded in views.
+- `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
+  ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
+  milestones have no storage of their own, "earned" is recomputed from the
+  attempts every time. Good milestones (volume/streak/session quality/skill
+  mastery) + "DUBIOUS HONOR" bad ones (falls, cold streaks). Tier = difficulty.
+- `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
+  fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`
   call off a `timeframe` @State in HomeView. `Views/Log/*` — the counter.
-  `Views/Share/*` — Stunt Cards sheet + HoloCardView.
+  `Views/Share/*` — Stunt Cards sheet, `DeckCard` (stats | milestone),
+  HoloCardView, PuckView. Deck = flat stat cards, then earned milestones
+  (tier desc), then locked teasers (progress desc). Locked cards disable the
+  share actions; earned milestones add a "Save cheer puck" action (round
+  collectible render).
 - Share/save/copy renders `HoloCardView(isSnapshot: true)` through
   ImageRenderer at `scale = 3` — `isSnapshot` freezes the TimelineView foil
-  animation; without it renders are nondeterministic.
+  animation; without it renders are nondeterministic. Foil edge/sheen animate
+  only on earned holo/legendary milestones — stat cards and locked teasers are
+  static by design.
 - `Utilities/DemoData.swift` — seeds the handoff's exact BASE dataset
   (74% / 171 reps today, 7 groups) via a seeded RNG — used to visually diff
   against handoff screenshots. Triggered from the empty-state Home button,

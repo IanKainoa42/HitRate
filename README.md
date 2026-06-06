@@ -22,9 +22,12 @@ Built from the `design_handoff_ckil_home` design handoff (originally codenamed
   distribution bar, trend line chart, group leaderboard ⇄ heatmap, takeaways,
   latest-session tape with rough-patch detection. Global timeframe filter
   (Today / This week / All-time).
-- **Stunt Cards** — swipeable holographic trading cards (one per group + team
-  card) with rarity tiers by hit rate (LEGENDARY ≥90 / HOLO RARE ≥78 / RARE ≥60
-  / COMMON), animated foil edges, share to Instagram / save / copy as image.
+- **Stunt Cards** — a swipeable trading-card deck: flat stat cards (team +
+  per-skill) up front, then **milestone cards** you earn — lifetime volume,
+  hit streaks, session quality, skill mastery, plus "dubious honor" cards for
+  the falls. Rarity = how hard the milestone is (COMMON → LEGENDARY, animated
+  foil on the top tiers); locked milestones show as progress teasers. Share to
+  Instagram / save / copy, and earned milestones save as round "cheer pucks".
 - **CSV export** of every logged attempt.
 
 ## Build
@@ -55,4 +58,13 @@ visual diffing against `docs/design-handoff/screenshots/`.
 - **No session timer**: the prototype's live elapsed clock in the Log header
   was dropped (unnecessary at practice); the rep count is the headline there
   instead.
+- **One register, not two**: the handoff renders the app UI in iOS light and
+  reserves the navy "court at night" for share cards. The shipped app puts the
+  whole UI in the brand register (navy backdrop, glass cards, dark scheme) —
+  onboarding/cards looked like one product and the dashboard looked like
+  another.
+- **Stunt vs tumbling skills** (athlete mode, not in the handoff): each skill
+  has a kind that picks the outcome wording — stunt: Hit / Bobble / Building
+  fall / Major fall; tumbling: Stuck / Stepped out / Touched down / Major fall.
+  Both renameable per kind; severity slots and colors are shared.
 - App icon: brand-register "98 ring" (`HitRate/Assets.xcassets`).

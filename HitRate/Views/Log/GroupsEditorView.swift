@@ -11,6 +11,7 @@ struct GroupsEditorView: View {
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
     @AppStorage("teamName") private var teamName = ""
+    @AppStorage(Sounds.defaultsKey) private var soundsOn = true
 
     // Outcome rename slots (blank = standard name) — observable store so the
     // rest of the app re-renders on rename.
@@ -28,11 +29,13 @@ struct GroupsEditorView: View {
                     Section("You") {
                         TextField("Your name", text: $athleteName)
                     }
+                    .listRowBackground(glassRow)
                 } else {
                     Section("Team") {
                         TextField("Program", text: $orgName)
                         TextField("Team", text: $teamName)
                     }
+                    .listRowBackground(glassRow)
                 }
 
                 Section(mode.nounPluralTitle) {
@@ -47,6 +50,32 @@ struct GroupsEditorView: View {
                             TextField("Name", text: Binding(
                                 get: { g.name },
                                 set: { g.name = $0 }))
+                            if mode == .athlete {
+                                // Stunt vs tumbling — picks the outcome wording
+                                // on the pad for this skill.
+                                Menu {
+                                    ForEach(SkillKind.allCases) { k in
+                                        Button {
+                                            g.kind = k
+                                            try? context.save()
+                                        } label: {
+                                            Label(k.label, systemImage: k.icon)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: g.kind.icon)
+                                            .font(.system(size: 10, weight: .semibold))
+                                        Text(g.kind.label)
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 5)
+                                    .background(Theme.fill)
+                                    .clipShape(Capsule())
+                                }
+                            }
                         }
                     }
                     .onDelete { idx in
@@ -76,21 +105,50 @@ struct GroupsEditorView: View {
                         Label("Add \(mode.noun)", systemImage: "plus")
                     }
                 }
+                .listRowBackground(glassRow)
 
                 Section {
                     ForEach(Outcome.allCases) { o in
                         HStack(spacing: 10) {
                             Circle().fill(o.color).frame(width: 12, height: 12)
-                            TextField(o.defaultLabel, text: Binding(
-                                get: { outcomeNames.custom[o.rawValue] },
-                                set: { outcomeNames.custom[o.rawValue] = $0 }))
+                            TextField(o.defaultLabel(.stunt), text: Binding(
+                                get: { outcomeNames.stunt[o.rawValue] },
+                                set: { outcomeNames.stunt[o.rawValue] = $0 }))
                         }
                     }
                 } header: {
-                    Text("Outcomes")
+                    Text(mode == .athlete ? "Stunt outcomes" : "Outcomes")
                 } footer: {
-                    Text("Rename outcomes to match how your gym calls them. Leave blank for the standard name. Severity order and colors stay fixed.")
+                    if mode == .coach {
+                        Text("Rename outcomes to match how your gym calls them. Leave blank for the standard name. Severity order and colors stay fixed.")
+                    }
                 }
+                .listRowBackground(glassRow)
+
+                if mode == .athlete {
+                    Section {
+                        ForEach(Outcome.allCases) { o in
+                            HStack(spacing: 10) {
+                                Circle().fill(o.color).frame(width: 12, height: 12)
+                                TextField(o.defaultLabel(.tumbling), text: Binding(
+                                    get: { outcomeNames.tumbling[o.rawValue] },
+                                    set: { outcomeNames.tumbling[o.rawValue] = $0 }))
+                            }
+                        }
+                    } header: {
+                        Text("Tumbling outcomes")
+                    } footer: {
+                        Text("Rename outcomes to match how your gym calls them. Leave blank for the standard name. Severity order and colors stay fixed across both.")
+                    }
+                    .listRowBackground(glassRow)
+                }
+
+                Section {
+                    Toggle("Tap sounds", isOn: $soundsOn)
+                } footer: {
+                    Text("Pops on the counter pad. Like keyboard clicks, they follow the ring/silent switch.")
+                }
+                .listRowBackground(glassRow)
 
                 Section {
                     Picker("Mode", selection: $appModeRaw) {
@@ -103,6 +161,7 @@ struct GroupsEditorView: View {
                 } footer: {
                     Text("Coach mode tracks multiple stunt groups and puts your program on the share cards. Your logged reps carry over either way.")
                 }
+                .listRowBackground(glassRow)
 
                 Section {
                 } footer: {
@@ -111,6 +170,8 @@ struct GroupsEditorView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.appBG)
             .navigationTitle(mode == .athlete ? "My Skills" : "Groups")
             .navigationBarTitleDisplayMode(.inline)
             .alert(
@@ -140,6 +201,9 @@ struct GroupsEditorView: View {
             }
         }
     }
+
+    /// Glass row surface — solid-ish so separators/swipe actions stay readable.
+    private var glassRow: Color { Color(hex: 0x161D30) }
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

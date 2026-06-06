@@ -15,13 +15,16 @@ struct OnboardingView: View {
 
     @State private var mode: AppMode?
     @State private var draft = ""
-    @State private var pending: [String] = []   // buckets created on finish
+    @State private var draftKind: SkillKind = .stunt
+    @State private var pending: [(name: String, kind: SkillKind)] = []   // buckets created on finish
 
-    private let skillSuggestions = ["Lib", "Stretch", "Full up", "Rewind", "Toss hands"]
+    private let stuntSuggestions = ["Lib", "Stretch", "Full up", "Rewind", "Toss hands"]
+    private let tumblingSuggestions = ["Back handspring", "Tuck", "Layout", "Full"]
 
     var body: some View {
         ZStack {
-            backdrop
+            CourtBackdrop()
+                .ignoresSafeArea()
             if let mode {
                 setup(mode)
             } else {
@@ -29,31 +32,6 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: mode)
-    }
-
-    // MARK: Backdrop (matches the share-sheet court)
-
-    private var backdrop: some View {
-        ZStack {
-            RadialGradient(
-                colors: [Color(hex: 0x1B2335), Color(hex: 0x0C1120), Color(hex: 0x06080F)],
-                center: UnitPoint(x: 0.5, y: -0.08),
-                startRadius: 0, endRadius: 700)
-            CourtGrid(cell: 30, lineColor: .white.opacity(0.05))
-                .mask(RadialGradient(colors: [.white, .clear], center: UnitPoint(x: 0.5, y: 0.3),
-                                     startRadius: 100, endRadius: 500))
-            Circle()
-                .fill(Theme.coral.opacity(0.16))
-                .frame(width: 300, height: 300)
-                .blur(radius: 80)
-                .offset(x: -140, y: -260)
-            Circle()
-                .fill(Theme.electric.opacity(0.13))
-                .frame(width: 300, height: 300)
-                .blur(radius: 80)
-                .offset(x: 150, y: 280)
-        }
-        .ignoresSafeArea()
     }
 
     // MARK: Step 1 — who's counting
@@ -169,7 +147,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white.opacity(0.5))
                         .padding(.top, 6)
 
-                    ForEach(Array(pending.enumerated()), id: \.offset) { i, name in
+                    ForEach(Array(pending.enumerated()), id: \.offset) { i, item in
                         HStack(spacing: 10) {
                             Text("\(i + 1)")
                                 .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -177,9 +155,19 @@ struct OnboardingView: View {
                                 .frame(width: 24, height: 24)
                                 .background(Theme.groupColor(i))
                                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                            Text(name)
+                            Text(item.name)
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
+                            if mode == .athlete {
+                                Text(item.kind.label.uppercased())
+                                    .font(Theme.grotesk(8))
+                                    .tracking(1.2)
+                                    .foregroundStyle(.white.opacity(0.45))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(.white.opacity(0.07))
+                                    .clipShape(Capsule())
+                            }
                             Spacer()
                             Button {
                                 pending.remove(at: i)
@@ -225,9 +213,45 @@ struct OnboardingView: View {
                     }
 
                     if mode == .athlete {
+                        // Manual adds need a kind — stunt vs tumbling picks the
+                        // outcome wording on the pad.
+                        HStack(spacing: 8) {
+                            ForEach(SkillKind.allCases) { k in
+                                let on = draftKind == k
+                                Button {
+                                    draftKind = k
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: k.icon)
+                                            .font(.system(size: 10, weight: .semibold))
+                                        Text(k.label)
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .foregroundStyle(on ? Theme.navy : .white.opacity(0.7))
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 6)
+                                    .background(on ? .white : .white.opacity(0.06))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(.white.opacity(on ? 0 : 0.14), lineWidth: 1))
+                                    .contentShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            Spacer()
+                        }
+
                         // Starter ideas — tapping one still *creates* it; nothing is pre-made.
-                        FlowChips(options: skillSuggestions.filter { !pending.contains($0) }) { name in
-                            pending.append(name)
+                        suggestionHeader("STUNTS")
+                        FlowChips(options: stuntSuggestions.filter { name in
+                            !pending.contains { $0.name == name }
+                        }) { name in
+                            pending.append((name, .stunt))
+                        }
+                        suggestionHeader("TUMBLING")
+                        FlowChips(options: tumblingSuggestions.filter { name in
+                            !pending.contains { $0.name == name }
+                        }) { name in
+                            pending.append((name, .tumbling))
                         }
                     }
                 }
@@ -267,18 +291,27 @@ struct OnboardingView: View {
                 .stroke(.white.opacity(0.14), lineWidth: 1))
     }
 
+    private func suggestionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.grotesk(9))
+            .tracking(1.6)
+            .foregroundStyle(.white.opacity(0.4))
+            .padding(.top, 2)
+    }
+
     private func addPending() {
         let name = draft.trimmingCharacters(in: .whitespaces)
         let fallback = mode == .coach ? "Group \(pending.count + 1)" : ""
         let final = name.isEmpty ? fallback : name
         guard !final.isEmpty else { return }
-        pending.append(final)
+        pending.append((final, mode == .athlete ? draftKind : .stunt))
         draft = ""
     }
 
     private func finish(_ mode: AppMode) {
-        for (i, name) in pending.enumerated() {
-            context.insert(StuntGroup(name: name, number: i + 1, orderIndex: i))
+        for (i, item) in pending.enumerated() {
+            context.insert(StuntGroup(name: item.name, number: i + 1, orderIndex: i,
+                                      kind: item.kind))
         }
         try? context.save()
         appModeRaw = mode.rawValue

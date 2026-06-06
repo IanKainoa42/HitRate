@@ -59,7 +59,7 @@ struct SummaryCard: View {
                 ForEach(Outcome.allCases) { o in
                     HStack(spacing: 8) {
                         Circle().fill(o.color).frame(width: 9, height: 9)
-                        Text(o.label)
+                        Text(o.label(stats.aggregateKind))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Theme.label)
                             .lineLimit(1)

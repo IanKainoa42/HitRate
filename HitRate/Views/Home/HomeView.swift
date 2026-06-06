@@ -57,7 +57,7 @@ struct HomeView: View {
                         GroupsCard(stats: d, view: $groupView)
                         TakeawaysCard(stats: d)
                         if d.latest != nil {
-                            SessionTapeCard(snapshot: d.latest!)
+                            SessionTapeCard(snapshot: d.latest!, kind: d.aggregateKind)
                         }
                         actionRow(d)
                     } else {
@@ -68,9 +68,13 @@ struct HomeView: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(Theme.appBG)
+        .background(CourtBackdrop().ignoresSafeArea())
         .fullScreenCover(isPresented: $shareOpen) {
-            ShareCardsSheet(stats: stats, teamName: displayTitle,
+            // Milestones are lifetime — deliberately not filtered by timeframe.
+            ShareCardsSheet(stats: stats,
+                            milestones: Milestones.evaluate(sessions: sessions,
+                                                            groups: groups, mode: mode),
+                            teamName: displayTitle,
                             orgName: mode == .athlete ? displayTitle : displayKicker,
                             mode: mode)
         }

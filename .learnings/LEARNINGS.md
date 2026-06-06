@@ -75,3 +75,27 @@
 - **Rule:** Always pass an NSObject completion target with
   `image(_:didFinishSavingWithError:contextInfo:)` and branch the user-facing
   confirmation on the error. Applies to every share/save surface.
+
+## 2026-06-06 — UIImageWriteToSavedPhotosAlbum flattens PNG alpha to JPG
+
+- **Category:** knowledge_gap
+- **What happened:** Cheer-puck renders (ImageRenderer, isOpaque=false, transparent corners) saved via UIImageWriteToSavedPhotosAlbum landed in the sim photo library as 720×720 JPGs with black corners — the alpha channel doesn't survive the save path.
+- **Rule:** If transparency must survive into Photos, use PHAssetCreationRequest with PNG data instead. If the flattened look is acceptable (dark art on black), UIImageWriteToSavedPhotosAlbum is fine and keeps the simple completion-target pattern.
+
+## 2026-06-06 — Custom segmented/dark List styling on iOS 17
+
+- **Category:** best_practice
+- **What happened:** Re-skinning the grouped List (GroupsEditorView) to the navy register: `.scrollContentBackground(.hidden)` + `.background(navy)` swaps the canvas, but rows stay system dark-gray unless `.listRowBackground(...)` is applied — and it must go on each Section (it applies to all rows within).
+- **Rule:** Dark-brand a SwiftUI List with: scrollContentBackground(.hidden) + background color + per-Section listRowBackground. Use a solid-ish row color (not low-alpha white) so swipe actions/separators stay readable.
+
+## 2026-06-06 — Synthesized UI tap sounds: recipe that avoids the "cheap click"
+
+- **Category:** best_practice
+- **What happened:** Built fidget sounds for the Log pad by synthesizing WAVs in pure Python (wave module, no deps): water-drop pops = downward pitch glide + exponential decay, pitched by outcome severity, 3 variants ±7% per event. Played via AudioServicesCreateSystemSoundID (register once at init, play per tap — lowest latency, respects silent switch, mixes over music).
+- **Rule:** Synthesized UI sounds MUST fade in ~2ms and force-fade to true zero at the end (assert first/last samples ≈ 0 in the generator) — non-zero endpoints produce a hard click on every play and that's inaudible to an agent. For organic feel: multiple pitch variants + never repeat the same variant twice in a row. Generator: /tmp/gen_sounds.py pattern (HitRate).
+
+## 2026-06-06 — Button sounds: Ian wants native-subtle, not designed
+
+- **Category:** correction
+- **What happened:** Button-sound iteration went synthesized pops → cinematic SFX pack (Singularity) → Ian: "im thinking just like regular subtle clicks." Final: system keyboard-click family (IDs 1104/1103/1105) rotated with no-repeat — zero assets.
+- **Rule:** For HitRate UI feedback, default to native/system-subtle (keyboard-click register) rather than designed/cinematic sounds. Severity theatrics belong on the share cards, not the counter. Known-good system click IDs: 1104 tock, 1103 tick, 1105 modifier tock.

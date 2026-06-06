@@ -2,9 +2,12 @@ import SwiftUI
 import UIKit
 
 /// Full-screen "court at night" share sheet: swipeable Stunt Cards carousel,
-/// dots, and real share actions (Instagram deep-link, save, copy).
+/// dots, and real share actions (Instagram deep-link, save, copy, pucks).
+/// Deck = flat stat cards up front, then milestones — earned holos first,
+/// locked teasers (with progress) trailing.
 struct ShareCardsSheet: View {
     let stats: FloorStats
+    let milestones: [Milestone]
     let teamName: String
     let orgName: String
     let mode: AppMode
@@ -15,12 +18,20 @@ struct ShareCardsSheet: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var photoSaver = PhotoSaver()
 
-    private var cards: [CardSpec] { CardSpec.deck(from: stats, teamName: teamName, mode: mode) }
+    private var cards: [DeckCard] {
+        var deck = CardSpec.deck(from: stats, teamName: teamName, mode: mode)
+            .map { DeckCard(id: $0.id, content: .stats($0)) }
+        for m in milestones {
+            deck.append(DeckCard(id: deck.count, content: .milestone(m)))
+        }
+        return deck
+    }
 
     var body: some View {
         let deck = cards
         ZStack {
-            backdrop
+            CourtBackdrop()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
@@ -48,34 +59,6 @@ struct ShareCardsSheet: View {
             }
             .allowsHitTesting(false)
         }
-    }
-
-    // MARK: Backdrop — radial navy + court grid + color glows
-
-    private var backdrop: some View {
-        ZStack {
-            RadialGradient(
-                colors: [Color(hex: 0x1B2335), Color(hex: 0x0C1120), Color(hex: 0x06080F)],
-                center: UnitPoint(x: 0.5, y: -0.08),
-                startRadius: 0, endRadius: 700)
-
-            CourtGrid(cell: 30, lineColor: .white.opacity(0.05))
-                .mask(RadialGradient(colors: [.white, .clear], center: UnitPoint(x: 0.5, y: 0.3),
-                                     startRadius: 100, endRadius: 500))
-
-            // coral glow top-left, electric glow bottom-right
-            Circle()
-                .fill(Theme.coral.opacity(0.16))
-                .frame(width: 300, height: 300)
-                .blur(radius: 80)
-                .offset(x: -140, y: -260)
-            Circle()
-                .fill(Theme.electric.opacity(0.13))
-                .frame(width: 300, height: 300)
-                .blur(radius: 80)
-                .offset(x: 150, y: 280)
-        }
-        .ignoresSafeArea()
     }
 
     // MARK: Header
@@ -113,13 +96,13 @@ struct ShareCardsSheet: View {
 
     // MARK: Carousel
 
-    private func carousel(_ deck: [CardSpec]) -> some View {
+    private func carousel(_ deck: [DeckCard]) -> some View {
         GeometryReader { geo in
             let margin = max(16, (geo.size.width - 290) / 2)
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 18) {
                     ForEach(deck) { card in
-                        HoloCardView(spec: card, index: card.id, count: deck.count, orgName: orgName)
+                        HoloCardView(card: card, index: card.id, count: deck.count, orgName: orgName)
                             .id(card.id)
                     }
                 }
@@ -135,7 +118,7 @@ struct ShareCardsSheet: View {
 
     // MARK: Dots
 
-    private func dots(_ deck: [CardSpec]) -> some View {
+    private func dots(_ deck: [DeckCard]) -> some View {
         HStack(spacing: 6) {
             ForEach(deck) { card in
                 let on = card.id == (activeIndex ?? 0)
@@ -159,8 +142,9 @@ struct ShareCardsSheet: View {
 
     // MARK: Actions
 
-    private func actions(_ deck: [CardSpec]) -> some View {
+    private func actions(_ deck: [DeckCard]) -> some View {
         let active = deck[min(activeIndex ?? 0, deck.count - 1)]
+        let locked = active.lockedMilestone != nil
         return VStack(spacing: 10) {
             Button {
                 shareToInstagram(active, count: deck.count)
@@ -200,9 +184,33 @@ struct ShareCardsSheet: View {
                     }
                 }
             }
+
+            // Earned milestones double as round collectible pucks.
+            if let m = active.earnedMilestone {
+                glassButton("Save cheer puck", icon: "circle.hexagongrid.circle") {
+                    if let img = renderPuck(m) {
+                        photoSaver.save(img) { ok in
+                            showToast(ok ? "Puck saved to Photos"
+                                         : "Couldn't save — allow Photos access in Settings")
+                        }
+                    }
+                }
+            }
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 20)
+        // Locked teasers aren't shareable — earn it first.
+        .disabled(locked)
+        .opacity(locked ? 0.35 : 1)
+        .animation(.easeOut(duration: 0.2), value: locked)
+        .overlay(alignment: .top) {
+            if locked {
+                Text("Locked — keep counting to earn this card")
+                    .font(Theme.grotesk(12, .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .offset(y: -22)
+            }
+        }
     }
 
     private func glassButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -228,9 +236,9 @@ struct ShareCardsSheet: View {
     // MARK: Share mechanics
 
     @MainActor
-    private func render(_ card: CardSpec, count: Int) -> UIImage? {
+    private func render(_ card: DeckCard, count: Int) -> UIImage? {
         let renderer = ImageRenderer(
-            content: HoloCardView(spec: card, index: card.id, count: count,
+            content: HoloCardView(card: card, index: card.id, count: count,
                                   orgName: orgName, isSnapshot: true)
                 .frame(width: 290, height: 430))
         renderer.scale = 3
@@ -238,8 +246,19 @@ struct ShareCardsSheet: View {
         return renderer.uiImage
     }
 
+    @MainActor
+    private func renderPuck(_ milestone: Milestone) -> UIImage? {
+        let renderer = ImageRenderer(
+            content: PuckView(milestone: milestone, orgName: orgName)
+                .frame(width: 240, height: 240))
+        renderer.scale = 3
+        renderer.isOpaque = false   // transparent corners — it's a sticker
+        renderer.proposedSize = ProposedViewSize(width: 240, height: 240)
+        return renderer.uiImage
+    }
+
     /// Save the card image, then deep-link to Instagram (handoff-recommended flow).
-    private func shareToInstagram(_ card: CardSpec, count: Int) {
+    private func shareToInstagram(_ card: DeckCard, count: Int) {
         guard let img = render(card, count: count) else { return }
         photoSaver.save(img) { ok in
             guard ok else {

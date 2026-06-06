@@ -3,15 +3,17 @@ import SwiftUI
 // MARK: - Design tokens (from design handoff)
 
 enum Theme {
-    // App UI register (iOS light)
-    static let appBG = Color(hex: 0xF2F2F7)
-    static let surface = Color.white
-    static let surface2 = Color(hex: 0xF4F4F8)
-    static let label = Color.black
-    static let label2 = Color(red: 60/255, green: 60/255, blue: 67/255).opacity(0.6)
-    static let label3 = Color(red: 60/255, green: 60/255, blue: 67/255).opacity(0.3)
-    static let separator = Color(red: 60/255, green: 60/255, blue: 67/255).opacity(0.16)
-    static let fill = Color(red: 120/255, green: 120/255, blue: 128/255).opacity(0.12)
+    // App UI register — court-at-night, same world as onboarding and the
+    // share cards (the original iOS-light register was retired 2026-06-06;
+    // views still consume only these tokens).
+    static let appBG = Color(hex: 0x0A0F1E)
+    static let surface = Color.white.opacity(0.06)      // glass card on navy
+    static let surface2 = Color.white.opacity(0.12)
+    static let label = Color.white
+    static let label2 = Color.white.opacity(0.60)
+    static let label3 = Color.white.opacity(0.35)
+    static let separator = Color.white.opacity(0.14)
+    static let fill = Color.white.opacity(0.08)
     static let accent = Color(hex: 0x007AFF)
 
     // Outcomes
@@ -66,8 +68,12 @@ enum Theme {
     }
 }
 
-// MARK: - Rarity tiers (share cards; cutoffs 90 / 78 / 60)
+// MARK: - Rarity chrome (card foil/edge/tag visuals)
 
+/// Card chrome. Since the milestone deck, rarity is set by milestone
+/// *difficulty* (`Milestone.Tier`), not by hit rate — stat cards are
+/// deliberately flat (`.stats`). The old rate-based tiers (90/78/60) survive
+/// only as flavor text on stat cards.
 struct Rarity {
     enum Foil { case legendary, holo, none }
 
@@ -78,33 +84,42 @@ struct Rarity {
     let foil: Foil
     let flavor: String
 
-    static func of(rate: Int, noun: String = "group") -> Rarity {
-        if rate >= 90 {
-            return Rarity(
-                tier: "LEGENDARY", stars: 3, tag: Theme.gold,
-                edgeColors: [0xFFB02E, 0xFFF3B0, 0xFFD43B, 0xFF9F1C, 0xFFF6C8, 0xFFD43B, 0xFFB02E].map { Color(hex: $0) },
-                foil: .legendary,
-                flavor: "Untouchable. Cleanest \(noun) on the floor.")
+    static let legendaryEdge = [0xFFB02E, 0xFFF3B0, 0xFFD43B, 0xFF9F1C, 0xFFF6C8, 0xFFD43B, 0xFFB02E].map { Color(hex: $0) }
+    static let holoEdge = [0x00D4FF, 0x9775FA, 0xFF4D6D, 0xFFD43B, 0x51FF9F, 0x00D4FF].map { Color(hex: $0) }
+    static let navyEdge = [0x22344E, 0x4A6A93, 0x22344E, 0x33506F, 0x22344E].map { Color(hex: $0) }
+    static let commonEdge = [0x3A2026, 0x6A2F38, 0x3A2026].map { Color(hex: $0) }
+
+    /// Milestone chrome by difficulty tier (flavor lives on the milestone).
+    static func of(tier: Milestone.Tier) -> Rarity {
+        switch tier {
+        case .legendary:
+            Rarity(tier: "LEGENDARY", stars: 3, tag: Theme.gold,
+                   edgeColors: legendaryEdge, foil: .legendary, flavor: "")
+        case .holo:
+            Rarity(tier: "HOLO RARE", stars: 2, tag: Theme.electric,
+                   edgeColors: holoEdge, foil: .holo, flavor: "")
+        case .rare:
+            Rarity(tier: "RARE", stars: 1, tag: Color(hex: 0x5AC8FA),
+                   edgeColors: navyEdge, foil: .none, flavor: "")
+        case .common:
+            Rarity(tier: "COMMON", stars: 0, tag: Theme.coralLight,
+                   edgeColors: commonEdge, foil: .none, flavor: "")
         }
-        if rate >= 78 {
-            return Rarity(
-                tier: "HOLO RARE", stars: 2, tag: Theme.electric,
-                edgeColors: [0x00D4FF, 0x9775FA, 0xFF4D6D, 0xFFD43B, 0x51FF9F, 0x00D4FF].map { Color(hex: $0) },
-                foil: .holo,
-                flavor: "Locked in — hits land with room to spare.")
-        }
-        if rate >= 60 {
-            return Rarity(
-                tier: "RARE", stars: 1, tag: Color(hex: 0x5AC8FA),
-                edgeColors: [0x22344E, 0x4A6A93, 0x22344E, 0x33506F, 0x22344E].map { Color(hex: $0) },
-                foil: .none,
-                flavor: "Solid base — a few bobbles to tighten.")
-        }
-        return Rarity(
-            tier: "COMMON", stars: 0, tag: Theme.coralLight,
-            edgeColors: [0x3A2026, 0x6A2F38, 0x3A2026].map { Color(hex: $0) },
-            foil: .none,
-            flavor: "Work in progress — spot the falls.")
+    }
+
+    /// Flat chrome for stat cards: static navy edge, no foil, no stars — the
+    /// holographic treatment is reserved for earned milestones.
+    static func stats(rate: Int, noun: String = "group") -> Rarity {
+        Rarity(tier: "STATS", stars: 0, tag: Color.white.opacity(0.55),
+               edgeColors: navyEdge, foil: .none,
+               flavor: statFlavor(rate: rate, noun: noun))
+    }
+
+    private static func statFlavor(rate: Int, noun: String) -> String {
+        if rate >= 90 { return "Untouchable. Cleanest \(noun) on the floor." }
+        if rate >= 78 { return "Locked in — hits land with room to spare." }
+        if rate >= 60 { return "Solid base — a few bobbles to tighten." }
+        return "Work in progress — spot the falls."
     }
 }
 

@@ -94,7 +94,7 @@ struct LineChart: View {
                 ForEach(Array(data.enumerated()), id: \.offset) { i, v in
                     let last = i == n - 1
                     Circle()
-                        .fill(last ? accent : Theme.surface)
+                        .fill(last ? accent : Theme.appBG)   // solid navy — glass fill would vanish
                         .stroke(accent, lineWidth: 2)
                         .frame(width: last ? 9 : 5.2, height: last ? 9 : 5.2)
                         .position(x: x(i), y: y(v))

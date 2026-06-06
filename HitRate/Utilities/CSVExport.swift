@@ -23,7 +23,8 @@ struct CSVExportItem: Transferable {
             .flatMap { s in
                 s.sortedAttempts.map {
                     Row(timestamp: $0.timestamp, sessionStart: s.startedAt,
-                        group: $0.group?.name ?? "", outcome: $0.outcome.label)
+                        group: $0.group?.name ?? "",
+                        outcome: $0.outcome.label($0.group?.kind ?? .stunt))
                 }
             }
             .sorted { $0.timestamp < $1.timestamp }

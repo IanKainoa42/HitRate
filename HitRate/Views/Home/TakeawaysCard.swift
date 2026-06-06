@@ -33,7 +33,7 @@ struct TakeawaysCard: View {
                 }
                 if let miss = stats.topMiss {
                     InsightRow(icon: "flame", color: Theme.accent, divider: false) {
-                        Text("\(Text(miss.label).fontWeight(.bold)) is your top miss at \(Text("\(stats.overall[miss.rawValue])").fontWeight(.bold)) reps — most fixable error.")
+                        Text("\(Text(miss.label(stats.aggregateKind)).fontWeight(.bold)) is your top miss at \(Text("\(stats.overall[miss.rawValue])").fontWeight(.bold)) reps — most fixable error.")
                     }
                 }
             }

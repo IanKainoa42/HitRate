@@ -4,6 +4,7 @@ import SwiftUI
 /// height/color by outcome, with a rough-patch bracket when one exists.
 struct SessionTapeCard: View {
     let snapshot: SessionSnapshot
+    var kind: SkillKind = .stunt   // legend wording (FloorStats.aggregateKind)
 
     private let heights: [Outcome: CGFloat] = [
         .hit: 34, .bobble: 26, .buildingFall: 22, .majorFall: 18,
@@ -76,7 +77,7 @@ struct SessionTapeCard: View {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(o.color)
                             .frame(width: 8, height: 8)
-                        Text(o.label)
+                        Text(o.label(kind))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.label2)
                             .lineLimit(1)
@@ -94,7 +95,7 @@ struct SessionTapeCard: View {
             snapshot.outcomes.filter { $0 == o }.count
         }
         let parts = Outcome.allCases.compactMap { o in
-            counts[o.rawValue] > 0 ? "\(counts[o.rawValue]) \(o.label.lowercased())" : nil
+            counts[o.rawValue] > 0 ? "\(counts[o.rawValue]) \(o.label(kind).lowercased())" : nil
         }
         return "\(snapshot.outcomes.count) reps: " + parts.joined(separator: ", ")
     }

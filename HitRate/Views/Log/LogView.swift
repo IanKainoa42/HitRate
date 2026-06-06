@@ -37,7 +37,7 @@ struct LogView: View {
                     idleView
                 }
             }
-            .background(Theme.appBG)
+            .background(CourtBackdrop().ignoresSafeArea())
             .navigationTitle("Log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -75,6 +75,7 @@ struct LogView: View {
                 try? context.save()
                 selectedGroup = groups.first
                 hapticTrigger += 1
+                Sounds.shared.play(.start)
             } label: {
                 Text("Start practice")
                     .font(.system(size: 17, weight: .bold))
@@ -122,6 +123,7 @@ struct LogView: View {
                     }
                     try? context.save()
                     hapticTrigger += 1
+                    Sounds.shared.play(.end)
                 } label: {
                     Text("End")
                         .font(.system(size: 15, weight: .semibold))
@@ -155,11 +157,11 @@ struct LogView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 Text(g.name)
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(on ? .white : Theme.label)
+                                    .foregroundStyle(on ? Theme.navy : Theme.label)
                             }
                             .padding(.horizontal, 11)
                             .padding(.vertical, 8)
-                            .background(on ? Color.black : Theme.surface)
+                            .background(on ? Color.white : Theme.surface)
                             .clipShape(Capsule())
                             .overlay(Capsule().stroke(on ? .clear : Theme.separator, lineWidth: 1))
                             .contentShape(Capsule())
@@ -181,6 +183,7 @@ struct LogView: View {
                             try? context.save()
                             selectedGroup = group
                             hapticTrigger += 1
+                            Sounds.shared.play(.outcome(o))
                         } label: {
                             VStack(spacing: 4) {
                                 Text("\(groupCounts[o.rawValue])")
@@ -189,9 +192,11 @@ struct LogView: View {
                                     .foregroundStyle(Theme.label)
                                     .contentTransition(.numericText(value: Double(groupCounts[o.rawValue])))
                                     .animation(.spring(duration: 0.3), value: groupCounts[o.rawValue])
-                                Text(o.label)
+                                Text(o.label(group.kind))
                                     .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(o == .bobble ? Color(hex: 0xA88A00) : o.color)
+                                    .foregroundStyle(o.color) // yellow reads fine on navy — the light-bg mustard special-case is gone
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)   // "Stepped out" must fit the pad button
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 92)
@@ -203,7 +208,7 @@ struct LogView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Log \(o.label)")
+                        .accessibilityLabel("Log \(o.label(group.kind))")
                         .accessibilityValue("\(groupCounts[o.rawValue]) logged for \(group.name)")
                     }
                 }
@@ -227,6 +232,7 @@ struct LogView: View {
                         context.delete(last)
                         try? context.save()
                         hapticTrigger += 1
+                        Sounds.shared.play(.undo)
                     }
                 } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward")
@@ -247,7 +253,7 @@ struct LogView: View {
                             Circle().fill(a.outcome.color).frame(width: 9, height: 9)
                             Text(a.group?.name ?? "—")
                                 .font(.system(size: 14, weight: .medium))
-                            Text(a.outcome.label)
+                            Text(a.outcome.label(a.group?.kind ?? .stunt))
                                 .font(.system(size: 13))
                                 .foregroundStyle(Theme.label2)
                             Spacer()

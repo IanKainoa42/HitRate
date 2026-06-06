@@ -23,6 +23,7 @@ struct GroupStat: Identifiable {
     let name: String
     let number: Int
     let colorIndex: Int
+    let kind: SkillKind    // picks the outcome wording for this bucket
     let counts: [Int]      // indexed by Outcome.rawValue
     let total: Int
     let hits: Int
@@ -66,6 +67,14 @@ struct FloorStats {
         return (miss.map { overall[$0.rawValue] } ?? 0) > 0 ? miss : nil
     }
     var hasData: Bool { total > 0 }
+
+    /// Which outcome wording aggregate views (legend, tape, team card) use:
+    /// tumbling only when every bucket with data is tumbling, stunt otherwise.
+    var aggregateKind: SkillKind {
+        let withData = groups.filter { $0.total > 0 }
+        return !withData.isEmpty && withData.allSatisfy { $0.kind == .tumbling }
+            ? .tumbling : .stunt
+    }
 }
 
 // MARK: - Engine
@@ -135,6 +144,7 @@ enum StatsEngine {
                 id: PersistentIdentifierBox(raw: "\(g.persistentModelID)"),
                 name: g.name, number: g.number,
                 colorIndex: (g.number - 1) % Theme.groupRainbow.count,
+                kind: g.kind,
                 counts: counts, total: total, hits: hits, rate: rate, delta: delta))
         }
 

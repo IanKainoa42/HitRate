@@ -91,6 +91,14 @@ struct HeatmapView: View {
         }
     }
 
+    /// Column headers span every bucket — tumbling shorts only when the whole
+    /// roster with data is tumbling (mirrors FloorStats.aggregateKind).
+    private var kind: SkillKind {
+        let withData = groups.filter { $0.total > 0 }
+        return !withData.isEmpty && withData.allSatisfy { $0.kind == .tumbling }
+            ? .tumbling : .stunt
+    }
+
     var body: some View {
         let cols = maxByCol
         VStack(spacing: 4) {
@@ -100,7 +108,7 @@ struct HeatmapView: View {
                 ForEach(Outcome.allCases) { o in
                     VStack(spacing: 3) {
                         Circle().fill(o.color).frame(width: 7, height: 7)
-                        Text(o.short)
+                        Text(o.short(kind))
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.27)
                             .foregroundStyle(Theme.label2)

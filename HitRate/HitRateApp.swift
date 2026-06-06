@@ -16,7 +16,7 @@ struct HitRateApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(.light) // app UI register is iOS light
+                .preferredColorScheme(.dark) // whole app lives in the brand register now
         }
         .modelContainer(container)
     }

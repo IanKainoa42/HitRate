@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One card's worth of data, derived from FloorStats.
+/// One stat card's worth of data, derived from FloorStats.
 struct CardSpec: Identifiable {
     let id: Int          // index in the deck (0 = team/season card)
     let kicker: String   // "FULL FLOOR"/"ALL SKILLS" / "GROUP N"/"SKILL N"
@@ -11,30 +11,69 @@ struct CardSpec: Identifiable {
     let counts: [Int]
     let total: Int
     let delta: Int?
-    var flavorNoun = "group"   // word used in rarity flavor text
+    var flavorNoun = "group"   // word used in stat flavor text
+    var kind: SkillKind = .stunt   // outcome wording on the energy chips
 
     static func deck(from stats: FloorStats, teamName: String, mode: AppMode) -> [CardSpec] {
         var cards: [CardSpec] = [
             CardSpec(id: 0, kicker: mode == .athlete ? "ALL SKILLS" : "FULL FLOOR",
                      name: teamName, badge: "★",
                      color: Theme.electric, rate: stats.rate, counts: stats.overall,
-                     total: stats.total, delta: stats.delta, flavorNoun: mode.noun)
+                     total: stats.total, delta: stats.delta, flavorNoun: mode.noun,
+                     kind: stats.aggregateKind)
         ]
         for (i, g) in stats.ranked.enumerated() where g.total > 0 {
             cards.append(CardSpec(
                 id: i + 1, kicker: "\(mode.nounTitle.uppercased()) \(g.number)",
                 name: g.name, badge: "\(g.number)",
                 color: Theme.groupColor(g.colorIndex), rate: g.rate, counts: g.counts,
-                total: g.total, delta: g.delta, flavorNoun: mode.noun))
+                total: g.total, delta: g.delta, flavorNoun: mode.noun, kind: g.kind))
         }
         return cards
     }
 }
 
-/// The Stunt Card — trading-card proportions (290×430), per-rarity animated
-/// foil edge, glowing gauge, energy chips, rarity tag + flavor, set footer.
+/// One swipeable card in the share deck: a flat stat card or a milestone
+/// (earned = full holo chrome, locked = desaturated teaser with progress).
+struct DeckCard: Identifiable {
+    enum Content {
+        case stats(CardSpec)
+        case milestone(Milestone)
+    }
+
+    let id: Int
+    let content: Content
+
+    var name: String {
+        switch content {
+        case .stats(let s): s.name
+        case .milestone(let m): m.name
+        }
+    }
+
+    var color: Color {
+        switch content {
+        case .stats(let s): s.color
+        case .milestone(let m): Rarity.of(tier: m.tier).tag
+        }
+    }
+
+    var lockedMilestone: Milestone? {
+        if case .milestone(let m) = content, !m.earned { return m }
+        return nil
+    }
+
+    var earnedMilestone: Milestone? {
+        if case .milestone(let m) = content, m.earned { return m }
+        return nil
+    }
+}
+
+/// The card — trading-card proportions (290×430). Stat cards render flat
+/// (static navy edge, no foil); milestone cards carry the rarity chrome,
+/// with foil sweep + sheen reserved for holo/legendary tiers.
 struct HoloCardView: View {
-    let spec: CardSpec
+    let card: DeckCard
     let index: Int
     let count: Int
     let orgName: String
@@ -42,19 +81,30 @@ struct HoloCardView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var rarity: Rarity { Rarity.of(rate: spec.rate, noun: spec.flavorNoun) }
-    private var animated: Bool { !isSnapshot && !reduceMotion }
+    private var rarity: Rarity {
+        switch card.content {
+        case .stats(let s): Rarity.stats(rate: s.rate, noun: s.flavorNoun)
+        case .milestone(let m): Rarity.of(tier: m.tier)
+        }
+    }
+
+    private var locked: Bool { card.lockedMilestone != nil }
+
+    /// Foil motion only on holo/legendary chrome — flat cards stay still.
+    private var animated: Bool {
+        !isSnapshot && !reduceMotion && rarity.foil != .none && !locked
+    }
 
     var body: some View {
         ZStack {
-            // Metallic foil border — animated gradient sweep (ambient `foilEdge`)
+            // Edge frame — animated gradient sweep on foil tiers only
             foilEdge
             // Inner card face
             inner
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                 .padding(8)
-            // Foil sheen overlay for holo/legendary tiers
-            if rarity.foil != .none {
+            // Foil sheen overlay for earned holo/legendary
+            if rarity.foil != .none && !locked {
                 foilSheen
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .padding(8)
@@ -62,6 +112,7 @@ struct HoloCardView: View {
             }
         }
         .frame(width: 290, height: 430)
+        .saturation(locked ? 0.25 : 1)   // locked teasers sit behind glass
         .shadow(color: .black.opacity(0.55), radius: 30, y: 22)
     }
 
@@ -122,13 +173,25 @@ struct HoloCardView: View {
                 .mask(RadialGradient(colors: [.white, .clear], center: .center,
                                      startRadius: 40, endRadius: 260))
 
+            switch card.content {
+            case .stats(let spec): statsFace(spec)
+            case .milestone(let m): milestoneFace(m)
+            }
+        }
+    }
+
+    // MARK: Stats face (flat)
+
+    private func statsFace(_ spec: CardSpec) -> some View {
+        ZStack {
             VStack(spacing: 0) {
-                header
-                gauge
-                powerBar
-                energyChips
+                header(badge: Text(spec.badge), color: spec.color,
+                       kicker: spec.kicker, name: spec.name)
+                gauge(spec)
+                powerBar(spec)
+                energyChips(spec)
                 Spacer(minLength: 0)
-                rarityAndFlavor
+                tagAndFlavor(rarity.flavor)
                 footer
             }
 
@@ -156,33 +219,7 @@ struct HoloCardView: View {
         .overlay(Capsule().stroke(c.opacity(0.5), lineWidth: 1))
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 9) {
-            Text(spec.badge)
-                .font(Theme.grotesk(14))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(spec.color)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .shadow(color: spec.color.opacity(0.53), radius: 7)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(spec.kicker)
-                    .font(Theme.grotesk(9))
-                    .tracking(1.44)
-                    .foregroundStyle(.white.opacity(0.5))
-                Text(spec.name)
-                    .font(Theme.grotesk(19))
-                    .tracking(-0.19)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(EdgeInsets(top: 14, leading: 13, bottom: 8, trailing: 52))
-    }
-
-    private var gauge: some View {
+    private func gauge(_ spec: CardSpec) -> some View {
         ZStack {
             Circle()
                 .fill(RadialGradient(colors: [spec.color.opacity(0.2), .clear],
@@ -194,14 +231,14 @@ struct HoloCardView: View {
         .padding(.top, 2)
     }
 
-    private var powerBar: some View {
+    private func powerBar(_ spec: CardSpec) -> some View {
         StackedBar(counts: spec.counts, total: spec.total, height: 7,
                    background: .white.opacity(0.08))
             .padding(.horizontal, 13)
             .padding(.top, 8)
     }
 
-    private var energyChips: some View {
+    private func energyChips(_ spec: CardSpec) -> some View {
         HStack(spacing: 6) {
             ForEach(Outcome.allCases) { o in
                 VStack(spacing: 2) {
@@ -209,7 +246,7 @@ struct HoloCardView: View {
                         .font(Theme.grotesk(16))
                         .monospacedDigit()
                         .foregroundStyle(.white)
-                    Text(o.short)
+                    Text(o.short(spec.kind))
                         .font(Theme.grotesk(8))
                         .tracking(0.48)
                         .foregroundStyle(o.color)
@@ -226,7 +263,100 @@ struct HoloCardView: View {
         .padding(.top, 8)
     }
 
-    private var rarityAndFlavor: some View {
+    // MARK: Milestone face
+
+    private func milestoneFace(_ m: Milestone) -> some View {
+        ZStack {
+            VStack(spacing: 0) {
+                header(badge: Image(systemName: m.icon).font(.system(size: 13, weight: .bold)),
+                       color: rarity.tag.opacity(m.earned ? 1 : 0.5),
+                       kicker: m.kicker, name: m.name)
+
+                // Progress ring with the milestone icon at its center
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [rarity.tag.opacity(m.earned ? 0.22 : 0.08), .clear],
+                                             center: .center, startRadius: 0, endRadius: 63))
+                        .frame(width: 126, height: 126)
+                    Circle()
+                        .stroke(.white.opacity(0.10), lineWidth: 9)
+                        .padding(9)
+                        .frame(width: 116, height: 116)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(m.progress))
+                        .stroke(rarity.tag, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .padding(9)
+                        .frame(width: 116, height: 116)
+                        .shadow(color: rarity.tag.opacity(m.earned ? 0.9 : 0.3), radius: 3.2)
+                    Image(systemName: m.earned ? m.icon : "lock.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(m.earned ? .white : .white.opacity(0.45))
+                }
+                .padding(.top, 2)
+
+                // The number that earned it (or the distance left)
+                Text(m.detail)
+                    .font(Theme.grotesk(15, .medium))
+                    .foregroundStyle(.white.opacity(m.earned ? 0.92 : 0.6))
+                    .padding(.top, 10)
+                    .padding(.horizontal, 14)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Spacer(minLength: 0)
+                tagAndFlavor(m.flavor)
+                footer
+            }
+
+            if !m.earned {
+                HStack(spacing: 3) {
+                    Image(systemName: "lock.fill").font(.system(size: 8))
+                    Text("LOCKED").font(Theme.grotesk(9)).tracking(1.0)
+                }
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(.white.opacity(0.10))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(.white.opacity(0.25), lineWidth: 1))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(11)
+            }
+        }
+    }
+
+    // MARK: Shared chrome
+
+    private func header(badge: some View, color: Color,
+                        kicker: String, name: String) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            badge
+                .font(Theme.grotesk(14))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .shadow(color: color.opacity(0.53), radius: 7)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(kicker)
+                    .font(Theme.grotesk(9))
+                    .tracking(1.44)
+                    .foregroundStyle(.white.opacity(0.5))
+                Text(name)
+                    .font(Theme.grotesk(19))
+                    .tracking(-0.19)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(EdgeInsets(top: 14, leading: 13, bottom: 8, trailing: 52))
+    }
+
+    private func tagAndFlavor(_ flavor: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(rarity.tier)
                 .font(Theme.grotesk(8))
@@ -237,7 +367,7 @@ struct HoloCardView: View {
                 .background(rarity.tag.opacity(0.12))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(rarity.tag.opacity(0.33), lineWidth: 1))
-            Text(rarity.flavor)
+            Text(flavor)
                 .font(.system(size: 11))
                 .italic()
                 .foregroundStyle(.white.opacity(0.62))
@@ -261,7 +391,9 @@ struct HoloCardView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-                StarsView(filled: rarity.stars)
+                if rarity.tier != "STATS" {
+                    StarsView(filled: rarity.stars)
+                }
                 Text("\(String(format: "%03d", index + 1))/\(String(format: "%03d", count))")
                     .font(Theme.grotesk(9))
                     .tracking(0.72)

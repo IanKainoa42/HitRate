@@ -22,6 +22,20 @@ enum AppMode: String {
     }
 }
 
+// MARK: - Skill kind (stunt vs tumbling)
+
+/// What kind of skill a bucket counts. Kind changes only the outcome *words*
+/// ("Bobble" vs "Stepped out") — severity slots, colors, and rawValue indexing
+/// are identical across kinds, so every `counts[o.rawValue]` stays valid.
+/// Coach groups are stunts; athletes can mix stunt and tumbling skills.
+enum SkillKind: String, CaseIterable, Identifiable {
+    case stunt, tumbling
+
+    var id: String { rawValue }
+    var label: String { self == .stunt ? "Stunt" : "Tumbling" }
+    var icon: String { self == .stunt ? "person.3.fill" : "figure.gymnastics" }
+}
+
 // MARK: - Outcome (the core domain enum)
 
 enum Outcome: Int, Codable, CaseIterable, Identifiable {
@@ -34,30 +48,45 @@ enum Outcome: Int, Codable, CaseIterable, Identifiable {
 
     /// UserDefaults key for the user's custom name of this outcome slot.
     /// Severity order and colors are fixed — only the words are renameable.
-    static func labelKey(_ slot: Int) -> String { "outcomeLabel\(slot)" }
+    static func labelKey(_ slot: Int, kind: SkillKind) -> String {
+        kind == .stunt ? "outcomeLabel\(slot)" : "tumblingOutcomeLabel\(slot)"
+    }
 
-    var defaultLabel: String {
-        switch self {
-        case .hit: "Hit"
-        case .bobble: "Bobble"
-        case .buildingFall: "Building fall"
-        case .majorFall: "Major fall"
+    func defaultLabel(_ kind: SkillKind) -> String {
+        switch (kind, self) {
+        case (.stunt, .hit): "Hit"
+        case (.stunt, .bobble): "Bobble"
+        case (.stunt, .buildingFall): "Building fall"
+        case (.stunt, .majorFall): "Major fall"
+        case (.tumbling, .hit): "Stuck"
+        case (.tumbling, .bobble): "Stepped out"
+        case (.tumbling, .buildingFall): "Touched down"
+        case (.tumbling, .majorFall): "Major fall"
         }
     }
 
-    var label: String {
-        let custom = OutcomeNames.shared.custom[rawValue]
-        return custom.isEmpty ? defaultLabel : custom
+    /// Kind-free conveniences for aggregate contexts with no single bucket
+    /// (prefer `label(_:)`/`short(_:)` wherever a kind is known).
+    var label: String { label(.stunt) }
+    var short: String { short(.stunt) }
+
+    func label(_ kind: SkillKind) -> String {
+        let custom = OutcomeNames.shared.custom(kind)[rawValue]
+        return custom.isEmpty ? defaultLabel(kind) : custom
     }
 
-    var short: String {
-        let custom = OutcomeNames.shared.custom[rawValue]
+    func short(_ kind: SkillKind) -> String {
+        let custom = OutcomeNames.shared.custom(kind)[rawValue]
         guard !custom.isEmpty else {
-            switch self {
-            case .hit: return "HIT"
-            case .bobble: return "BOB"
-            case .buildingFall: return "BF"
-            case .majorFall: return "MF"
+            switch (kind, self) {
+            case (.stunt, .hit): return "HIT"
+            case (.stunt, .bobble): return "BOB"
+            case (.stunt, .buildingFall): return "BF"
+            case (.stunt, .majorFall): return "MF"
+            case (.tumbling, .hit): return "STK"
+            case (.tumbling, .bobble): return "SO"
+            case (.tumbling, .buildingFall): return "TD"
+            case (.tumbling, .majorFall): return "MF"
             }
         }
         // Derive: initials for multi-word names ("Touch down" → TD),
@@ -83,26 +112,37 @@ enum Outcome: Int, Codable, CaseIterable, Identifiable {
 
 // MARK: - Outcome rename store
 
-/// Custom outcome names (blank slot = standard name), persisted to
-/// UserDefaults. @Observable on purpose: every view that renders
-/// `Outcome.label`/`short` picks up a tracked dependency just by reading it
-/// in body, so renames in the editor re-render the whole app. Raw
+/// Custom outcome names (blank slot = standard name), one 4-slot set per
+/// skill kind, persisted to UserDefaults. @Observable on purpose: every view
+/// that renders `Outcome.label`/`short` picks up a tracked dependency just by
+/// reading it in body, so renames in the editor re-render the whole app. Raw
 /// UserDefaults reads are invisible to SwiftUI — that shipped stale labels
 /// on the Log pad and tape legend (QA e2-1/e2-2).
 @Observable
 final class OutcomeNames {
     static let shared = OutcomeNames()
 
-    var custom: [String] {
-        didSet {
-            for (i, v) in custom.enumerated() {
-                UserDefaults.standard.set(v, forKey: Outcome.labelKey(i))
-            }
+    var stunt: [String] {
+        didSet { persist(stunt, kind: .stunt) }
+    }
+
+    var tumbling: [String] {
+        didSet { persist(tumbling, kind: .tumbling) }
+    }
+
+    func custom(_ kind: SkillKind) -> [String] {
+        kind == .stunt ? stunt : tumbling
+    }
+
+    private func persist(_ values: [String], kind: SkillKind) {
+        for (i, v) in values.enumerated() {
+            UserDefaults.standard.set(v, forKey: Outcome.labelKey(i, kind: kind))
         }
     }
 
     private init() {
-        custom = (0..<4).map { UserDefaults.standard.string(forKey: Outcome.labelKey($0)) ?? "" }
+        stunt = (0..<4).map { UserDefaults.standard.string(forKey: Outcome.labelKey($0, kind: .stunt)) ?? "" }
+        tumbling = (0..<4).map { UserDefaults.standard.string(forKey: Outcome.labelKey($0, kind: .tumbling)) ?? "" }
     }
 }
 
@@ -114,16 +154,26 @@ final class StuntGroup {
     var number: Int        // badge number shown in chips/cards
     var orderIndex: Int    // display order
     var createdAt: Date
+    /// Stunt vs tumbling — default keeps existing stores migrating lightweight
+    /// (every pre-kind bucket was a stunt).
+    var kindRaw: String = SkillKind.stunt.rawValue
     /// Deleting a group deletes its logged attempts with it — stats never see
     /// orphaned reps (which used to leak into deltas/trend but not the rate).
     @Relationship(deleteRule: .cascade, inverse: \Attempt.group)
     var attempts: [Attempt] = []
 
-    init(name: String, number: Int, orderIndex: Int, createdAt: Date = .now) {
+    init(name: String, number: Int, orderIndex: Int, kind: SkillKind = .stunt,
+         createdAt: Date = .now) {
         self.name = name
         self.number = number
         self.orderIndex = orderIndex
+        self.kindRaw = kind.rawValue
         self.createdAt = createdAt
+    }
+
+    var kind: SkillKind {
+        get { SkillKind(rawValue: kindRaw) ?? .stunt }
+        set { kindRaw = newValue.rawValue }
     }
 
     /// Group identity color — formation rainbow, cycled by number.
