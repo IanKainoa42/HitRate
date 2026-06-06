@@ -14,8 +14,17 @@ struct HomeView: View {
     @State private var timeframe: Timeframe = .today
     @State private var groupView = "Ranked"
     @State private var shareOpen = false
+    @State private var editorOpen = false
+    @State private var logSession: PracticeSession?   // non-nil = counter cover up
+    @State private var hapticTrigger = 0
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
+    /// A live session survives the app being killed mid-practice — the pill
+    /// becomes "Resume" and reopens it instead of creating a duplicate.
+    private var activeSession: PracticeSession? {
+        sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
+    }
 
     /// Header + share-card identity per mode.
     private var displayTitle: String {
@@ -67,8 +76,10 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
+            .safeAreaInset(edge: .bottom) { practicePill }
         }
-        .background(CourtBackdrop().ignoresSafeArea())
+        .background(CourtBackdrop(twinkle: true).ignoresSafeArea())
+        .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
         .fullScreenCover(isPresented: $shareOpen) {
             // Milestones are lifetime — deliberately not filtered by timeframe.
             ShareCardsSheet(stats: stats,
@@ -78,6 +89,63 @@ struct HomeView: View {
                             orgName: mode == .athlete ? displayTitle : displayKicker,
                             mode: mode)
         }
+        .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
+            LogView(session: s)
+        }
+        .sheet(isPresented: $editorOpen) {
+            GroupsEditorView()
+        }
+    }
+
+    // MARK: Practice pill (the only way into the counter — no tab bar)
+
+    private var practicePill: some View {
+        Button {
+            let s: PracticeSession
+            if let live = activeSession {
+                s = live
+            } else {
+                s = PracticeSession()
+                context.insert(s)
+                try? context.save()
+                Sounds.shared.play(.start)
+            }
+            hapticTrigger += 1
+            logSession = s
+        } label: {
+            HStack(spacing: 8) {
+                if let live = activeSession {
+                    Circle()
+                        .fill(Theme.hit)
+                        .frame(width: 7, height: 7)
+                    Text("Resume practice · \(live.attempts.count) rep\(live.attempts.count == 1 ? "" : "s")")
+                        .font(.system(size: 16, weight: .bold))
+                } else {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Start practice")
+                        .font(.system(size: 16, weight: .bold))
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(Theme.accent)
+            .clipShape(Capsule())
+            .shadow(color: Theme.accent.opacity(0.45), radius: 14, y: 6)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 6)
+    }
+
+    /// "End" on a rep-less session leaves it live (deleting a model the cover
+    /// is still rendering crashes mid-dismiss) — finish the delete here.
+    private func sweepEmptyLiveSessions() {
+        let empties = sessions.filter { $0.isActive && $0.attempts.isEmpty }
+        guard !empties.isEmpty else { return }
+        for s in empties { context.delete(s) }
+        try? context.save()
     }
 
     // MARK: Header
@@ -107,6 +175,21 @@ struct HomeView: View {
                     .foregroundStyle(Theme.label)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Skills/groups editor — with the Log tab gone, this is the only
+            // path to roster + settings outside a live practice.
+            Button {
+                editorOpen = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.label2)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.fill)
+                    .clipShape(Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
 
             Button {
                 shareOpen = true
@@ -183,8 +266,8 @@ struct HomeView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.label)
                 Text(mode == .athlete
-                     ? "Log your stunt reps from the Log tab during practice. Your dashboard builds itself from every rep."
-                     : "Log stunt outcomes from the Log tab during practice. The floor dashboard builds itself from every rep.")
+                     ? "Hit Start practice below and log every rep as it lands. Your dashboard builds itself from there."
+                     : "Hit Start practice below and log every outcome as it lands. The floor dashboard builds itself from there.")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.label2)
                     .multilineTextAlignment(.center)

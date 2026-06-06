@@ -67,4 +67,12 @@ visual diffing against `docs/design-handoff/screenshots/`.
   has a kind that picks the outcome wording — stunt: Hit / Bobble / Building
   fall / Major fall; tumbling: Stuck / Stepped out / Touched down / Major fall.
   Both renameable per kind; severity slots and colors are shared.
+- **No tab bar**: the handoff implies a Home/Log split; the shipped app makes
+  the dashboard the whole app. The counter is a full-screen practice session
+  entered from a floating "Start practice" pill and exited with "End" (back
+  to Home). Practice is occasional — the data is the product.
+- **Glow + twinkle** (not in the handoff): an ambient star field on Home plus
+  glow reserved for the hero data cards (rate-band halo on the summary, neon
+  accent on the trend line) to pull the eye to the charts. Reduce Motion gets
+  a static field.
 - App icon: brand-register "98 ring" (`HitRate/Assets.xcassets`).

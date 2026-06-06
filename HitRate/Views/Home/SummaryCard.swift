@@ -7,10 +7,15 @@ struct SummaryCard: View {
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
+    private var rateColor: Color {
+        Theme.rateColor(stats.rate, hasData: stats.hasData)
+    }
+
     var body: some View {
-        FeedCard {
+        // Glow tracks the rate band — green halo when hot, red when cold.
+        FeedCard(glow: rateColor) {
             HStack(alignment: .bottom) {
-                // Big animated hit-rate number, colored by rate band.
+                // Big animated hit-rate number, colored by rate band + neon glow.
                 HStack(alignment: .lastTextBaseline, spacing: 2) {
                     Text("\(stats.rate)")
                         .font(.system(size: 52, weight: .heavy, design: .rounded))
@@ -19,7 +24,8 @@ struct SummaryCard: View {
                     Text("%")
                         .font(.system(size: 26, weight: .heavy, design: .rounded))
                 }
-                .foregroundStyle(Theme.rateColor(stats.rate, hasData: stats.hasData))
+                .foregroundStyle(rateColor)
+                .shadow(color: rateColor.opacity(0.5), radius: 12)
                 .lineLimit(1)
 
                 Spacer()

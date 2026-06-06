@@ -1,12 +1,17 @@
 import SwiftUI
 import SwiftData
 
-/// The counter. Built for the floor: pick a group once, then hammer one of
-/// four giant outcome buttons per rep. Full-surface tap targets, haptics, undo.
+/// The counter, presented full-screen from Home's practice pill for the
+/// duration of one session. Built for the floor: pick a group once, then
+/// hammer one of four giant outcome buttons per rep. Full-surface tap
+/// targets, haptics, undo. "End" is the only exit — it returns to Home
+/// (an empty session is swept by Home on dismiss instead of being kept).
 struct LogView: View {
+    let session: PracticeSession
+
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
-    @Query private var sessions: [PracticeSession]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
 
@@ -15,10 +20,6 @@ struct LogView: View {
     @State private var showGroupsEditor = false
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
-
-    private var activeSession: PracticeSession? {
-        sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
-    }
 
     /// The group the pad logs into. Validates membership so a selection that
     /// was deleted in the editor can't receive new attempts (deleted SwiftData
@@ -30,71 +31,25 @@ struct LogView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let session = activeSession {
-                    activeView(session)
-                } else {
-                    idleView
+            activeView
+                .background(CourtBackdrop().ignoresSafeArea())
+                .navigationTitle("Practice")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(mode.nounPluralTitle) { showGroupsEditor = true }
+                    }
                 }
-            }
-            .background(CourtBackdrop().ignoresSafeArea())
-            .navigationTitle("Log")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(mode.nounPluralTitle) { showGroupsEditor = true }
+                .sheet(isPresented: $showGroupsEditor) {
+                    GroupsEditorView()
                 }
-            }
-            .sheet(isPresented: $showGroupsEditor) {
-                GroupsEditorView()
-            }
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
     }
 
-    // MARK: Idle (no active session)
-
-    private var idleView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "figure.gymnastics")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.accent)
-            Text("Ready to count")
-                .font(.system(size: 22, weight: .bold))
-            Text("Start a practice, pick a \(mode.noun), and log every stunt rep as it lands.")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.label2)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Spacer()
-
-            Button {
-                let s = PracticeSession()
-                context.insert(s)
-                try? context.save()
-                selectedGroup = groups.first
-                hapticTrigger += 1
-                Sounds.shared.play(.start)
-            } label: {
-                Text("Start practice")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
-        }
-    }
-
     // MARK: Active session
 
-    private func activeView(_ session: PracticeSession) -> some View {
+    private var activeView: some View {
         let attempts = session.sortedAttempts
         let hits = attempts.filter { $0.outcome.isHit }.count
         let rate = attempts.isEmpty ? nil : Int((Double(hits) / Double(attempts.count) * 100).rounded())
@@ -114,16 +69,16 @@ struct LogView: View {
                 }
                 Spacer()
                 Button {
-                    if session.attempts.isEmpty {
-                        // Nothing logged — drop the session instead of keeping
-                        // an empty one in the store.
-                        context.delete(session)
-                    } else {
+                    // A session with reps ends here; an empty one stays live
+                    // and Home deletes it on dismiss (mutating-then-rendering
+                    // a deleted model mid-animation crashes).
+                    if !session.attempts.isEmpty {
                         session.endedAt = .now
+                        try? context.save()
                     }
-                    try? context.save()
                     hapticTrigger += 1
                     Sounds.shared.play(.end)
+                    dismiss()
                 } label: {
                     Text("End")
                         .font(.system(size: 15, weight: .semibold))

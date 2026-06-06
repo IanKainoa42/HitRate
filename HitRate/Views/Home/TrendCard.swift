@@ -6,7 +6,7 @@ struct TrendCard: View {
     let stats: FloorStats
 
     var body: some View {
-        FeedCard {
+        FeedCard(glow: stats.trend.count >= 2 ? Theme.accent : nil) {
             CardHead("HIT RATE OVER TIME") {
                 Text(stats.rangeNote)
                     .font(.system(size: 11, weight: .medium))
@@ -81,7 +81,7 @@ struct LineChart: View {
                 }
                 .fill(accent.opacity(0.08))
 
-                // Line
+                // Line (neon — soft accent glow under the stroke)
                 Path { p in
                     p.move(to: CGPoint(x: x(0), y: y(data[0])))
                     for (i, v) in data.enumerated().dropFirst() {
@@ -89,6 +89,14 @@ struct LineChart: View {
                     }
                 }
                 .stroke(accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                .shadow(color: accent.opacity(0.55), radius: 5)
+
+                // Halo behind the latest point — the "you are here" beacon.
+                Circle()
+                    .fill(accent.opacity(0.35))
+                    .frame(width: 22, height: 22)
+                    .blur(radius: 6)
+                    .position(x: x(n - 1), y: y(data[n - 1]))
 
                 // Points (last emphasized)
                 ForEach(Array(data.enumerated()), id: \.offset) { i, v in

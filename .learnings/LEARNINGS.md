@@ -99,3 +99,9 @@
 - **Category:** correction
 - **What happened:** Button-sound iteration went synthesized pops → cinematic SFX pack (Singularity) → Ian: "im thinking just like regular subtle clicks." Final: system keyboard-click family (IDs 1104/1103/1105) rotated with no-repeat — zero assets.
 - **Rule:** For HitRate UI feedback, default to native/system-subtle (keyboard-click register) rather than designed/cinematic sounds. Severity theatrics belong on the share cards, not the counter. Known-good system click IDs: 1104 tock, 1103 tick, 1105 modifier tock.
+
+## 2026-06-06 — Don't delete a SwiftData model a fullScreenCover is still rendering
+
+- **Category:** best_practice
+- **What happened:** Killing the tab bar made LogView a `fullScreenCover(item:)` holding a `PracticeSession`. "End" on an empty session originally deleted the model, but the cover keeps rendering it during the dismiss animation — deleted-model property access crashes.
+- **Rule:** Inside the cover, only mutate live models (`endedAt = .now`); defer deletes to the presenter's `onDismiss` (Home sweeps empty live sessions there). Same family as the existing "validate selection membership before insert" rule in LogView.

@@ -72,10 +72,18 @@ Key invariants:
 ## Architecture
 
 - `HitRateApp.swift` — entry; `RootView` shows `OnboardingView` until
-  `didOnboard`, then a two-tab TabView (Home/Log). NO group seeding — first
-  launch goes through the onboarding chooser (athlete vs coach) where the user
-  creates their own buckets. Installs that predate onboarding (have groups but
-  no `didOnboard`) are migrated to coach mode silently.
+  `didOnboard`, then `HomeView` as the ONLY root — the tab bar was retired
+  2026-06-06 (practice is occasional; the dashboard is the app). The counter
+  is `LogView(session:)` in a fullScreenCover off Home's floating practice
+  pill; the pill resumes a live session or creates one (the ONLY place
+  sessions are created). "End" returns to Home; an empty session is left live
+  and swept in Home's cover `onDismiss` (deleting a model the cover still
+  renders crashes mid-dismiss). The stale-session/orphan sweeps hang off
+  RootView's root `Group` — keep them attached when touching RootView. NO
+  group seeding — first launch goes through the onboarding chooser (athlete
+  vs coach) where the user creates their own buckets. Installs that predate
+  onboarding (have groups but no `didOnboard`) are migrated to coach mode
+  silently.
 - `Views/Onboarding/OnboardingView.swift` — brand-register (navy) chooser +
   identity + quick-add first skills/groups. Suggestion chips create buckets;
   they are not pre-made.
@@ -95,7 +103,15 @@ Key invariants:
 - `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
   fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`
-  call off a `timeframe` @State in HomeView. `Views/Log/*` — the counter.
+  call off a `timeframe` @State in HomeView. Glow guides the eye to the data:
+  `FeedCard(glow:)` lights ONLY the hero cards (SummaryCard = rate-band color,
+  TrendCard = accent + neon line/last-point halo); everything else stays flat
+  glass — don't spread glow to every card. `CourtBackdrop(twinkle: true)` is
+  Home-only (ambient star field, top-weighted toward the charts, Reduce
+  Motion-aware) — the counter, onboarding, and share snapshot paths stay
+  twinkle-free on purpose. Header also hosts the skills/groups editor button —
+  the only path to roster + settings outside a live practice.
+  `Views/Log/*` — the counter.
   `Views/Share/*` — Stunt Cards sheet, `DeckCard` (stats | milestone),
   HoloCardView, PuckView. Deck = flat stat cards, then earned milestones
   (tier desc), then locked teasers (progress desc). Locked cards disable the

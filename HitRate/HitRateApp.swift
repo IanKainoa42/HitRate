@@ -32,18 +32,15 @@ struct RootView: View {
 
     var body: some View {
         Group {
+            // No tab bar — practice is occasional, the dashboard is the app.
+            // The counter lives in a full-screen cover off Home's practice pill.
             if didOnboard {
-                TabView {
-                    HomeView()
-                        .tabItem { Label("Home", systemImage: "chart.bar.fill") }
-                    LogView()
-                        .tabItem { Label("Log", systemImage: "plus.circle.fill") }
-                }
-                .tint(Theme.accent)
+                HomeView()
             } else {
                 OnboardingView()
             }
         }
+        .tint(Theme.accent)
         .onAppear {
             migrateExistingInstallIfNeeded()
             sweepOrphanedAttempts()
