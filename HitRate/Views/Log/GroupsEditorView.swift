@@ -16,6 +16,9 @@ struct GroupsEditorView: View {
     // rest of the app re-renders on rename.
     @State private var outcomeNames = OutcomeNames.shared
 
+    // Swipe-deleted group awaiting confirmation (only when it has logged reps).
+    @State private var pendingDelete: StuntGroup?
+
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
     var body: some View {
@@ -47,8 +50,15 @@ struct GroupsEditorView: View {
                         }
                     }
                     .onDelete { idx in
-                        for i in idx { context.delete(groups[i]) }
-                        renumber()
+                        guard let i = idx.first else { return }
+                        let g = groups[i]
+                        if g.attempts.isEmpty {
+                            context.delete(g)
+                            renumber()
+                        } else {
+                            // Deleting cascades its logged reps — confirm first.
+                            pendingDelete = g
+                        }
                     }
                     .onMove { from, to in
                         var arr = groups
@@ -93,9 +103,31 @@ struct GroupsEditorView: View {
                 } footer: {
                     Text("Coach mode tracks multiple stunt groups and puts your program on the share cards. Your logged reps carry over either way.")
                 }
+
+                Section {
+                } footer: {
+                    Text("HitRate \(appVersion)")
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                }
             }
             .navigationTitle(mode == .athlete ? "My Skills" : "Groups")
             .navigationBarTitleDisplayMode(.inline)
+            .alert(
+                "Delete \(pendingDelete?.name ?? "")?",
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }),
+                presenting: pendingDelete
+            ) { g in
+                Button("Delete \(mode.noun) & reps", role: .destructive) {
+                    context.delete(g)
+                    renumber()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { g in
+                Text("Its \(g.attempts.count) logged reps will be deleted too. This can't be undone.")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -107,6 +139,12 @@ struct GroupsEditorView: View {
                 }
             }
         }
+    }
+
+    private var appVersion: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(v) (\(b))"
     }
 
     private func renumber() {

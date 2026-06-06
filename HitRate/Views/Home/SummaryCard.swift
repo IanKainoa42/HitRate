@@ -63,6 +63,7 @@ struct SummaryCard: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Theme.label)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.75)   // "Building fall" must not truncate beside big counts
                         Spacer(minLength: 4)
                         Text("\(stats.overall[o.rawValue])")
                             .font(.system(size: 14, weight: .bold, design: .rounded))

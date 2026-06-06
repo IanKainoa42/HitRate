@@ -13,6 +13,7 @@ struct ShareCardsSheet: View {
     @State private var activeIndex: Int? = 0
     @State private var toast = ""
     @State private var toastTask: Task<Void, Never>?
+    @State private var photoSaver = PhotoSaver()
 
     private var cards: [CardSpec] { CardSpec.deck(from: stats, teamName: teamName, mode: mode) }
 
@@ -138,14 +139,22 @@ struct ShareCardsSheet: View {
         HStack(spacing: 6) {
             ForEach(deck) { card in
                 let on = card.id == (activeIndex ?? 0)
-                Capsule()
-                    .fill(on ? card.color : .white.opacity(0.25))
-                    .frame(width: on ? 18 : 6, height: 6)
-                    .animation(.easeOut(duration: 0.25), value: activeIndex)
+                Button {
+                    withAnimation(.easeOut(duration: 0.3)) { activeIndex = card.id }
+                } label: {
+                    Capsule()
+                        .fill(on ? card.color : .white.opacity(0.25))
+                        .frame(width: on ? 18 : 6, height: 6)
+                        .animation(.easeOut(duration: 0.25), value: activeIndex)
+                        .padding(.vertical, 8)   // a 6pt dot is not a tap target
+                        .padding(.horizontal, 2)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Card \(card.id + 1) of \(deck.count), \(card.name)")
             }
         }
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
     }
 
     // MARK: Actions
@@ -178,8 +187,10 @@ struct ShareCardsSheet: View {
             HStack(spacing: 10) {
                 glassButton("Save image", icon: "arrow.down.to.line") {
                     if let img = render(active, count: deck.count) {
-                        UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
-                        showToast("Saved to Photos")
+                        photoSaver.save(img) { ok in
+                            showToast(ok ? "Saved to Photos"
+                                         : "Couldn't save — allow Photos access in Settings")
+                        }
                     }
                 }
                 glassButton("Copy image", icon: "doc.on.doc") {
@@ -230,14 +241,19 @@ struct ShareCardsSheet: View {
     /// Save the card image, then deep-link to Instagram (handoff-recommended flow).
     private func shareToInstagram(_ card: CardSpec, count: Int) {
         guard let img = render(card, count: count) else { return }
-        UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
-        if let url = URL(string: "instagram://app"), UIApplication.shared.canOpenURL(url) {
-            showToast("Saved card — opening Instagram")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                UIApplication.shared.open(url)
+        photoSaver.save(img) { ok in
+            guard ok else {
+                showToast("Couldn't save — allow Photos access in Settings")
+                return
             }
-        } else {
-            showToast("Saved card to Photos — open Instagram to post")
+            if let url = URL(string: "instagram://app"), UIApplication.shared.canOpenURL(url) {
+                showToast("Saved card — opening Instagram")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    UIApplication.shared.open(url)
+                }
+            } else {
+                showToast("Saved card to Photos — open Instagram to post")
+            }
         }
     }
 
@@ -248,5 +264,24 @@ struct ShareCardsSheet: View {
             try? await Task.sleep(for: .seconds(1.9))
             if !Task.isCancelled { toast = "" }
         }
+    }
+}
+
+/// Completion-reporting wrapper for UIImageWriteToSavedPhotosAlbum — the
+/// fire-and-forget form swallows permission errors, so the toast would claim
+/// "Saved to Photos" even when access was denied.
+private final class PhotoSaver: NSObject {
+    private var completion: ((Bool) -> Void)?
+
+    func save(_ image: UIImage, completion: @escaping (Bool) -> Void) {
+        self.completion = completion
+        UIImageWriteToSavedPhotosAlbum(
+            image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?,
+                             contextInfo: UnsafeRawPointer) {
+        completion?(error == nil)
+        completion = nil
     }
 }

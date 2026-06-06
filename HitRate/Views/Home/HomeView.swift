@@ -146,8 +146,9 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
 
-            if let url = CSVExport.write(sessions: sessions) {
-                ShareLink(item: url) {
+            let csv = CSVExportItem(sessions: sessions)
+            if csv.hasData {
+                ShareLink(item: csv, preview: SharePreview("HitRate practice data")) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.to.line")
                             .font(.system(size: 15, weight: .semibold))

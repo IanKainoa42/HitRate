@@ -114,6 +114,10 @@ final class StuntGroup {
     var number: Int        // badge number shown in chips/cards
     var orderIndex: Int    // display order
     var createdAt: Date
+    /// Deleting a group deletes its logged attempts with it — stats never see
+    /// orphaned reps (which used to leak into deltas/trend but not the rate).
+    @Relationship(deleteRule: .cascade, inverse: \Attempt.group)
+    var attempts: [Attempt] = []
 
     init(name: String, number: Int, orderIndex: Int, createdAt: Date = .now) {
         self.name = name

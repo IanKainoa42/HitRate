@@ -88,7 +88,8 @@ enum StatsEngine {
             current = sorted.filter { cal.isDateInToday($0.startedAt) }
             previous = sorted.last { !cal.isDateInToday($0.startedAt) }.map { [$0] } ?? []
             deltaNote = "vs last session"
-            rangeNote = "last \(min(8, max(sorted.count, 1))) sessions"
+            let n = min(8, max(sorted.count, 1))
+            rangeNote = n == 1 ? "last session" : "last \(n) sessions"
         case .week:
             let week = cal.dateInterval(of: .weekOfYear, for: now)!
             current = sorted.filter { week.contains($0.startedAt) }
@@ -113,6 +114,7 @@ enum StatsEngine {
         // Per-group stats in the current and previous periods.
         let ordered = groups.sorted { $0.orderIndex < $1.orderIndex }
         var groupStats: [GroupStat] = []
+        var prevOverall = [0, 0, 0, 0]
         for g in ordered {
             let counts = outcomeCounts(in: current, group: g)
             let total = counts.reduce(0, +)
@@ -121,6 +123,7 @@ enum StatsEngine {
 
             let prevCounts = outcomeCounts(in: previous, group: g)
             let prevTotal = prevCounts.reduce(0, +)
+            for i in 0..<4 { prevOverall[i] += prevCounts[i] }
             var delta: Int?
             if total > 0, prevTotal > 0 {
                 // For .all, compare against the first session (season start) — "growth since Sept".
@@ -142,10 +145,10 @@ enum StatsEngine {
         let hits = overall[Outcome.hit.rawValue]
         let rate = total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : 0
 
-        var prevOverall = [0, 0, 0, 0]
-        for s in previous {
-            for a in s.attempts { prevOverall[a.outcomeRaw] += 1 }
-        }
+        // prevOverall is rolled up from per-group counts (not raw session
+        // attempts) so the floor delta and the per-group deltas agree — raw
+        // attempts could include legacy orphans from before group-delete
+        // cascaded.
         let prevTotal = prevOverall.reduce(0, +)
         var delta: Int?
         if total > 0, prevTotal > 0 {

@@ -15,6 +15,8 @@ struct TrendCard: View {
             if stats.trend.count >= 2 {
                 LineChart(data: stats.trend, accent: Theme.accent)
                     .frame(height: 116)
+                    .accessibilityLabel("Hit rate over time")
+                    .accessibilityValue("\(stats.trend.map { "\($0)%" }.joined(separator: ", ")). Latest \(stats.trend.last ?? 0)%")
             } else {
                 Text("Not enough sessions yet — the trend appears after two.")
                     .font(.system(size: 13))

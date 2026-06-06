@@ -71,8 +71,10 @@ struct RankedRow: View {
                 Text("%")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)   // "100%" must not wrap in the fixed column
             .foregroundStyle(Theme.rateColor(stat.rate, hasData: stat.total > 0))
-            .frame(width: 44, alignment: .trailing)
+            .frame(width: 48, alignment: .trailing)
         }
         .padding(.vertical, 10)
     }

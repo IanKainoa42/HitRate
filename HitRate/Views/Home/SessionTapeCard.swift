@@ -32,6 +32,8 @@ struct SessionTapeCard: View {
                 }
             }
             .frame(height: 36)
+            .accessibilityLabel("Session tape")
+            .accessibilityValue(tapeSummary)
 
             // Rough-patch bracket
             if let patch = snapshot.roughPatch {
@@ -84,6 +86,17 @@ struct SessionTapeCard: View {
             }
             .padding(.top, 11)
         }
+    }
+
+    /// VoiceOver stand-in for the drawn tape: per-outcome counts in order.
+    private var tapeSummary: String {
+        let counts = Outcome.allCases.map { o in
+            snapshot.outcomes.filter { $0 == o }.count
+        }
+        let parts = Outcome.allCases.compactMap { o in
+            counts[o.rawValue] > 0 ? "\(counts[o.rawValue]) \(o.label.lowercased())" : nil
+        }
+        return "\(snapshot.outcomes.count) reps: " + parts.joined(separator: ", ")
     }
 
     /// Midpoint timestamp of the rough patch, interpolated across the session.

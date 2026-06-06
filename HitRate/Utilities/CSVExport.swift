@@ -1,29 +1,55 @@
+import CoreTransferable
 import Foundation
+import UniformTypeIdentifiers
 
-enum CSVExport {
-    /// Writes every attempt to a temp CSV and returns its URL (nil if no data).
-    static func write(sessions: [PracticeSession]) -> URL? {
-        let all = sessions.flatMap { s in
-            s.sortedAttempts.map { (session: s, attempt: $0) }
-        }
-        guard !all.isEmpty else { return nil }
+/// Lazily-exported CSV of every attempt. Rows are snapshotted as plain values
+/// when the view builds (cheap); the string build + temp-file write only
+/// happen when the share actually fires — never do file I/O in a SwiftUI body
+/// (the old version rewrote the CSV to disk on every Home render).
+struct CSVExportItem: Transferable {
+    struct Row {
+        let timestamp: Date
+        let sessionStart: Date
+        let group: String
+        let outcome: String
+    }
 
+    let rows: [Row]
+    let noun: String   // CSV header column for the bucket ("skill"/"group")
+
+    init(sessions: [PracticeSession]) {
+        noun = AppMode.current.noun
+        rows = sessions
+            .flatMap { s in
+                s.sortedAttempts.map {
+                    Row(timestamp: $0.timestamp, sessionStart: s.startedAt,
+                        group: $0.group?.name ?? "", outcome: $0.outcome.label)
+                }
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+    }
+
+    var hasData: Bool { !rows.isEmpty }
+
+    private func write() throws -> URL {
         let iso = ISO8601DateFormatter()
-        var csv = "timestamp,session_start,\(AppMode.current.noun),outcome\n"
-        for row in all.sorted(by: { $0.attempt.timestamp < $1.attempt.timestamp }) {
-            let group = (row.attempt.group?.name ?? "").replacingOccurrences(of: ",", with: " ")
-            csv += "\(iso.string(from: row.attempt.timestamp)),\(iso.string(from: row.session.startedAt)),\(group),\(row.attempt.outcome.label)\n"
+        var csv = "timestamp,session_start,\(noun),outcome\n"
+        for r in rows {
+            let group = r.group.replacingOccurrences(of: ",", with: " ")
+            csv += "\(iso.string(from: r.timestamp)),\(iso.string(from: r.sessionStart)),\(group),\(r.outcome)\n"
         }
 
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("HitRate-\(f.string(from: .now)).csv")
-        do {
-            try csv.write(to: url, atomically: true, encoding: .utf8)
-            return url
-        } catch {
-            return nil
+        try csv.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .commaSeparatedText) { item in
+            SentTransferredFile(try item.write())
         }
     }
 }

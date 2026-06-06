@@ -20,6 +20,14 @@ struct LogView: View {
         sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
     }
 
+    /// The group the pad logs into. Validates membership so a selection that
+    /// was deleted in the editor can't receive new attempts (deleted SwiftData
+    /// models crash on property access).
+    private var activeGroup: StuntGroup? {
+        if let sel = selectedGroup, groups.contains(where: { $0 === sel }) { return sel }
+        return groups.first
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -94,18 +102,24 @@ struct LogView: View {
             // Session header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        Text(elapsed(since: session.startedAt))
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                    }
-                    Text("\(attempts.count) reps\(rate.map { " · \($0)% hit" } ?? "")")
+                    Text("\(attempts.count) reps")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: Double(attempts.count)))
+                        .animation(.spring(duration: 0.3), value: attempts.count)
+                    Text(rate.map { "\($0)% hit" } ?? "Log each rep as it lands")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.label2)
                 }
                 Spacer()
                 Button {
-                    session.endedAt = .now
+                    if session.attempts.isEmpty {
+                        // Nothing logged — drop the session instead of keeping
+                        // an empty one in the store.
+                        context.delete(session)
+                    } else {
+                        session.endedAt = .now
+                    }
                     try? context.save()
                     hapticTrigger += 1
                 } label: {
@@ -127,7 +141,7 @@ struct LogView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(groups) { g in
-                        let on = selectedGroup === g
+                        let on = activeGroup === g
                         Button {
                             selectedGroup = g
                             hapticTrigger += 1
@@ -157,7 +171,7 @@ struct LogView: View {
             }
 
             // Outcome pad
-            if let group = selectedGroup ?? groups.first {
+            if let group = activeGroup {
                 let groupCounts = countsFor(group: group, in: attempts)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())],
                           spacing: 10) {
@@ -189,6 +203,8 @@ struct LogView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Log \(o.label)")
+                        .accessibilityValue("\(groupCounts[o.rawValue]) logged for \(group.name)")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -226,7 +242,7 @@ struct LogView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(attempts.suffix(12).reversed().enumerated()), id: \.offset) { _, a in
+                    ForEach(Array(attempts.suffix(12).reversed())) { a in
                         HStack(spacing: 10) {
                             Circle().fill(a.outcome.color).frame(width: 9, height: 9)
                             Text(a.group?.name ?? "—")
@@ -253,10 +269,5 @@ struct LogView: View {
             counts[a.outcomeRaw] += 1
         }
         return counts
-    }
-
-    private func elapsed(since start: Date) -> String {
-        let s = Int(Date.now.timeIntervalSince(start))
-        return String(format: "%d:%02d", s / 60, s % 60)
     }
 }

@@ -23,7 +23,10 @@ struct HitRateApp: App {
 }
 
 struct RootView: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var groups: [StuntGroup]
+    @Query private var sessions: [PracticeSession]
     @AppStorage("didOnboard") private var didOnboard = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
 
@@ -41,7 +44,14 @@ struct RootView: View {
                 OnboardingView()
             }
         }
-        .onAppear { migrateExistingInstallIfNeeded() }
+        .onAppear {
+            migrateExistingInstallIfNeeded()
+            sweepOrphanedAttempts()
+            endStaleSessions()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { endStaleSessions() }
+        }
     }
 
     /// Pre-onboarding installs already have groups (the old seeded roster).
@@ -50,5 +60,33 @@ struct RootView: View {
         guard !didOnboard, !groups.isEmpty else { return }
         appModeRaw = AppMode.coach.rawValue
         didOnboard = true
+    }
+
+    /// Group deletes now cascade their attempts, but installs from before the
+    /// cascade may hold orphaned attempts (group → nil) that distort the trend
+    /// and tape while being invisible in the rate. Deleting the group meant
+    /// deleting its reps — finish the job once.
+    private func sweepOrphanedAttempts() {
+        let orphans = (try? context.fetch(
+            FetchDescriptor<Attempt>(predicate: #Predicate { $0.group == nil }))) ?? []
+        guard !orphans.isEmpty else { return }
+        for a in orphans { context.delete(a) }
+        try? context.save()
+    }
+
+    /// A session left running from a previous day ends at its last rep —
+    /// otherwise reps logged "today" land in a session dated days ago and
+    /// silently vanish from Today stats. A session still being logged across
+    /// midnight (last attempt is today) is left alive.
+    private func endStaleSessions() {
+        let cal = Calendar.current
+        var dirty = false
+        for s in sessions where s.isActive && !cal.isDateInToday(s.startedAt) {
+            let lastActivity = s.sortedAttempts.last?.timestamp ?? s.startedAt
+            guard !cal.isDateInToday(lastActivity) else { continue }
+            s.endedAt = lastActivity
+            dirty = true
+        }
+        if dirty { try? context.save() }
     }
 }

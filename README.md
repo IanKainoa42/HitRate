@@ -52,4 +52,7 @@ visual diffing against `docs/design-handoff/screenshots/`.
   `.contentTransition(.numericText())`.
 - Card display font: bundled Space Grotesk (OFL). Inter body text substituted
   with the system font.
-- App icon TBD.
+- **No session timer**: the prototype's live elapsed clock in the Log header
+  was dropped (unnecessary at practice); the rep count is the headline there
+  instead.
+- App icon: brand-register "98 ring" (`HitRate/Assets.xcassets`).
