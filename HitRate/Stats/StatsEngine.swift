@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // MARK: - Timeframe (the global Home filter)
 
@@ -31,6 +32,17 @@ struct GroupStat: Identifiable {
     let delta: Int?        // vs previous comparable period; nil if no prior data
 
     var falls: Int { counts[Outcome.buildingFall.rawValue] + counts[Outcome.majorFall.rawValue] }
+    var bobbles: Int { counts[Outcome.bobble.rawValue] }
+
+    // Clean-hit lens (Ian: stats should center clean hits, not raw hit/bobble).
+    // `rate` is already hits/total (a bobble is NOT a hit) — the clean-hit rate.
+    /// Times the skill stayed up (clean hit or bobble — didn't hit the mat).
+    var standUps: Int { hits + bobbles }
+    /// Of the reps that stayed up, the share that were CLEAN (no bobble).
+    /// "Cleanest" skill = highest purity.
+    var purity: Double { standUps > 0 ? Double(hits) / Double(standUps) : 0 }
+    /// Share of all reps that stayed off the mat. "Most consistent" = highest.
+    var upRate: Double { total > 0 ? Double(standUps) / Double(total) : 0 }
 }
 
 /// Hashable wrapper so GroupStat can be Identifiable off a SwiftData id.
@@ -68,6 +80,26 @@ struct FloorStats {
     }
     var hasData: Bool { total > 0 }
 
+    // MARK: Skill report (highlights / lowlights / improve)
+    // Only skills with enough reps to mean something get ranked.
+
+    static let insightMinReps = 6
+    private var rankable: [GroupStat] { groups.filter { $0.total >= Self.insightMinReps } }
+
+    /// Highest clean-hit rate — the skill to show off.
+    var bestSkill: GroupStat? { rankable.max { $0.rate < $1.rate } }
+    /// Lowest clean-hit rate — where to put the reps in. Only when there's a
+    /// field to compare against (≥2 rankable skills).
+    var worstSkill: GroupStat? {
+        rankable.count >= 2 ? rankable.min { $0.rate < $1.rate } : nil
+    }
+    /// When it stays up, it's clean (fewest bobbles among stand-ups).
+    var cleanestSkill: GroupStat? { rankable.max { $0.purity < $1.purity } }
+    /// Rarely hits the mat (highest stayed-up share).
+    var mostConsistentSkill: GroupStat? { rankable.max { $0.upRate < $1.upRate } }
+    /// True once there's at least one skill with enough reps to report on.
+    var hasSkillReport: Bool { !rankable.isEmpty }
+
     /// Which outcome wording aggregate views (legend, tape, team card) use:
     /// tumbling only when every bucket with data is tumbling, stunt otherwise.
     var aggregateKind: SkillKind {
@@ -85,6 +117,10 @@ enum StatsEngine {
                         timeframe: Timeframe, now: Date = .now) -> FloorStats {
         let cal = Calendar.current
         let sorted = sessions.sorted { $0.startedAt < $1.startedAt }
+        // Every derived number is confined to the passed groups — so a
+        // kind-filtered view (stunt-only / tumbling-only) doesn't leak the
+        // other kind's reps into the trend, tape, or rough patch.
+        let allowed = Set(groups.map { $0.persistentModelID })
 
         // Partition sessions into current period vs the previous comparable period.
         let current: [PracticeSession]
@@ -173,18 +209,19 @@ enum StatsEngine {
                 + groupStats.filter { $0.total == 0 },
             overall: overall, total: total, hits: hits, rate: rate,
             delta: delta, deltaNote: deltaNote, rangeNote: rangeNote,
-            trend: trendSeries(sorted: sorted, timeframe: timeframe, now: now),
-            latest: latestSnapshot(sorted: sorted))
+            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe, now: now),
+            latest: latestSnapshot(sorted: sorted, allowed: allowed))
     }
 
     // MARK: Trend series
 
-    private static func trendSeries(sorted: [PracticeSession], timeframe: Timeframe, now: Date) -> [Int] {
+    private static func trendSeries(sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
+                                    timeframe: Timeframe, now: Date) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession]) -> Int? {
             var hits = 0, total = 0
             for s in sessions {
-                for a in s.attempts {
+                for a in s.attempts where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     total += 1
                     if a.outcome.isHit { hits += 1 }
                 }
@@ -224,10 +261,15 @@ enum StatsEngine {
 
     // MARK: Latest session tape
 
-    private static func latestSnapshot(sorted: [PracticeSession]) -> SessionSnapshot? {
-        guard let last = sorted.last(where: { !$0.attempts.isEmpty }) else { return nil }
-        let attempts = last.sortedAttempts
-        guard !attempts.isEmpty else { return nil }
+    private static func latestSnapshot(sorted: [PracticeSession],
+                                       allowed: Set<PersistentIdentifier>) -> SessionSnapshot? {
+        // Latest session that has reps of an allowed kind — and only those reps
+        // (a mixed session viewed under a kind filter shows just that kind's tape).
+        func inKind(_ s: PracticeSession) -> [Attempt] {
+            s.sortedAttempts.filter { $0.group.map { allowed.contains($0.persistentModelID) } ?? false }
+        }
+        guard let last = sorted.last(where: { !inKind($0).isEmpty }) else { return nil }
+        let attempts = inKind(last)
         let outcomes = attempts.map(\.outcome)
         return SessionSnapshot(
             outcomes: outcomes,

@@ -105,3 +105,21 @@
 - **Category:** best_practice
 - **What happened:** Killing the tab bar made LogView a `fullScreenCover(item:)` holding a `PracticeSession`. "End" on an empty session originally deleted the model, but the cover keeps rendering it during the dismiss animation — deleted-model property access crashes.
 - **Rule:** Inside the cover, only mutate live models (`endedAt = .now`); defer deletes to the presenter's `onDismiss` (Home sweeps empty live sessions there). Same family as the existing "validate selection membership before insert" rule in LogView.
+
+## 2026-06-07 — Inset-well recipe + design-dial iteration
+
+- **Category:** best_practice
+- **What happened:** The training-floor restyle needed recessed "embedded" modules. SwiftUI recipe that matches the approved mockup: `RoundedRectangle.fill(color.shadow(.inner(color:.black.opacity(0.6),radius:4,y:2)).shadow(.inner(color:.white.opacity(0.05),radius:0.5,y:-1))).shadow(color:.white.opacity(0.05),radius:0,y:1)` — inner top shadow + bottom inner catch-light + 1px outer bottom edge. A second inner shadow in an accent color (radius 1, y:-2) makes the engraved colored bottom edge on the Log pad. Also: content scrolling under a `safeAreaInset` CTA pokes through the button's corner gaps — back it with a clear→bg vertical gradient.
+- **Rule:** For embedded/inset surfaces use stacked `.shadow(.inner())` on the fill's ShapeStyle, not overlays; always give floating safeAreaInset buttons a fade backstop. When iterating design with Ian, isolate one dial per round (skeleton → texture → font → accent) in clickable browser mockups — see memory `ian-visual-design-taste`.
+
+## 2026-06-07 — TextField↔@Observable feedback loop = laggy keyboard (PracticeMix-class)
+
+- **Category:** best_practice
+- **What happened:** Renaming a skill/outcome in GroupsEditorView lagged + dropped/fought keystrokes. Cause: the TextField bound via `Binding(get:{observed},set:{observed=$0})` to `OutcomeNames` (app-wide @Observable) and to a SwiftData @Model (`g.name`). Each keystroke mutated observed state the editing view reads → re-rendered the editor mid-edit (worsened by the inset-well shadow recompositing after the restyle) → cursor fought the keyboard. Same class as the PracticeMix typing fix (don't do heavy work / observable round-trips on the keystroke setter).
+- **Rule:** For rename fields, type into a LOCAL `@State` buffer and commit to the observable/model only on blur (`onChange(of: focused)`), `.onSubmit`, and `.onDisappear` — see `RenameField` in GroupsEditorView.swift. Preserves the e2-1/e2-2 invariant (labels still re-render app-wide once the rename commits, just not per keystroke). Note: MCP/sim taps can't reproduce typing-throughput lag (each tap is a network hop) — you can catch dropped *characters* (typed vs field value) but smooth-but-slow must be judged by the user on-device.
+
+## 2026-06-07 — Confine StatsEngine to the passed groups before any subset feature
+
+- **Category:** correction
+- **What happened:** Adding the athlete stunt/tumbling split (filter the `groups` array → recompute) would have silently leaked the other kind into the trend and latest-session tape: `trendSeries`/`latestSnapshot` counted ALL session attempts, ignoring the passed `groups`. (advisor-caught before build.)
+- **Rule:** When a pure stats function takes a `groups` subset, EVERY derived series must honor it. Build `let allowed = Set(groups.map(\.persistentModelID))` once and filter `attempt.group` membership in trend/tape/rough-patch — not just the per-group rollup. Verified: stunt(109) + tumbling(124) = all(233); tumbling-only flips the legend wording via aggregateKind for free.

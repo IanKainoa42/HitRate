@@ -12,13 +12,30 @@ struct HomeView: View {
     @AppStorage("teamName") private var teamName = ""
 
     @State private var timeframe: Timeframe = .today
-    @State private var groupView = "Ranked"
     @State private var shareOpen = false
     @State private var editorOpen = false
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
+    /// The stunt/tumbling split only makes sense in athlete mode once BOTH
+    /// kinds have logged reps (coach is all-stunt; a single-kind athlete has
+    /// nothing to split). When true, the dashboard stacks an OVERALL section
+    /// over a STUNT section over a TUMBLING section — not a one-at-a-time tab.
+    private var showsKindSplit: Bool {
+        guard mode == .athlete else { return false }
+        let kinds = Set(groups.filter { !$0.attempts.isEmpty }.map(\.kind))
+        return kinds.contains(.stunt) && kinds.contains(.tumbling)
+    }
+
+    /// A dashboard scoped to one skill kind — same numbers, confined to the
+    /// stunt-only (or tumbling-only) groups.
+    private func kindStats(_ kind: SkillKind) -> FloorStats {
+        StatsEngine.compute(sessions: sessions,
+                            groups: groups.filter { $0.kind == kind },
+                            timeframe: timeframe)
+    }
 
     /// A live session survives the app being killed mid-practice — the pill
     /// becomes "Resume" and reopens it instead of creating a duplicate.
@@ -45,26 +62,34 @@ struct HomeView: View {
 
     var body: some View {
         let d = stats
-        VStack(spacing: 0) {
+        VStack(spacing: 9) {
             header
 
             // Timeframe — the global filter; every number below scales to it.
-            Picker("Timeframe", selection: $timeframe) {
-                ForEach(Timeframe.allCases) { tf in
-                    Text(tf.label).tag(tf)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 10)
+            timeframeTabs
 
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 9) {
                     if d.hasData {
-                        SummaryCard(stats: d)
-                        TrendCard(stats: d)
-                        GroupsCard(stats: d, view: $groupView)
-                        TakeawaysCard(stats: d)
+                        if showsKindSplit {
+                            // Overall first, then a stunt-only and tumbling-only
+                            // section stacked beneath it (not a one-at-a-time tab).
+                            sectionHeader("OVERALL", icon: "square.grid.2x2.fill", reps: d.total)
+                            dashboardCards(d)
+
+                            let st = kindStats(.stunt)
+                            sectionHeader("STUNT", icon: SkillKind.stunt.icon, reps: st.total)
+                            dashboardCards(st)
+
+                            let tu = kindStats(.tumbling)
+                            sectionHeader("TUMBLING", icon: SkillKind.tumbling.icon, reps: tu.total)
+                            dashboardCards(tu)
+                        } else {
+                            dashboardCards(d)
+                        }
+
+                        // Latest-session recap + actions sit once at the bottom,
+                        // below every section.
                         if d.latest != nil {
                             SessionTapeCard(snapshot: d.latest!, kind: d.aggregateKind)
                         }
@@ -76,9 +101,9 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
-            .safeAreaInset(edge: .bottom) { practicePill }
+            .safeAreaInset(edge: .bottom) { practiceCTA }
         }
-        .background(CourtBackdrop(twinkle: true).ignoresSafeArea())
+        .background(FloorBackdrop().ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
         .fullScreenCover(isPresented: $shareOpen) {
             // Milestones are lifetime — deliberately not filtered by timeframe.
@@ -97,9 +122,10 @@ struct HomeView: View {
         }
     }
 
-    // MARK: Practice pill (the only way into the counter — no tab bar)
+    // MARK: Practice CTA (the only way into the counter — no tab bar)
 
-    private var practicePill: some View {
+    /// The one RAISED element on the dashboard — everything else is inset.
+    private var practiceCTA: some View {
         Button {
             let s: PracticeSession
             if let live = activeSession {
@@ -113,30 +139,30 @@ struct HomeView: View {
             hapticTrigger += 1
             logSession = s
         } label: {
-            HStack(spacing: 8) {
-                if let live = activeSession {
-                    Circle()
-                        .fill(Theme.hit)
-                        .frame(width: 7, height: 7)
-                    Text("Resume practice · \(live.attempts.count) rep\(live.attempts.count == 1 ? "" : "s")")
-                        .font(.system(size: 16, weight: .bold))
-                } else {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Start practice")
-                        .font(.system(size: 16, weight: .bold))
-                }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
-            .background(Theme.accent)
-            .clipShape(Capsule())
-            .shadow(color: Theme.accent.opacity(0.45), radius: 14, y: 6)
-            .contentShape(Capsule())
+            Text(activeSession.map {
+                    "RESUME PRACTICE · \($0.attempts.count) REP\($0.attempts.count == 1 ? "" : "S")"
+                 } ?? "START PRACTICE")
+                .font(.system(size: 13, weight: .heavy))
+                .tracking(1.5)
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .shadow(color: Theme.accent.opacity(0.3), radius: 10, y: 3)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        // Fade the floor in behind the CTA so mid-scroll content doesn't
+        // slide visibly through the gaps around the button.
+        .background(
+            LinearGradient(colors: [Theme.appBGBottom.opacity(0), Theme.appBGBottom],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 
     /// "End" on a rep-less session leaves it live (deleting a model the cover
@@ -148,31 +174,24 @@ struct HomeView: View {
         try? context.save()
     }
 
-    // MARK: Header
+    // MARK: Header (identity well)
 
     private var header: some View {
-        HStack(spacing: 11) {
-            // Identity crest (team in coach mode, the athlete in athlete mode)
-            Text(initials(of: displayTitle, max: 2))
-                .font(Theme.grotesk(15))
-                .tracking(0.3)
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(
-                    LinearGradient(colors: [Theme.coral, Theme.coralLight],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing))
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                .shadow(color: Theme.coral.opacity(0.4), radius: 7, y: 4)
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Wordmark — the green RATE is the one brand moment up here.
+                HStack(spacing: 0) {
+                    Text("HIT").foregroundStyle(Theme.label)
+                    Text("RATE").foregroundStyle(Theme.accent)
+                }
+                .font(.system(size: 17, weight: .black))
+                .tracking(0.5)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(displayKicker.uppercased())
-                    .font(Theme.grotesk(9))
-                    .tracking(1.26)
+                Text("\(displayTitle) · \(displayKicker)".uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.5)
                     .foregroundStyle(Theme.label2)
-                Text(displayTitle)
-                    .font(.system(size: 22, weight: .bold))
-                    .tracking(-0.44)
-                    .foregroundStyle(Theme.label)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -182,12 +201,12 @@ struct HomeView: View {
                 editorOpen = true
             } label: {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.label2)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.fill)
-                    .clipShape(Circle())
-                    .contentShape(Circle())
+                    .frame(width: 34, height: 34)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -195,20 +214,96 @@ struct HomeView: View {
                 shareOpen = true
             } label: {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.fill)
-                    .clipShape(Circle())
-                    .contentShape(Circle())
+                    .frame(width: 34, height: 34)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!stats.hasData)
             .opacity(stats.hasData ? 1 : 0.4)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .wellBackground()
         .padding(.horizontal, 16)
         .padding(.top, 2)
-        .padding(.bottom, 12)
+    }
+
+    // MARK: Timeframe tabs (well)
+
+    private var timeframeTabs: some View {
+        HStack(spacing: 4) {
+            ForEach(Timeframe.allCases) { tf in
+                let on = timeframe == tf
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { timeframe = tf }
+                } label: {
+                    Text(tf.label.uppercased())
+                        .font(.system(size: 10.5, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(on ? Theme.well : Theme.label2)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(on ? Theme.label : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(5)
+        .wellBackground()
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: Stacked sections (overall / stunt / tumbling)
+
+    /// One dashboard's worth of cards for a given kind scope. Sits empty-aware:
+    /// in a split, a kind may have no reps in the current timeframe even though
+    /// it has lifetime data.
+    @ViewBuilder
+    private func dashboardCards(_ d: FloorStats) -> some View {
+        if d.hasData {
+            SummaryCard(stats: d)
+            TrendCard(stats: d)
+            GroupsCard(stats: d)
+            SkillInsightsCard(stats: d)
+        } else {
+            FeedCard {
+                Text("No reps logged \(timeframe.label.lowercased()).")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.label2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+            }
+        }
+    }
+
+    /// A floor-level divider that labels each stacked section. Not a well — it
+    /// sits ON the floor between the recessed cards.
+    private func sectionHeader(_ title: String, icon: String, reps: Int) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.label2)
+            Text(title)
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(2)
+                .foregroundStyle(Theme.label)
+            Text("\(reps) REP\(reps == 1 ? "" : "S")")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(Theme.label3)
+            Rectangle()
+                .fill(Theme.separator)
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 1)
     }
 
     // MARK: Action row
@@ -220,15 +315,14 @@ struct HomeView: View {
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                     Text("Create share cards")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .bold))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.accent)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .wellBackground()
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -238,15 +332,14 @@ struct HomeView: View {
                 ShareLink(item: csv, preview: SharePreview("HitRate practice data")) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.to.line")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                         Text("CSV")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .bold))
                     }
                     .foregroundStyle(Theme.label)
                     .padding(.vertical, 13)
                     .padding(.horizontal, 16)
-                    .background(Theme.fill)
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .wellBackground()
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -279,11 +372,11 @@ struct HomeView: View {
                     } label: {
                         Text("Load demo data")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.accentText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .background(Theme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

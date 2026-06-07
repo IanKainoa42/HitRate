@@ -61,13 +61,22 @@ Key invariants:
   stunt.
 - Card set numbers (`001/00N`) are dynamic: groups with data + 1 team card
   (`CardSpec.deck` — team card is id 0, groups follow in ranked order).
-- ONE visual register since 2026-06-06: the whole app lives in the brand
-  "court at night" navy (locked via `.preferredColorScheme(.dark)` in
-  `HitRateApp`; `CourtBackdrop` in Components.swift is the shared backdrop;
-  Theme app tokens are glass-on-navy). Space Grotesk = display font (bundled,
-  PostScript names `SpaceGrotesk-Regular/Medium/Bold`, via `Theme.grotesk()`).
-  The original handoff's iOS-light app UI was retired deliberately — don't
-  reintroduce it.
+- TWO registers since 2026-06-07 (Ian's design-direction session — "inset
+  bento" won; mockups in `.superpowers/brainstorm/`):
+  - **App UI = "training floor"**: lifted graphite `FloorBackdrop` (gradient +
+    1px diagonal hairline), every module an inset well (`wellBackground()` in
+    Components.swift — inner top shadow + bottom catch-light), chalk text,
+    ONE green signal accent (`Theme.accent` 0x34D26A; green only ever means
+    go/hit/improving). NO glass, NO glow, NO twinkle, NO sparkles — Ian killed
+    those as "toy". The only raised element on Home is the practice CTA.
+    Numerals set in Barlow Condensed (bundled, PostScript
+    `BarlowCondensed-SemiBold/Bold/ExtraBold`, via `Theme.barlow()`); words
+    stay SF — condensed face is for numbers only or it reads as costume.
+  - **Onboarding + share cards = "court at night"**: navy `CourtBackdrop`,
+    coral/electric, Space Grotesk (`Theme.grotesk()`,
+    `SpaceGrotesk-Regular/Medium/Bold`). Don't migrate these to graphite or
+    vice versa.
+  The original handoff's iOS-light app UI stays retired.
 
 ## Architecture
 
@@ -90,11 +99,19 @@ Key invariants:
 - `Models/Models.swift` — SwiftData: StuntGroup, PracticeSession, Attempt.
   An "active" session is `endedAt == nil`; LogView assumes at most one.
 - `Stats/StatsEngine.swift` — ALL derived numbers (rates, deltas, trend,
-  rough patch, takeaways inputs). Pure function of sessions+groups+timeframe.
+  rough patch, skill-report inputs). Pure function of sessions+groups+timeframe.
   Mirrors `buildData()` from the handoff prototype. Delta baseline depends on
   timeframe: today = last prior-day session, week = previous calendar week,
   all-time = first session of the season. Rough patch = worst sliding window
-  of 7 attempts with ≥4 misses.
+  of 7 attempts with ≥4 misses. **Every number is confined to the passed
+  `groups`** (via an `allowed` Set of persistentModelIDs) — trend and the
+  latest-session tape filter attempts by group membership, so the stunt-only /
+  tumbling-only kind filter can't leak the other kind's reps. `rate` is
+  hits/total (a bobble is NOT a hit), i.e. already the *clean-hit* rate; the
+  skill-report metrics (`purity` = hits/stand-ups, `upRate` = stand-ups/total)
+  build on that. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
+  dashboard split; `FloorStats.bestSkill/worstSkill/cleanestSkill/
+  mostConsistentSkill` are gated to skills with ≥`insightMinReps` reps.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
@@ -103,15 +120,32 @@ Key invariants:
 - `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
   fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`
-  call off a `timeframe` @State in HomeView. Glow guides the eye to the data:
-  `FeedCard(glow:)` lights ONLY the hero cards (SummaryCard = rate-band color,
-  TrendCard = accent + neon line/last-point halo); everything else stays flat
-  glass — don't spread glow to every card. `CourtBackdrop(twinkle: true)` is
-  Home-only (ambient star field, top-weighted toward the charts, Reduce
-  Motion-aware) — the counter, onboarding, and share snapshot paths stay
-  twinkle-free on purpose. Header also hosts the skills/groups editor button —
-  the only path to roster + settings outside a live practice.
-  `Views/Log/*` — the counter.
+  call off a `timeframe` @State in HomeView. Bento layout: header well +
+  custom timeframe-tabs well fixed, then a 9pt-gutter scroll of `FeedCard`
+  wells; the green practice CTA is docked via `safeAreaInset` with a fade
+  backstop so scroll content doesn't slide visibly through its corners.
+  Header hosts the wordmark (HIT + green RATE), identity subline, and the
+  skills/groups editor button — the only path to roster + settings outside a
+  live practice. In athlete mode with BOTH kinds logged (`showsKindSplit`),
+  the scroll STACKS three sections — OVERALL, then STUNT, then TUMBLING — each
+  introduced by a floor-level `sectionHeader` (icon + label + rep count + a
+  hairline rule; NOT a well) over a `dashboardCards(_:)` block (summary / trend
+  / groups / skill report). Per-kind scopes come from `kindStats(_:)`, which
+  re-runs `StatsEngine.compute` confined to that kind's groups; a section with
+  no reps in the current timeframe shows a small "No reps logged …" well. The
+  latest-session tape + action row sit ONCE at the bottom, below every section.
+  This deliberately replaced the earlier one-at-a-time kind filter — Ian wants
+  stunt and tumbling visible together, not behind a toggle.
+  `SkillInsightsCard` ("SKILL REPORT") ranks best/worst/cleanest/
+  most-consistent skill (de-duped: one row per skill), centered on clean hits;
+  it replaced the old floor-narrative Takeaways card on Home (TakeawaysCard.swift
+  is retained only because `InsightRow` lives there). `Views/Log/*` — the
+  counter; outcome pad buttons are engraved wells (outcome color lives in the
+  bottom inner edge + caps label, count in chalk Barlow), NOT colored candy
+  buttons. **Editor rename fields use `RenameField`** (local @State buffer,
+  commits on blur/submit/disappear) — never bind a TextField directly through
+  `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
+  re-renders the editor mid-edit and the cursor fights the keyboard.
   `Views/Share/*` — Stunt Cards sheet, `DeckCard` (stats | milestone),
   HoloCardView, PuckView. Deck = flat stat cards, then earned milestones
   (tier desc), then locked teasers (progress desc). Locked cards disable the

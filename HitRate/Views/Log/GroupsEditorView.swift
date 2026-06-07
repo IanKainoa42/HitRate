@@ -1,6 +1,39 @@
 import SwiftUI
 import SwiftData
 
+/// A rename field that types into a LOCAL buffer and only commits the result
+/// on blur / return / dismiss — never per keystroke. The old direct binding
+/// wrote through `OutcomeNames` (app-wide @Observable) or a SwiftData @Model
+/// on every character, so each keystroke re-rendered the editor (and, after
+/// the inset-well restyle, re-composited every shadow) mid-edit — the cursor
+/// fought the keyboard. Committing on commit keeps the e2-1/e2-2 invariant
+/// (labels re-render app-wide once the rename lands, just not per keystroke).
+private struct RenameField: View {
+    let prompt: String
+    let value: String
+    let commit: (String) -> Void
+
+    @State private var draft = ""
+    @State private var loaded = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(prompt, text: $draft)
+            .focused($focused)
+            .submitLabel(.done)
+            .onAppear {
+                guard !loaded else { return }
+                draft = value
+                loaded = true
+            }
+            .onChange(of: focused) { _, nowFocused in
+                if !nowFocused { commit(draft) }   // tapped away
+            }
+            .onSubmit { commit(draft) }
+            .onDisappear { commit(draft) }         // sheet dismissed via Done
+    }
+}
+
 /// Manage the roster of skills/groups, identity, outcome names, and mode.
 struct GroupsEditorView: View {
     @Environment(\.modelContext) private var context
@@ -47,9 +80,10 @@ struct GroupsEditorView: View {
                                 .frame(width: 24, height: 24)
                                 .background(g.color)
                                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                            TextField("Name", text: Binding(
-                                get: { g.name },
-                                set: { g.name = $0 }))
+                            RenameField(prompt: "Name", value: g.name) { new in
+                                g.name = new
+                                try? context.save()
+                            }
                             if mode == .athlete {
                                 // Stunt vs tumbling — picks the outcome wording
                                 // on the pad for this skill.
@@ -111,9 +145,10 @@ struct GroupsEditorView: View {
                     ForEach(Outcome.allCases) { o in
                         HStack(spacing: 10) {
                             Circle().fill(o.color).frame(width: 12, height: 12)
-                            TextField(o.defaultLabel(.stunt), text: Binding(
-                                get: { outcomeNames.stunt[o.rawValue] },
-                                set: { outcomeNames.stunt[o.rawValue] = $0 }))
+                            RenameField(prompt: o.defaultLabel(.stunt),
+                                        value: outcomeNames.stunt[o.rawValue]) { new in
+                                outcomeNames.stunt[o.rawValue] = new
+                            }
                         }
                     }
                 } header: {
@@ -130,9 +165,10 @@ struct GroupsEditorView: View {
                         ForEach(Outcome.allCases) { o in
                             HStack(spacing: 10) {
                                 Circle().fill(o.color).frame(width: 12, height: 12)
-                                TextField(o.defaultLabel(.tumbling), text: Binding(
-                                    get: { outcomeNames.tumbling[o.rawValue] },
-                                    set: { outcomeNames.tumbling[o.rawValue] = $0 }))
+                                RenameField(prompt: o.defaultLabel(.tumbling),
+                                            value: outcomeNames.tumbling[o.rawValue]) { new in
+                                    outcomeNames.tumbling[o.rawValue] = new
+                                }
                             }
                         }
                     } header: {
@@ -171,7 +207,7 @@ struct GroupsEditorView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Theme.appBG)
+            .background(FloorBackdrop().ignoresSafeArea())
             .navigationTitle(mode == .athlete ? "My Skills" : "Groups")
             .navigationBarTitleDisplayMode(.inline)
             .alert(
@@ -202,8 +238,8 @@ struct GroupsEditorView: View {
         }
     }
 
-    /// Glass row surface — solid-ish so separators/swipe actions stay readable.
-    private var glassRow: Color { Color(hex: 0x161D30) }
+    /// Well row surface — solid so separators/swipe actions stay readable.
+    private var glassRow: Color { Theme.well }
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

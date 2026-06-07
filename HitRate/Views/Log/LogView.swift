@@ -32,7 +32,7 @@ struct LogView: View {
     var body: some View {
         NavigationStack {
             activeView
-                .background(CourtBackdrop().ignoresSafeArea())
+                .background(FloorBackdrop().ignoresSafeArea())
                 .navigationTitle("Practice")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -54,17 +54,18 @@ struct LogView: View {
         let hits = attempts.filter { $0.outcome.isHit }.count
         let rate = attempts.isEmpty ? nil : Int((Double(hits) / Double(attempts.count) * 100).rounded())
 
-        return VStack(spacing: 12) {
-            // Session header
+        return VStack(spacing: 9) {
+            // Session header (well)
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(attempts.count) reps")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(attempts.count)")
+                        .font(Theme.barlow(30, .extrabold))
                         .monospacedDigit()
                         .contentTransition(.numericText(value: Double(attempts.count)))
                         .animation(.spring(duration: 0.3), value: attempts.count)
-                    Text(rate.map { "\($0)% hit" } ?? "Log each rep as it lands")
-                        .font(.system(size: 12, weight: .medium))
+                    Text((rate.map { "REPS · \($0)% HIT" } ?? "REPS — LOG EACH AS IT LANDS"))
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
                         .foregroundStyle(Theme.label2)
                 }
                 Spacer()
@@ -80,19 +81,24 @@ struct LogView: View {
                     Sounds.shared.play(.end)
                     dismiss()
                 } label: {
-                    Text("End")
-                        .font(.system(size: 15, weight: .semibold))
+                    Text("END")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1)
                         .foregroundStyle(Theme.majorFall)
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 9)
-                        .background(Theme.majorFall.opacity(0.12))
-                        .clipShape(Capsule())
-                        .contentShape(Capsule())
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .stroke(Theme.majorFall.opacity(0.4), lineWidth: 1))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .wellBackground()
             .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.top, 4)
 
             // Group picker
             ScrollView(.horizontal, showsIndicators: false) {
@@ -112,14 +118,15 @@ struct LogView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 Text(g.name)
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(on ? Theme.navy : Theme.label)
+                                    .foregroundStyle(on ? Theme.well : Theme.label)
                             }
                             .padding(.horizontal, 11)
                             .padding(.vertical, 8)
-                            .background(on ? Color.white : Theme.surface)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(on ? .clear : Theme.separator, lineWidth: 1))
-                            .contentShape(Capsule())
+                            .background(on ? Theme.label : Theme.well)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(on ? .clear : Color.white.opacity(0.07), lineWidth: 1))
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -140,26 +147,31 @@ struct LogView: View {
                             hapticTrigger += 1
                             Sounds.shared.play(.outcome(o))
                         } label: {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 3) {
                                 Text("\(groupCounts[o.rawValue])")
-                                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                                    .font(Theme.barlow(34, .extrabold))
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.label)
                                     .contentTransition(.numericText(value: Double(groupCounts[o.rawValue])))
                                     .animation(.spring(duration: 0.3), value: groupCounts[o.rawValue])
-                                Text(o.label(group.kind))
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(o.color) // yellow reads fine on navy — the light-bg mustard special-case is gone
+                                Text(o.label(group.kind).uppercased())
+                                    .font(.system(size: 11, weight: .bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(o.color)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.7)   // "Stepped out" must fit the pad button
+                                    .minimumScaleFactor(0.7)   // "STEPPED OUT" must fit the pad button
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 92)
-                            .background(o.color.opacity(0.14))
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(o.color.opacity(0.4), lineWidth: 1.5))
+                            // Engraved well — the outcome color lives in the
+                            // machined bottom edge + label, one material.
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Theme.well
+                                        .shadow(.inner(color: .black.opacity(0.6), radius: 4, y: 2))
+                                        .shadow(.inner(color: o.color.opacity(0.9), radius: 1, y: -2)))
+                                    .shadow(color: .white.opacity(0.05), radius: 0, y: 1)
+                            )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -175,52 +187,56 @@ struct LogView: View {
                     .padding(.top, 30)
             }
 
-            // Recent + undo
-            HStack {
-                Text("RECENT")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.88)
-                    .foregroundStyle(Theme.label2)
-                Spacer()
-                Button {
-                    if let last = attempts.last {
-                        context.delete(last)
-                        try? context.save()
-                        hapticTrigger += 1
-                        Sounds.shared.play(.undo)
-                    }
-                } label: {
-                    Label("Undo", systemImage: "arrow.uturn.backward")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(attempts.isEmpty ? Theme.label3 : Theme.accent)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(attempts.isEmpty)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(attempts.suffix(12).reversed())) { a in
-                        HStack(spacing: 10) {
-                            Circle().fill(a.outcome.color).frame(width: 9, height: 9)
-                            Text(a.group?.name ?? "—")
-                                .font(.system(size: 14, weight: .medium))
-                            Text(a.outcome.label(a.group?.kind ?? .stunt))
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.label2)
-                            Spacer()
-                            Text(a.timestamp.tapeTime)
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(Theme.label3)
+            // Recent + undo (well)
+            VStack(spacing: 4) {
+                HStack {
+                    Text("RECENT")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.8)
+                        .foregroundStyle(Theme.label2)
+                    Spacer()
+                    Button {
+                        if let last = attempts.last {
+                            context.delete(last)
+                            try? context.save()
+                            hapticTrigger += 1
+                            Sounds.shared.play(.undo)
                         }
-                        .padding(.vertical, 7)
-                        .padding(.horizontal, 16)
+                    } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(attempts.isEmpty ? Theme.label3 : Theme.accent)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(attempts.isEmpty)
+                }
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Array(attempts.suffix(12).reversed())) { a in
+                            HStack(spacing: 10) {
+                                Circle().fill(a.outcome.color).frame(width: 8, height: 8)
+                                Text(a.group?.name ?? "—")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text(a.outcome.label(a.group?.kind ?? .stunt))
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.label2)
+                                Spacer()
+                                Text(a.timestamp.tapeTime)
+                                    .font(Theme.barlow(13, .semibold))
+                                    .foregroundStyle(Theme.label3)
+                            }
+                            .padding(.vertical, 7)
+                        }
                     }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .wellBackground()
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
     }
 

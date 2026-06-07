@@ -11,14 +11,17 @@
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
 		32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD1AA942B68F4E661CF6471 /* HomeView.swift */; };
+		380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */; };
 		491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79288C2661DD00CF6B1AF541 /* TrendCard.swift */; };
 		52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */; };
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
 		79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */; };
 		7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B8E106687D6F5AA09DD3A66E /* Assets.xcassets */; };
+		7EFC99951270AF184F534565 /* BarlowCondensed-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */; };
 		80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */; };
 		8472DF181A48BC7407E5698A /* Milestones.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8957D930EDEABBAF6E32BF0 /* Milestones.swift */; };
 		86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD99E08D7FCE2602733C7EF /* CSVExport.swift */; };
+		8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
 		B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */; };
 		BA5DE252AC6CBCD0335F8489 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */; };
@@ -26,6 +29,7 @@
 		BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */; };
 		CA745130292CAC719774B178 /* HitRateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354E38DADE87EAEA70210445 /* HitRateApp.swift */; };
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
+		DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */; };
 		E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */; };
 		E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20184832604D05CBF0C04210 /* HoloCardView.swift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
@@ -38,6 +42,7 @@
 		05982546BF2BB526C6B9356D /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		138B89E3489E75197EA700F8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
+		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
 		296943D1F64367EB72E3C679 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
@@ -46,11 +51,14 @@
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-SemiBold.ttf"; sourceTree = "<group>"; };
 		5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsEditorView.swift; sourceTree = "<group>"; };
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
 		79288C2661DD00CF6B1AF541 /* TrendCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendCard.swift; sourceTree = "<group>"; };
 		8CACDF028181ABDC147D68BB /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		9E30AC6D5D161DB570B82771 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-Bold.ttf"; sourceTree = "<group>"; };
+		AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-ExtraBold.ttf"; sourceTree = "<group>"; };
 		B8E106687D6F5AA09DD3A66E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BC4A053415866660A35A4745 /* SummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryCard.swift; sourceTree = "<group>"; };
 		BCD1AA942B68F4E661CF6471 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -93,6 +101,7 @@
 				FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */,
 				BCD1AA942B68F4E661CF6471 /* HomeView.swift */,
 				3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */,
+				245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */,
 				BC4A053415866660A35A4745 /* SummaryCard.swift */,
 				D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */,
 				79288C2661DD00CF6B1AF541 /* TrendCard.swift */,
@@ -169,6 +178,9 @@
 		AB7FFD93EB0CE8046CC13D1A /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
+				ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */,
+				AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */,
+				586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */,
 				3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */,
 				4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */,
 				5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */,
@@ -271,6 +283,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */,
+				DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */,
+				7EFC99951270AF184F534565 /* BarlowCondensed-ExtraBold.ttf in Resources */,
+				8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */,
 				BA5DE252AC6CBCD0335F8489 /* SpaceGrotesk-Bold.ttf in Resources */,
 				EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */,
 				80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */,
@@ -299,6 +314,7 @@
 				79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,
+				380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */,
 				A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */,
 				E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */,
 				6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */,

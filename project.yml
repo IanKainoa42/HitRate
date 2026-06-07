@@ -39,6 +39,9 @@ targets:
           - SpaceGrotesk-Regular.ttf
           - SpaceGrotesk-Medium.ttf
           - SpaceGrotesk-Bold.ttf
+          - BarlowCondensed-SemiBold.ttf
+          - BarlowCondensed-Bold.ttf
+          - BarlowCondensed-ExtraBold.ttf
         NSPhotoLibraryAddUsageDescription: HitRate saves your stunt cards to Photos so you can post them.
         LSApplicationQueriesSchemes:
           - instagram

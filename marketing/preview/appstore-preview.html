@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HitRate — App Store Listing Preview</title>
+<style>
+  :root {
+    --text: #1d1d1f; --muted: #86868b; --rule: #d2d2d7;
+    --blue: #0071e3; --bg: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .banner {
+    background: #1d1d1f; color: #f5f5f7; font-size: 13px;
+    padding: 10px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  .banner strong { color: #fff; }
+  .tabs { display: flex; gap: 8px; margin-left: auto; }
+  .tab {
+    border: 1px solid #515154; background: transparent; color: #f5f5f7;
+    border-radius: 980px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+  }
+  .tab.active { background: #fff; color: #1d1d1f; border-color: #fff; }
+  .page { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  header.app { display: flex; gap: 28px; align-items: flex-start; padding-bottom: 28px; border-bottom: 1px solid var(--rule); }
+  .icon {
+    width: 196px; height: 196px; border-radius: 44px; flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.08) inset; object-fit: cover;
+  }
+  .head-text { padding-top: 6px; flex: 1; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: .2px; line-height: 1.15; }
+  .subtitle { font-size: 19px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+  .seller { font-size: 14px; color: var(--blue); margin-top: 10px; }
+  .price-row { display: flex; align-items: center; gap: 14px; margin-top: 22px; }
+  .get {
+    background: var(--blue); color: #fff; border-radius: 980px;
+    padding: 7px 22px; font-size: 14px; font-weight: 600; border: none;
+  }
+  .iap { font-size: 11px; color: var(--muted); }
+  .meta-strip { display: flex; gap: 0; margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 14px; }
+  .meta-cell { padding: 0 28px; text-align: center; border-right: 1px solid var(--rule); }
+  .meta-cell:first-child { padding-left: 0; }
+  .meta-cell:last-child { border-right: none; }
+  .meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; }
+  .meta-value { font-size: 17px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+  .meta-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  section { padding: 28px 0; border-bottom: 1px solid var(--rule); }
+  h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+  .shots { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  .shots img {
+    height: 440px; border-radius: 22px; flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.1) inset, 0 2px 10px rgba(0,0,0,.08);
+  }
+  .promo { font-size: 15px; line-height: 1.5; margin-bottom: 14px; }
+  .desc { font-size: 15px; line-height: 1.5; white-space: pre-wrap; color: var(--text); }
+  .ratings { display: flex; align-items: baseline; gap: 14px; }
+  .ratings .big { font-size: 44px; font-weight: 700; color: var(--muted); }
+  .ratings .note { font-size: 14px; color: var(--muted); }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; }
+  .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e8e8ed; font-size: 13px; }
+  .info-row .k { color: var(--muted); }
+  .info-row .v { text-align: right; }
+
+  details.aso { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  details.aso summary { cursor: pointer; font-weight: 600; }
+  details.aso code { display: block; margin-top: 8px; background: #f5f5f7; padding: 10px 12px; border-radius: 8px; font-size: 12px; word-break: break-all; }
+  .flag { background: #fff8e1; border: 1px solid #f0d77b; border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-top: 16px; color: #6d5400; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <span><strong>HitRate — listing preview</strong> · mockup, not live · generated 2026-06-06 by /brand</span>
+  <div class="tabs">
+    <button class="tab active" onclick="show('v1', this)">v1 — Cheer (SHIPPING)</button>
+    <button class="tab" onclick="show('v2a', this)">v2 — General Opt 1</button>
+    <button class="tab" onclick="show('v2b', this)">v2 — General Opt 2</button>
+  </div>
+</div>
+
+<!-- ============ v1 — CHEER (SHIPPING) ============ -->
+<div class="page variant active" id="v1">
+  <header class="app">
+    <img class="icon" src="../../HitRate/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" alt="HitRate icon">
+    <div class="head-text">
+      <h1>HitRate: Skill Tracker</h1>
+      <div class="subtitle">Count every hit, bobble, fall</div>
+      <div class="seller">Ian Kainoa Richardson</div>
+      <div class="price-row">
+        <button class="get">GET</button>
+        <span class="iap">Planned free · pricing TBD</span>
+      </div>
+      <div class="meta-strip">
+        <div class="meta-cell"><div class="meta-label">Ratings</div><div class="meta-value">—</div><div class="meta-sub">No ratings yet</div></div>
+        <div class="meta-cell"><div class="meta-label">Category</div><div class="meta-value">🏅</div><div class="meta-sub">Sports</div></div>
+        <div class="meta-cell"><div class="meta-label">Compatibility</div><div class="meta-value">iPhone</div><div class="meta-sub">iOS 17+</div></div>
+        <div class="meta-cell"><div class="meta-label">Privacy</div><div class="meta-value">🔒</div><div class="meta-sub">Data Not Collected</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <h2>iPhone Screenshots</h2>
+    <div class="shots">
+      <img src="../screenshots/en-US/01_framed.png" alt="">
+      <img src="../screenshots/en-US/02_framed.png" alt="">
+      <img src="../screenshots/en-US/03_framed.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/3_athlete-card.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/5_coach-dashboard.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/6_onboarding.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/7_team-card.png" alt="">
+    </div>
+  </section>
+
+  <section>
+    <div class="promo"><em>Every rep counts. Log hits, bobbles, and falls in one tap — then share your hit rate as a holographic stunt card.</em></div>
+    <div class="desc">Count every stunt rep. Know your hit rate.
+
+HitRate is the stunt-outcome counter for cheerleading. Tap once per rep — hit, bobble, building fall, or major fall — and your dashboard builds itself.
+
+FOR ATHLETES
+Track the skills YOU'RE working on. Create your own list — lib, stretch, full up, anything — and log every rep at practice. Watch your hit rate climb across the season.
+
+FOR COACHES
+Switch to coach mode and track every stunt group on the floor. See which groups are locked in and which need reps, ranked automatically.
+
+THE DASHBOARD
+• Hit rate at a glance — today, this week, or all-time
+• Trend line across your recent sessions
+• Skills and groups ranked by hit rate, with movement vs last session
+• Auto-written takeaways: what led the way, what to tighten next
+• Session tape: every rep of your latest practice on one strip
+
+STUNT CARDS
+Turn your numbers into holographic trading cards. Earn milestone cards from COMMON to LEGENDARY — rarity is set by how hard each one is to earn, like 1,000 reps logged or 25 hits in a row. There are even DUBIOUS HONOR cards for the falls. Save them, copy them, or post them to Instagram.
+
+BUILT FOR THE GYM
+• One-tap logging with big targets — made for fast hands at practice
+• Rename outcomes to match your gym's language
+• Undo mis-taps instantly
+• CSV export of every rep
+• Works completely offline — your data never leaves your phone
+
+No accounts. No ads. No tracking. Just counts.</div>
+  </section>
+
+  <section>
+    <h2>Ratings &amp; Reviews</h2>
+    <div class="ratings"><span class="big">—</span><span class="note">No ratings yet — pre-launch</span></div>
+  </section>
+
+  <section>
+    <h2>Information</h2>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="k">Seller</span><span class="v">Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">Category</span><span class="v">Sports</span></div>
+        <div class="info-row"><span class="k">Compatibility</span><span class="v">iPhone · iOS 17+</span></div>
+      </div>
+      <div>
+        <div class="info-row"><span class="k">Price</span><span class="v">Free (planned)</span></div>
+        <div class="info-row"><span class="k">Copyright</span><span class="v">© 2026 Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">App Privacy</span><span class="v">Data Not Collected</span></div>
+      </div>
+    </div>
+    <details class="aso">
+      <summary>ASO meta (not customer-visible)</summary>
+      <code>keywords (87/100): cheer,cheerleading,stunt,tracker,counter,practice,hit,skills,allstar,coach,gym,stats</code>
+    </details>
+  </section>
+</div>
+
+<!-- ============ v2 — GENERAL OPTION 1 ============ -->
+<div class="page variant" id="v2a">
+  <header class="app">
+    <img class="icon" src="../../HitRate/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" alt="HitRate icon">
+    <div class="head-text">
+      <h1>HitRate: Trick &amp; Stunt Tracker</h1>
+      <div class="subtitle">Landed, sketchy, bail or slam</div>
+      <div class="seller">Ian Kainoa Richardson</div>
+      <div class="price-row">
+        <button class="get">GET</button>
+        <span class="iap">Planned free · pricing TBD</span>
+      </div>
+      <div class="meta-strip">
+        <div class="meta-cell"><div class="meta-label">Ratings</div><div class="meta-value">—</div><div class="meta-sub">No ratings yet</div></div>
+        <div class="meta-cell"><div class="meta-label">Category</div><div class="meta-value">🏅</div><div class="meta-sub">Sports</div></div>
+        <div class="meta-cell"><div class="meta-label">Compatibility</div><div class="meta-value">iPhone</div><div class="meta-sub">iOS 17+</div></div>
+        <div class="meta-cell"><div class="meta-label">Privacy</div><div class="meta-value">🔒</div><div class="meta-sub">Data Not Collected</div></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flag">⚠️ v2 mismatch (why this is gated on the product pass): general/skate-leading copy over 100% cheer screenshots, "Stunt Cards", and cheer onboarding. Needs sport-neutral onboarding + multi-sport screenshots + Skill Cards rename before this can ship coherently.</div>
+
+  <section>
+    <h2>iPhone Screenshots</h2>
+    <div class="shots">
+      <img src="../../fastlane/screenshots/en-US/1_athlete-dashboard.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/2_log-counter.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/3_athlete-card.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/4_legendary-card.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/5_coach-dashboard.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/6_onboarding.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/7_team-card.png" alt="">
+    </div>
+  </section>
+
+  <section>
+    <div class="promo"><em>Land it or bail it, log it in one tap — skate, cheer, climb, gym, any skill. Watch your rate climb, then turn it into a holographic card. Offline. No accounts.</em></div>
+    <div class="desc">Land it or bail it — log every attempt in one tap. Skate, cheer, climbing, gymnastics, parkour: if you can attempt it, you can track it.
+
+HitRate turns reps into a performance dashboard and a deck of holographic cards. Pick the trick, tap once per try, and HitRate sorts each attempt into a four-level ladder — clean, a little sketchy, a small bail, or a full slam — building your hit rate as you go.
+
+YOUR TRICKS, YOUR WORDS
+Nothing comes pre-loaded. Build your own list — kickflip, back handspring, full up, a V6 problem, a kong vault — whatever you're working. Rename the four outcome buttons to match how you actually talk: Landed / Sketchy / Bail / Slam, or Hit / Bobble / Building fall / Major fall. The severity ladder stays fixed; the words are yours.
+
+FOR ATHLETES
+Track the skills you're chasing and watch your rate climb session over session. See your cleanest skill, your roughest one, and the single mistake that's most worth fixing — written out in plain English, no chart-reading required.
+
+FOR COACHES &amp; SPECTATORS
+Coaching a group or just watching from the stands? Switch modes and log someone else's attempts as fast as they throw them. A parent in the bleachers, a coach across the floor — one tap per rep, no setup.
+
+THE DASHBOARD
+• Hit rate at a glance — today, this week, or all-time
+• Trend line across your recent sessions
+• Skills ranked by rate, with movement vs last session
+• A heatmap of where the misses pile up
+• Auto-written takeaways: what led the way, what to tighten next
+• Session tape: every rep of your latest practice on one strip, with rough patches flagged automatically
+
+THE CARD DECK
+Turn your numbers into holographic, trading-card-style collectibles with an ambient foil shimmer. Stat cards up front, then a deck of unlockable milestones — and rarity is set by how hard the achievement is to earn, not by your hit rate. Grind 1,000 reps, stack 25 clean in a row, or nail a flawless session to pull a LEGENDARY. There are DUBIOUS HONOR cards too, for the falls you walked away from. Save a card to Photos, copy it, or open it in Instagram.
+
+BUILT FOR THE SESSION
+• One-tap logging with big targets — made for fast hands at the park or on the floor
+• Instant undo for mis-taps
+• Rename every outcome to your own language
+• CSV export of every attempt you've logged
+• Works completely offline — your data never leaves your phone
+
+No accounts. No ads. No tracking. Just counts.</div>
+  </section>
+
+  <section>
+    <h2>Ratings &amp; Reviews</h2>
+    <div class="ratings"><span class="big">—</span><span class="note">No ratings yet — pre-launch</span></div>
+  </section>
+
+  <section>
+    <h2>Information</h2>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="k">Seller</span><span class="v">Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">Category</span><span class="v">Sports</span></div>
+        <div class="info-row"><span class="k">Compatibility</span><span class="v">iPhone · iOS 17+</span></div>
+      </div>
+      <div>
+        <div class="info-row"><span class="k">Price</span><span class="v">Free (planned)</span></div>
+        <div class="info-row"><span class="k">Copyright</span><span class="v">© 2026 Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">App Privacy</span><span class="v">Data Not Collected</span></div>
+      </div>
+    </div>
+    <details class="aso">
+      <summary>ASO meta (not customer-visible)</summary>
+      <code>keywords (95/100): cheer,counter,skate,gymnastics,climbing,parkour,tumbling,reps,practice,progress,stats,coach,bmx</code>
+    </details>
+  </section>
+</div>
+
+<!-- ============ v2 — GENERAL OPTION 2 ============ -->
+<div class="page variant" id="v2b">
+  <header class="app">
+    <img class="icon" src="../../HitRate/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" alt="HitRate icon">
+    <div class="head-text">
+      <h1>HitRate: Trick Tracker</h1>
+      <div class="subtitle">Log every rep. Any skill.</div>
+      <div class="seller">Ian Kainoa Richardson</div>
+      <div class="price-row">
+        <button class="get">GET</button>
+        <span class="iap">Planned free · pricing TBD</span>
+      </div>
+      <div class="meta-strip">
+        <div class="meta-cell"><div class="meta-label">Ratings</div><div class="meta-value">—</div><div class="meta-sub">No ratings yet</div></div>
+        <div class="meta-cell"><div class="meta-label">Category</div><div class="meta-value">🏅</div><div class="meta-sub">Sports</div></div>
+        <div class="meta-cell"><div class="meta-label">Compatibility</div><div class="meta-value">iPhone</div><div class="meta-sub">iOS 17+</div></div>
+        <div class="meta-cell"><div class="meta-label">Privacy</div><div class="meta-value">🔒</div><div class="meta-sub">Data Not Collected</div></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flag">⚠️ v2 mismatch (why this is gated on the product pass): general/skate-leading copy over 100% cheer screenshots, "Stunt Cards", and cheer onboarding. Needs sport-neutral onboarding + multi-sport screenshots + Skill Cards rename before this can ship coherently.</div>
+
+  <section>
+    <h2>iPhone Screenshots</h2>
+    <div class="shots">
+      <img src="../../fastlane/screenshots/en-US/1_athlete-dashboard.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/2_log-counter.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/3_athlete-card.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/4_legendary-card.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/5_coach-dashboard.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/6_onboarding.png" alt="">
+      <img src="../../fastlane/screenshots/en-US/7_team-card.png" alt="">
+    </div>
+  </section>
+
+  <section>
+    <div class="promo"><em>Land it or bail it, log it in one tap — skate, cheer, climb, gym, any skill. Watch your rate climb, then turn it into a holographic card. Offline. No accounts.</em></div>
+    <div class="desc">Land it or bail it — log every attempt in one tap. Skate, cheer, climbing, gymnastics, parkour: if you can attempt it, you can track it.
+
+(Description identical to Option 1 — see that tab. Only name, subtitle, and keywords differ.)</div>
+  </section>
+
+  <section>
+    <h2>Ratings &amp; Reviews</h2>
+    <div class="ratings"><span class="big">—</span><span class="note">No ratings yet — pre-launch</span></div>
+  </section>
+
+  <section>
+    <h2>Information</h2>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="k">Seller</span><span class="v">Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">Category</span><span class="v">Sports</span></div>
+        <div class="info-row"><span class="k">Compatibility</span><span class="v">iPhone · iOS 17+</span></div>
+      </div>
+      <div>
+        <div class="info-row"><span class="k">Price</span><span class="v">Free (planned)</span></div>
+        <div class="info-row"><span class="k">Copyright</span><span class="v">© 2026 Ian Kainoa Richardson</span></div>
+        <div class="info-row"><span class="k">App Privacy</span><span class="v">Data Not Collected</span></div>
+      </div>
+    </div>
+    <details class="aso">
+      <summary>ASO meta (not customer-visible)</summary>
+      <code>keywords (97/100): cheer,stunt,counter,landed,skate,gymnastics,climbing,parkour,tumbling,bmx,practice,progress,stats</code>
+    </details>
+  </section>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -3,7 +3,9 @@ import SwiftUI
 /// "GROUPS"/"SKILLS" — ranked leaderboard ⇄ outcome heatmap, toggled in place.
 struct GroupsCard: View {
     let stats: FloorStats
-    @Binding var view: String
+    // Toggle state lives in the card so each stacked section (overall / stunt /
+    // tumbling) flips Ranked⇄Grid independently — not through one shared binding.
+    @State private var view = "Ranked"
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
@@ -39,8 +41,8 @@ struct RankedRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Text("\(rank)")
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(rank == 1 ? Theme.buildingFall : Theme.label3)
+                .font(Theme.barlow(14, .extrabold))
+                .foregroundStyle(rank == 1 ? Theme.accent : Theme.label3)
                 .frame(width: 18)
 
             Text("\(stat.number)")
@@ -64,12 +66,12 @@ struct RankedRow: View {
                     .frame(width: 34, alignment: .trailing)
             }
 
-            HStack(alignment: .lastTextBaseline, spacing: 0) {
+            HStack(alignment: .lastTextBaseline, spacing: 1) {
                 Text("\(stat.rate)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .font(Theme.barlow(19, .extrabold))
                     .monospacedDigit()
                 Text("%")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(Theme.barlow(12, .bold))
             }
             .lineLimit(1)
             .minimumScaleFactor(0.8)   // "100%" must not wrap in the fixed column

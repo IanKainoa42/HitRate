@@ -3,24 +3,29 @@ import SwiftUI
 // MARK: - Design tokens (from design handoff)
 
 enum Theme {
-    // App UI register — court-at-night, same world as onboarding and the
-    // share cards (the original iOS-light register was retired 2026-06-06;
-    // views still consume only these tokens).
-    static let appBG = Color(hex: 0x0A0F1E)
-    static let surface = Color.white.opacity(0.06)      // glass card on navy
-    static let surface2 = Color.white.opacity(0.12)
-    static let label = Color.white
-    static let label2 = Color.white.opacity(0.60)
-    static let label3 = Color.white.opacity(0.35)
-    static let separator = Color.white.opacity(0.14)
-    static let fill = Color.white.opacity(0.08)
-    static let accent = Color(hex: 0x007AFF)
+    // App UI register — "training floor" (2026-06-07): lifted graphite with a
+    // tight diagonal hairline, inset wells, chalk text, ONE green signal
+    // accent. Replaces the court-at-night glass app UI (which lives on for
+    // onboarding + share cards). Views still consume only these tokens.
+    static let appBG = Color(hex: 0x181A1D)             // graphite floor (FloorBackdrop adds gradient + hairline)
+    static let appBGTop = Color(hex: 0x1F2125)
+    static let appBGBottom = Color(hex: 0x151719)
+    static let well = Color(hex: 0x101114)              // recessed module surface
+    static let surface = Color(hex: 0x101114)           // legacy alias — wells
+    static let surface2 = Color(hex: 0x2A2C31)          // raised chip on a well
+    static let label = Color(hex: 0xECEBE7)             // chalk
+    static let label2 = Color(hex: 0x8D8B86)            // warm gray
+    static let label3 = Color(hex: 0x5C5B57)
+    static let separator = Color(hex: 0x1F2125)         // hairline inside a well
+    static let fill = Color(hex: 0x1D1F23)              // track behind bars
+    static let accent = Color(hex: 0x34D26A)            // the green signal — go/hit/improving
+    static let accentText = Color(hex: 0x0E1511)        // dark ink on green chips/CTA
 
-    // Outcomes
-    static let hit = Color(hex: 0x34C759)
-    static let bobble = Color(hex: 0xFFCC00)
-    static let buildingFall = Color(hex: 0xFF9500)
-    static let majorFall = Color(hex: 0xFF3B30)
+    // Outcomes (severity hues tuned to the graphite register)
+    static let hit = Color(hex: 0x34D26A)
+    static let bobble = Color(hex: 0xE8C94B)
+    static let buildingFall = Color(hex: 0xFF9A3D)
+    static let majorFall = Color(hex: 0xFF6B57)
 
     // Brand register ("court at night")
     static let navy = Color(hex: 0x0A0F1E)
@@ -30,11 +35,12 @@ enum Theme {
     static let gold = Color(hex: 0xFFD43B)
     static let brandGreen = Color(hex: 0x51CF66)
 
-    // Group identity rainbow (cycled)
+    // Group identity rainbow (cycled) — desaturated athletic tones; the candy
+    // iOS-system hues read as toy against the graphite floor.
     static let groupRainbow: [Color] = [
-        Color(hex: 0x007AFF), Color(hex: 0x34C759), Color(hex: 0xFF9500),
-        Color(hex: 0xAF52DE), Color(hex: 0xFF2D55), Color(hex: 0x5AC8FA),
-        Color(hex: 0xFFCC00),
+        Color(hex: 0x6B9BD8), Color(hex: 0x5FBF77), Color(hex: 0xE0A458),
+        Color(hex: 0xA98BD4), Color(hex: 0xD97B85), Color(hex: 0x6FC3C9),
+        Color(hex: 0xC9B458),
     ]
 
     static func groupColor(_ index: Int) -> Color {
@@ -50,7 +56,7 @@ enum Theme {
         return majorFall
     }
 
-    // MARK: Brand display font (Space Grotesk; bundled)
+    // MARK: Brand display font (Space Grotesk; bundled) — share-card register
 
     static func grotesk(_ size: CGFloat, _ weight: GroteskWeight = .bold) -> Font {
         Font.custom(weight.postScriptName, size: size)
@@ -65,6 +71,35 @@ enum Theme {
             case .bold: "SpaceGrotesk-Bold"
             }
         }
+    }
+
+    // MARK: Stat numerals (Barlow Condensed; bundled) — app register
+
+    /// Every big number in the app UI sets in this: tall, athletic, planted.
+    /// Words stay SF — the condensed face is reserved for numerals so it
+    /// reads as scoreboard, not costume.
+    static func barlow(_ size: CGFloat, _ weight: BarlowWeight = .bold) -> Font {
+        Font.custom(weight.postScriptName, size: size)
+    }
+
+    enum BarlowWeight {
+        case semibold, bold, extrabold
+        var postScriptName: String {
+            switch self {
+            case .semibold: "BarlowCondensed-SemiBold"
+            case .bold: "BarlowCondensed-Bold"
+            case .extrabold: "BarlowCondensed-ExtraBold"
+            }
+        }
+    }
+
+    /// Engraved section label ("HIT RATE", "OUTCOMES") — the kicker style
+    /// every well leads with.
+    static func kicker(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold))
+            .tracking(1.8)
+            .foregroundStyle(Theme.label2)
     }
 }
 
