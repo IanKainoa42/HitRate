@@ -1,3 +1,32 @@
+## 2026-06-07 — When Ian recalls a past UI, confirm by describing — don't force multiple-choice
+
+- **Category:** correction
+- **What happened:** Ian asked what happened to "the grid view during practice"
+  — a layout he remembered. I checked git/handoff (it was never committed), then
+  fired an AskUserQuestion with A/B/C interaction-model options. He rejected the
+  tool ("the user wants to clarify"), then plainly described it himself: the
+  practice recorder laid out like the stats/home heatmap (groups×outcomes), each
+  cell tap-to-`+1`.
+- **Rule:** When Ian references a feature from memory, reflect my understanding
+  back in one sentence for confirmation, or ask him to describe it — do NOT box
+  him into multiple-choice options that may all miss his mental model. Multiple
+  choice is for forks I genuinely can't resolve, not for "what did you mean."
+
+## 2026-06-07 — Coach practice recorder: tap-to-log matrix (groups×outcomes)
+
+- **Category:** best_practice
+- **What happened:** Built `logGrid` in LogView — the whole roster as a
+  groups×4-outcomes matrix, each cell a tap-to-`+1` button (no group selection).
+  A single outcome-label header row means it's gated to single-kind rosters
+  (`gridAvailable`); coach (all-stunt) defaults to Grid, mixed-kind athletes
+  stay on the Pad. Grid⇄Pad `MiniSeg` persisted in `practiceLayout`.
+- **Rule:** Verify increments via the accessibility tree, not screenshots — each
+  cell exposes `accessibilityLabel "Log <Outcome> for <Group>"` + value = count,
+  so a single tap → value 0→1 is checkable. Sims kept auto-shutting between
+  steps this session (`code 405: ... Shutdown`); re-`boot`+`bootstatus` before
+  each install. iPhone flipped to `unavailable` mid-session → device build fails
+  with "Unable to find a destination" until it's reconnected/unlocked.
+
 ## 2026-06-05 — UserDefaults reads inside model computed properties ship stale UI
 
 - **Category:** knowledge_gap

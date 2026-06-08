@@ -142,7 +142,19 @@ Key invariants:
   is retained only because `InsightRow` lives there). `Views/Log/*` — the
   counter; outcome pad buttons are engraved wells (outcome color lives in the
   bottom inner edge + caps label, count in chalk Barlow), NOT colored candy
-  buttons. **Editor rename fields use `RenameField`** (local @State buffer,
+  buttons. LogView has TWO layouts: **Pad** (pick one group from the horizontal
+  scroll, then hammer the 4 outcome wells — per-skill kind labels) and **Grid**
+  (`logGrid` — the whole roster as a groups×4-outcomes matrix, every cell a
+  tap-to-`+1` button into the session; no group selection — tap "Bobble" on
+  Group 1 and it adds a bobble to Group 1). A single header row of outcome
+  labels means the Grid is offered ONLY for single-kind rosters (`gridAvailable`
+  = all groups one kind); coach is always all-stunt so it always qualifies, a
+  single-kind athlete also does, mixed-kind athletes get Pad only (no toggle).
+  The `MiniSeg` Grid⇄Pad toggle (persisted in `practiceLayout`) shows whenever
+  `gridAvailable`; `useGrid` defaults coach→Grid, athlete→Pad. Cells reuse the
+  engraved-well style and `countsFor` per-session counts; column headers/cell
+  a11y route outcome words through `OutcomeNames` via `o.short/label(gridKind)`.
+  **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
   re-renders the editor mid-edit and the cursor fights the keyboard.

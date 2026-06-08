@@ -14,6 +14,7 @@ struct LogView: View {
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    @AppStorage("practiceLayout") private var practiceLayoutRaw = ""   // "" auto, "grid", "pad"
 
     @State private var selectedGroup: StuntGroup?
     @State private var hapticTrigger = 0
@@ -27,6 +28,29 @@ struct LogView: View {
     private var activeGroup: StuntGroup? {
         if let sel = selectedGroup, groups.contains(where: { $0 === sel }) { return sel }
         return groups.first
+    }
+
+    /// The tap-to-log matrix has ONE outcome-label header row, so it's only
+    /// offered when every group shares a kind (coach is always all-stunt; a
+    /// single-kind athlete also qualifies). Mixed-kind athletes stay on the
+    /// per-skill pad, which labels each skill in its own kind's words.
+    private var gridAvailable: Bool {
+        !groups.isEmpty && Set(groups.map(\.kind)).count == 1
+    }
+    private var gridKind: SkillKind { groups.first?.kind ?? .stunt }
+    /// Coach defaults to the matrix; athlete to the pad. Either flips via the
+    /// Grid⇄Pad toggle (persisted in `practiceLayout`).
+    private var useGrid: Bool {
+        guard gridAvailable else { return false }
+        switch practiceLayoutRaw {
+        case "grid": return true
+        case "pad": return false
+        default: return mode == .coach
+        }
+    }
+    private var layoutBinding: Binding<String> {
+        Binding(get: { useGrid ? "Grid" : "Pad" },
+                set: { practiceLayoutRaw = ($0 == "Grid") ? "grid" : "pad" })
     }
 
     var body: some View {
@@ -100,6 +124,18 @@ struct LogView: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
 
+            // Layout toggle — grid is offered only for single-kind rosters.
+            if gridAvailable {
+                HStack {
+                    Spacer()
+                    MiniSeg(options: ["Grid", "Pad"], selection: layoutBinding)
+                }
+                .padding(.horizontal, 16)
+            }
+
+            if useGrid {
+                logGrid(attempts)
+            } else {
             // Group picker
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -186,6 +222,7 @@ struct LogView: View {
                     .foregroundStyle(Theme.label2)
                     .padding(.top, 30)
             }
+            }   // end of pad layout (else useGrid)
 
             // Recent + undo (well)
             VStack(spacing: 4) {
@@ -238,6 +275,97 @@ struct LogView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
         }
+    }
+
+    // MARK: Tap-to-log matrix (groups × outcomes)
+
+    /// The whole roster on one screen: a column per outcome, a row per group,
+    /// every cell a tap-to-+1 button into this session. No group selection —
+    /// tap "Bobble" on Group 1 and it adds a bobble to Group 1. Cells are the
+    /// same engraved wells as the pad (outcome color in the machined edge, the
+    /// running count in chalk Barlow); the column header names the outcome.
+    @ViewBuilder
+    private func logGrid(_ attempts: [Attempt]) -> some View {
+        VStack(spacing: 8) {
+            Text("TAP A CELL TO LOG A REP")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.6)
+                .foregroundStyle(Theme.label3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Column headers — one kind (see gridAvailable), via OutcomeNames.
+            HStack(spacing: 6) {
+                Color.clear.frame(width: 78, height: 1)
+                ForEach(Outcome.allCases) { o in
+                    VStack(spacing: 3) {
+                        Circle().fill(o.color).frame(width: 7, height: 7)
+                        Text(o.short(gridKind))
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.3)
+                            .foregroundStyle(Theme.label2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 6) {
+                    ForEach(groups) { g in
+                        let c = countsFor(group: g, in: attempts)
+                        HStack(spacing: 6) {
+                            // Row label — colored number badge + name.
+                            HStack(spacing: 6) {
+                                Text("\(g.number)")
+                                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 22, height: 22)
+                                    .background(g.color)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                Text(g.name)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.label)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                            .frame(width: 78, alignment: .leading)
+
+                            ForEach(Outcome.allCases) { o in
+                                let v = c[o.rawValue]
+                                Button {
+                                    context.insert(Attempt(outcome: o, group: g, session: session))
+                                    try? context.save()
+                                    hapticTrigger += 1
+                                    Sounds.shared.play(.outcome(o))
+                                } label: {
+                                    Text("\(v)")
+                                        .font(Theme.barlow(20, .extrabold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(v == 0 ? Theme.label3 : Theme.label)
+                                        .contentTransition(.numericText(value: Double(v)))
+                                        .animation(.spring(duration: 0.3), value: v)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .fill(Theme.well
+                                                    .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
+                                                    .shadow(.inner(color: o.color.opacity(0.85), radius: 1, y: -2)))
+                                        )
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Log \(o.label(gridKind)) for \(g.name)")
+                                .accessibilityValue("\(v)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(maxHeight: .infinity)
     }
 
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {

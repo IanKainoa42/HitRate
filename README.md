@@ -15,9 +15,14 @@ Built from the `design_handoff_ckil_home` design handoff (originally codenamed
 - **Onboarding** — first launch asks who's counting ("Just me" vs "I coach a
   team"); you create your own skills/groups — nothing is pre-seeded. Mode is
   switchable later in the editor.
-- **Log** — the counter. Start a practice, pick a skill/group, hammer one of
-  four big outcome buttons per rep. Haptics, undo, live session hit-rate,
-  recent tape. Outcome names are renameable (severity order/colors fixed).
+- **Log** — the counter, two layouts via a Grid⇄Pad toggle. **Pad**: pick one
+  skill/group, hammer one of four big outcome buttons per rep. **Grid**: the
+  whole roster as a groups×outcomes matrix — tap any cell to add that outcome to
+  that group (no selecting), best for a coach running many groups on the floor.
+  Grid is offered only for single-kind rosters (coach defaults to it; mixed-kind
+  athletes stay on Pad, which labels each skill in its own kind's words).
+  Haptics, undo, live session hit-rate, recent tape. Outcome names are
+  renameable (severity order/colors fixed).
 - **Home** — floor dashboard: hit-rate summary with animated counter +
   distribution bar, trend line chart, group leaderboard ⇄ heatmap, takeaways,
   latest-session tape with rough-patch detection. Global timeframe filter
