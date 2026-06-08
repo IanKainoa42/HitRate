@@ -204,12 +204,17 @@ final class Attempt {
     var outcomeRaw: Int
     var group: StuntGroup?
     var session: PracticeSession?
+    /// Reps committed together as one wave/routine share a `waveID`; reps logged
+    /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
+    /// container in the practice log. Optional → additive lightweight migration.
+    var waveID: UUID?
 
-    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now) {
+    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
         self.group = group
         self.session = session
         self.timestamp = timestamp
+        self.waveID = waveID
     }
 
     var outcome: Outcome { Outcome(rawValue: outcomeRaw) ?? .hit }
