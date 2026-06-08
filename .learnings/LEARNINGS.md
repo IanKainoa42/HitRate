@@ -1,3 +1,24 @@
+## 2026-06-07 — xcodegen hardcodes Info.plist version "1"/"1.0" — wire it to build settings
+
+- **Category:** correction
+- **What happened:** Bumped `CURRENT_PROJECT_VERSION` 1→2 in project.yml +
+  `xcodegen generate` (pbxproj showed 2), but `fastlane ship_upload` failed:
+  altool `ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE` "bundle version must be
+  higher than previously uploaded version: '1'." The archive's CFBundleVersion
+  was still 1 — xcodegen's generated `HitRate/Info.plist` hardcoded
+  `CFBundleVersion = 1` because the `info.properties` block never set it. The
+  documented "just bump CURRENT_PROJECT_VERSION" silently did nothing to the
+  binary; build 1 only worked because it matched xcodegen's default.
+- **Rule:** In `project.yml` `targets.HitRate.info.properties`, set
+  `CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"` and
+  `CFBundleShortVersionString: "$(MARKETING_VERSION)"` so the plist resolves
+  from build settings at build time (Xcode substitutes `$(...)` during the
+  build). Now fixed + committed. After any version bump, verify the ARCHIVE:
+  `plutil -extract CFBundleVersion raw /tmp/HitRate_ship/HitRate.xcarchive/Products/Applications/HitRate.app/Info.plist`
+  must equal the new number before trusting the upload. TestFlight-only upload
+  lane = `fastlane ship_upload` (build+upload, no submit); build must be >
+  every prior uploaded build (`fastlane asc_build_status` to check).
+
 ## 2026-06-07 — When Ian recalls a past UI, confirm by describing — don't force multiple-choice
 
 - **Category:** correction
