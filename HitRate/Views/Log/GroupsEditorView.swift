@@ -200,6 +200,19 @@ struct GroupsEditorView: View {
                 .listRowBackground(glassRow)
 
                 Section {
+                    NavigationLink {
+                        DataManagementView()
+                    } label: {
+                        Label("Manage data", systemImage: "externaldrive")
+                    }
+                } header: {
+                    Text("Data")
+                } footer: {
+                    Text("Export a backup, clear history, or erase everything.")
+                }
+                .listRowBackground(glassRow)
+
+                Section {
                 } footer: {
                     Text("HitRate \(appVersion)")
                         .frame(maxWidth: .infinity)
