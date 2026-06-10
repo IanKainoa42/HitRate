@@ -173,3 +173,9 @@
 - **Category:** correction
 - **What happened:** Adding the athlete stunt/tumbling split (filter the `groups` array → recompute) would have silently leaked the other kind into the trend and latest-session tape: `trendSeries`/`latestSnapshot` counted ALL session attempts, ignoring the passed `groups`. (advisor-caught before build.)
 - **Rule:** When a pure stats function takes a `groups` subset, EVERY derived series must honor it. Build `let allowed = Set(groups.map(\.persistentModelID))` once and filter `attempt.group` membership in trend/tape/rough-patch — not just the per-group rollup. Verified: stunt(109) + tumbling(124) = all(233); tumbling-only flips the legend wording via aggregateKind for free.
+
+## 2026-06-10 — Concurrent session edits HitRate mid-task
+
+- **Category:** best_practice
+- **What happened:** While building the ghost-competitor feature, another agent session was editing the same repo: it duplicated a `ghostChallengeNote` view into WeeklyTournamentCard.swift mid-edit (would not compile), modified DataManagementView/OnboardingView, added a commit, and switched the checkout from the feature branch to main.
+- **Rule:** In HitRate (and any repo with multiple live agents): before committing, run `git status` + `git log -1` and stage ONLY the files you touched by name — never `git add -A`. If an Edit fails with "file modified since read", re-read and check for foreign duplicate declarations before re-applying.

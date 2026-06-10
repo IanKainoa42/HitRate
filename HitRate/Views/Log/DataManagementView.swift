@@ -17,6 +17,7 @@ struct DataManagementView: View {
     @Query private var sessions: [PracticeSession]
     @Query private var attempts: [Attempt]
 
+    @AppStorage("didOnboard") private var didOnboard = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -142,9 +143,11 @@ struct DataManagementView: View {
     /// outcome labels live in UserDefaults and are intentionally preserved
     /// (settings, not practice data).
     private func eraseAll() {
+        for t in all(Team.self) { context.delete(t) }
         for g in all(StuntGroup.self) { context.delete(g) }
         for s in all(PracticeSession.self) { context.delete(s) }
         for a in all(Attempt.self) { context.delete(a) }
         try? context.save()
+        didOnboard = false
     }
 }

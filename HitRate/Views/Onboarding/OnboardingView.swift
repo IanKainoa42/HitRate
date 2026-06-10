@@ -255,6 +255,15 @@ struct OnboardingView: View {
                         }) { name in
                             pending.append((name, .tumbling))
                         }
+                    } else {
+                        // Coach starter ideas
+                        let groupSuggestions = ["Group 1", "Group 2", "Group 3", "Group 4", "Group 5"]
+                        suggestionHeader("STARTER GROUPS")
+                        FlowChips(options: groupSuggestions.filter { name in
+                            !pending.contains { $0.name == name }
+                        }) { name in
+                            pending.append((name, .stunt))
+                        }
                     }
                 }
                 .padding(.bottom, 12)

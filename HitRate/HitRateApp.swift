@@ -46,6 +46,14 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .onAppear {
+            print("--- ROOT VIEW APPEAR ---")
+            print("didOnboard: \(didOnboard)")
+            print("teams count: \(teams.count), currentTeamID: \(currentTeamID)")
+            print("groups count: \(groups.count)")
+            for g in groups {
+                print("  Group: \(g.name), team: \(g.team?.name ?? "nil")")
+            }
+            print("------------------------")
             migrateExistingInstallIfNeeded()
             migrateGroupsIntoDefaultTeam()
             sweepOrphanedAttempts()

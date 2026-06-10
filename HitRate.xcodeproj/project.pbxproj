@@ -480,7 +480,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = iphoneos;
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -503,7 +503,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = iphoneos;
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
