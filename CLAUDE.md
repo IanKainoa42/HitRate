@@ -92,10 +92,14 @@ Key invariants:
   group seeding — first launch goes through the onboarding chooser (athlete
   vs coach) where the user creates their own buckets. Installs that predate
   onboarding (have groups but no `didOnboard`) are migrated to coach mode
-  silently.
+  silently — UNLESS `replayingIntro` (AppStorage) is set: Manage Data →
+  "Replay intro" flips `didOnboard` off to re-run the setup, and the flag
+  keeps this migration from instantly re-completing it.
 - `Views/Onboarding/OnboardingView.swift` — brand-register (navy) chooser +
   identity + quick-add first skills/groups. Suggestion chips create buckets;
-  they are not pre-made.
+  they are not pre-made. On an intro REPLAY, `finish()` reuses the existing
+  current team (new buckets top up the roster, numbering offset past it) —
+  never forks a duplicate team — and chips hide names already rostered.
 - `Models/Models.swift` — SwiftData: Team, StuntGroup, PracticeSession,
   Attempt. An "active" session is `endedAt == nil`; LogView assumes at most
   one. MULTI-TEAM (both modes): every StuntGroup belongs to a `Team`
