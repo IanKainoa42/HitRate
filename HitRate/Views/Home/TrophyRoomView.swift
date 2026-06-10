@@ -1,12 +1,12 @@
 import SwiftUI
 import SwiftData
 
-/// The trophy room — a display case for everything earned: the season league
-/// standing, every weekly cup banked, and the milestone cards unlocked at
-/// practice. Training-floor register (the room is part of the app); the
-/// milestone cards bring their own court-at-night chrome as objects on the
-/// shelf. Opened from the Home header, read-only — sharing stays on the
-/// Stunt Cards sheet.
+/// The trophy room — the competition hub, kept separate from the analytics on
+/// Home: the live weekly game, the season league standing, every weekly cup
+/// banked, and the milestone cards unlocked at practice. Training-floor
+/// register (the room is part of the app); the milestone cards bring their own
+/// court-at-night chrome as objects on the shelf. Opened from the Home header,
+/// read-only — sharing stays on the Stunt Cards sheet.
 struct TrophyRoomView: View {
     let sessions: [PracticeSession]
     let groups: [StuntGroup]
@@ -15,30 +15,27 @@ struct TrophyRoomView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private var tournament: WeeklyTournament {
+        WeeklyLeague.compute(sessions: sessions, groups: groups)
+    }
     private var earned: [Milestone] {
         Milestones.evaluate(sessions: sessions, groups: groups, mode: mode).filter(\.earned)
-    }
-    private var league: [SeasonRank] {
-        WeeklyLeague.compute(sessions: sessions, groups: groups).league
     }
     private var cups: [WeeklyCup] {
         WeeklyLeague.cupHistory(sessions: sessions, groups: groups)
     }
 
-    private var isEmpty: Bool { earned.isEmpty && cups.isEmpty && league.isEmpty }
-
     var body: some View {
+        let t = tournament
         VStack(spacing: 9) {
             header
             ScrollView {
                 VStack(spacing: 9) {
-                    if isEmpty {
-                        emptyState
-                    } else {
-                        if !league.isEmpty { seasonSection }
-                        if !cups.isEmpty { cupsSection }
-                        if !earned.isEmpty { accoladesSection }
-                    }
+                    // The live competition leads the room; analytics stay on Home.
+                    WeeklyTournamentCard(tournament: t, weekOnly: true)
+                    if !t.league.isEmpty { seasonSection(t.league) }
+                    if !cups.isEmpty { cupsSection }
+                    if !earned.isEmpty { accoladesSection }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -88,7 +85,7 @@ struct TrophyRoomView: View {
 
     // MARK: Season league
 
-    private var seasonSection: some View {
+    private func seasonSection(_ league: [SeasonRank]) -> some View {
         FeedCard {
             CardHead("SEASON LEAGUE") {
                 if let leader = league.first {
@@ -159,28 +156,6 @@ struct TrophyRoomView: View {
                 .foregroundStyle(Theme.label3)
                 .padding(.top, 4)
         }
-    }
-
-    // MARK: Empty
-
-    private var emptyState: some View {
-        FeedCard {
-            VStack(spacing: 14) {
-                Image(systemName: "trophy")
-                    .font(.system(size: 34))
-                    .foregroundStyle(Theme.label3)
-                Text("Your trophy room is empty")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.label)
-                Text("Win a weekly cup or unlock a milestone at practice — your cups, league standing, and accolade cards collect here.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.label2)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 26)
-        }
-        .padding(.top, 40)
     }
 }
 

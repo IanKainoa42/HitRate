@@ -245,7 +245,8 @@ enum WeeklyLeague {
         for i in standings.indices { standings[i].rank = i + 1 }
         standings += provisional   // rank stays 0
 
-        let defending = championOf(sessions: lastWeekSessions, groups: ordered, game: prevGame)
+        let defending = (prevWeek.end > seasonStart(for: now)
+            ? championOf(sessions: lastWeekSessions, groups: ordered, game: prevGame) : nil)
             .map { DefendingChampion(name: $0.group.name, number: $0.group.number,
                                      colorIndex: ($0.group.number - 1) % Theme.groupRainbow.count,
                                      game: prevGame, score: $0.score) }
@@ -305,11 +306,14 @@ enum WeeklyLeague {
     private static func seasonLeague(sessions: [PracticeSession], groups: [StuntGroup],
                                      cal: Calendar, now: Date) -> [SeasonRank] {
         guard let firstStart = sessions.map(\.startedAt).min() else { return [] }
+        // Reset every season: never replay past the later of first data or the
+        // June rollover, so last season's points don't carry over.
+        let floor = max(firstStart, seasonStart(for: now))
         var acc: [String: (g: StuntGroup, points: Int, cups: Int)] = [:]
-        for back in 1...60 {   // ~a season and change; bounds the replay
+        for back in 1...60 {   // a full season's worth of weeks; bounds the replay
             guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: now),
                   let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
-            if interval.end <= firstStart { break }
+            if interval.end <= floor { break }
             let weekSessions = sessions.filter { interval.contains($0.startedAt) }
             guard !weekSessions.isEmpty else { continue }
             let game = WeeklyGame.of(week: interval)
@@ -341,12 +345,14 @@ enum WeeklyLeague {
                            now: Date = .now) -> [WeeklyCup] {
         let cal = Calendar.current
         guard let firstStart = sessions.map(\.startedAt).min() else { return [] }
+        // Reset every season — cups won last season don't carry into this one.
+        let floor = max(firstStart, seasonStart(for: now))
         let ordered = groups.sorted { $0.orderIndex < $1.orderIndex }
         var cups: [WeeklyCup] = []
         for back in 1...60 {
             guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: now),
                   let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
-            if interval.end <= firstStart { break }
+            if interval.end <= floor { break }
             let weekSessions = sessions.filter { interval.contains($0.startedAt) }
             guard !weekSessions.isEmpty else { continue }
             let game = WeeklyGame.of(week: interval)

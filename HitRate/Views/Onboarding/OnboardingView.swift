@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
     @AppStorage("teamName") private var teamName = ""
+    @AppStorage("currentTeamID") private var currentTeamID = ""
 
     @State private var mode: AppMode?
     @State private var draft = ""
@@ -309,11 +310,20 @@ struct OnboardingView: View {
     }
 
     private func finish(_ mode: AppMode) {
+        // Every bucket lives under a team. The first team is created here; the
+        // program/org identity stays shared app-wide.
+        let firstTeamName = mode == .coach
+            ? (teamName.isEmpty ? "My Team" : teamName)
+            : (athleteName.isEmpty ? "My Skills" : "\(athleteName)'s Skills")
+        let team = Team(name: firstTeamName, orderIndex: 0)
+        context.insert(team)
         for (i, item) in pending.enumerated() {
-            context.insert(StuntGroup(name: item.name, number: i + 1, orderIndex: i,
-                                      kind: item.kind))
+            let g = StuntGroup(name: item.name, number: i + 1, orderIndex: i, kind: item.kind)
+            g.team = team
+            context.insert(g)
         }
         try? context.save()
+        currentTeamID = team.id.uuidString
         appModeRaw = mode.rawValue
         didOnboard = true
     }

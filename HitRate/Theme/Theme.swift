@@ -186,15 +186,27 @@ extension Date {
     }
 }
 
-/// "’25–’26" style season string (season rolls over in August).
+/// "’25–’26" style season string. The cheer season ends in May, so it rolls
+/// over on June 1.
 func seasonString(for date: Date = .now) -> String {
     let cal = Calendar.current
     let y = cal.component(.year, from: date)
     let m = cal.component(.month, from: date)
-    let start = m >= 8 ? y : y - 1
+    let start = m >= 6 ? y : y - 1
     let a = String(String(start).suffix(2))
     let b = String(String(start + 1).suffix(2))
     return "’\(a)–’\(b)"
+}
+
+/// Midnight on Jun 1 of the current season's start year — the cutoff the
+/// season league and cup history reset to (mirrors `seasonString`'s rollover;
+/// the cheer season ends in May).
+func seasonStart(for date: Date = .now) -> Date {
+    let cal = Calendar.current
+    let y = cal.component(.year, from: date)
+    let m = cal.component(.month, from: date)
+    let startYear = m >= 6 ? y : y - 1
+    return cal.date(from: DateComponents(year: startYear, month: 6, day: 1)) ?? date
 }
 
 /// Initials for a name ("Cheer Force San Diego" → "CFSD", "Senior Coed" → "SC").

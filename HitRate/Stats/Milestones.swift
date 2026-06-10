@@ -34,7 +34,15 @@ enum Milestones {
     /// Earned cards sort by tier (flashiest first), locked teasers by progress.
     static func evaluate(sessions: [PracticeSession], groups: [StuntGroup],
                          mode: AppMode) -> [Milestone] {
-        let attempts = sessions.flatMap(\.attempts).sorted { $0.timestamp < $1.timestamp }
+        // Confine every milestone to the passed roster (the active team) — like
+        // StatsEngine, filter attempts by group membership so one team's reps
+        // can't inflate another team's accolades.
+        let allowed = Set(groups.map { $0.persistentModelID })
+        func inTeam(_ a: Attempt) -> Bool {
+            a.group.map { allowed.contains($0.persistentModelID) } ?? false
+        }
+        let attempts = sessions.flatMap(\.attempts).filter(inTeam)
+            .sorted { $0.timestamp < $1.timestamp }
         let total = attempts.count
         let falls = attempts.filter {
             $0.outcome == .buildingFall || $0.outcome == .majorFall
@@ -61,10 +69,11 @@ enum Milestones {
             let perfect: Bool   // hits == reps, NOT rate == 100 (rounding lies)
         }
         let shapes: [SessionShape] = sessions.compactMap { s in
-            let n = s.attempts.count
+            let reps = s.attempts.filter(inTeam)
+            let n = reps.count
             guard n > 0 else { return nil }
-            let hits = s.attempts.filter(\.outcome.isHit).count
-            let f = s.attempts.filter {
+            let hits = reps.filter(\.outcome.isHit).count
+            let f = reps.filter {
                 $0.outcome == .buildingFall || $0.outcome == .majorFall
             }.count
             return SessionShape(reps: n,

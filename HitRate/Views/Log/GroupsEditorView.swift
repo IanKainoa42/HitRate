@@ -38,22 +38,28 @@ private struct RenameField: View {
 struct GroupsEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
+    @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
-    @AppStorage("teamName") private var teamName = ""
+    @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage(Sounds.defaultsKey) private var soundsOn = true
 
     // Outcome rename slots (blank = standard name) — observable store so the
     // rest of the app re-renders on rename.
     @State private var outcomeNames = OutcomeNames.shared
 
-    // Swipe-deleted group awaiting confirmation (only when it has logged reps).
+    // Swipe-deleted group/team awaiting confirmation (only when it has reps).
     @State private var pendingDelete: StuntGroup?
+    @State private var pendingTeamDelete: Team?
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
+    /// The active team and its roster — the editor edits this team.
+    private var currentTeam: Team? { teams.current(id: currentTeamID) }
+    private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
 
     var body: some View {
         NavigationStack {
@@ -64,14 +70,15 @@ struct GroupsEditorView: View {
                     }
                     .listRowBackground(glassRow)
                 } else {
-                    Section("Team") {
+                    Section("Program") {
                         TextField("Program", text: $orgName)
-                        TextField("Team", text: $teamName)
                     }
                     .listRowBackground(glassRow)
                 }
 
-                Section(mode.nounPluralTitle) {
+                teamsSection
+
+                Section("\(mode.nounPluralTitle) · \(currentTeam?.name ?? "")") {
                     ForEach(groups) { g in
                         HStack(spacing: 10) {
                             Text("\(g.number)")
@@ -132,8 +139,10 @@ struct GroupsEditorView: View {
 
                     Button {
                         let next = (groups.map(\.number).max() ?? 0) + 1
-                        context.insert(StuntGroup(name: "\(mode.nounTitle) \(next)",
-                                                  number: next, orderIndex: groups.count))
+                        let g = StuntGroup(name: "\(mode.nounTitle) \(next)",
+                                           number: next, orderIndex: groups.count)
+                        g.team = currentTeam
+                        context.insert(g)
                         try? context.save()
                     } label: {
                         Label("Add \(mode.noun)", systemImage: "plus")
@@ -238,6 +247,18 @@ struct GroupsEditorView: View {
             } message: { g in
                 Text("Its \(g.attempts.count) logged reps will be deleted too. This can't be undone.")
             }
+            .alert(
+                "Delete \(pendingTeamDelete?.name ?? "")?",
+                isPresented: Binding(
+                    get: { pendingTeamDelete != nil },
+                    set: { if !$0 { pendingTeamDelete = nil } }),
+                presenting: pendingTeamDelete
+            ) { t in
+                Button("Delete team & data", role: .destructive) { removeTeam(t) }
+                Button("Cancel", role: .cancel) {}
+            } message: { t in
+                Text("Its \(groupCount(t)) \(mode.nounPlural) and all their logged reps will be deleted. This can't be undone.")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -262,6 +283,90 @@ struct GroupsEditorView: View {
 
     private func renumber() {
         for (i, g) in groups.enumerated() { g.orderIndex = i }
+        try? context.save()
+    }
+
+    // MARK: Teams
+
+    @ViewBuilder
+    private var teamsSection: some View {
+        Section {
+            ForEach(teams) { t in
+                HStack(spacing: 10) {
+                    Button {
+                        currentTeamID = t.id.uuidString
+                    } label: {
+                        Image(systemName: t.id == currentTeam?.id ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(t.id == currentTeam?.id ? Theme.accent : Theme.label3)
+                    }
+                    .buttonStyle(.plain)
+                    RenameField(prompt: "Team name", value: t.name) { new in
+                        let trimmed = new.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        t.name = trimmed
+                        try? context.save()
+                    }
+                    Spacer()
+                    Text("\(groupCount(t))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onDelete(perform: deleteTeams)
+            .onMove(perform: moveTeams)
+
+            Button {
+                addTeam()
+            } label: {
+                Label("Add team", systemImage: "plus")
+            }
+        } header: {
+            Text("Teams")
+        } footer: {
+            Text("Each team keeps its own \(mode.nounPlural) and stats. Switch the active team with the circle here or from the Home header.")
+        }
+        .listRowBackground(glassRow)
+    }
+
+    private func groupCount(_ t: Team) -> Int {
+        allGroups.filter { $0.team?.id == t.id }.count
+    }
+
+    private func addTeam() {
+        let t = Team(name: "Team \(teams.count + 1)", orderIndex: teams.count)
+        context.insert(t)
+        try? context.save()
+        currentTeamID = t.id.uuidString
+    }
+
+    private func deleteTeams(_ idx: IndexSet) {
+        guard let i = idx.first else { return }
+        // Always keep at least one team — there's nowhere to put reps otherwise.
+        guard teams.count > 1 else { return }
+        let t = teams[i]
+        if allGroups.contains(where: { $0.team?.id == t.id && !$0.attempts.isEmpty }) {
+            pendingTeamDelete = t   // has logged reps — confirm the cascade
+        } else {
+            removeTeam(t)
+        }
+    }
+
+    private func removeTeam(_ t: Team) {
+        let wasCurrent = t.id == currentTeam?.id
+        let remaining = teams.filter { $0.id != t.id }.sorted { $0.orderIndex < $1.orderIndex }
+        context.delete(t)
+        for (i, team) in remaining.enumerated() { team.orderIndex = i }
+        try? context.save()
+        if wasCurrent, let first = remaining.first {
+            currentTeamID = first.id.uuidString
+        }
+    }
+
+    private func moveTeams(_ from: IndexSet, _ to: Int) {
+        var arr = teams
+        arr.move(fromOffsets: from, toOffset: to)
+        for (i, t) in arr.enumerated() { t.orderIndex = i }
         try? context.save()
     }
 }

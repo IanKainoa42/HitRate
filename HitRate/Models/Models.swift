@@ -148,6 +148,31 @@ final class OutcomeNames {
 
 // MARK: - SwiftData models
 
+/// A roster the user tracks separately — a coach's squad or an athlete's
+/// gym/team. Each team owns its own buckets and therefore its own stats, cups,
+/// and league; the program/org identity is shared app-wide (AppStorage).
+@Model
+final class Team {
+    /// Stable id used to remember the active team in @AppStorage("currentTeamID").
+    /// Unique by generation; not a SwiftData unique constraint (avoids upsert
+    /// surprises on a freshly added entity).
+    var id: UUID = UUID()
+    var name: String
+    var orderIndex: Int
+    var createdAt: Date
+    /// Deleting a team takes its roster with it (and each group cascades its
+    /// own logged reps) — the team's whole history goes.
+    @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
+    var groups: [StuntGroup] = []
+
+    init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+    }
+}
+
 @Model
 final class StuntGroup {
     var name: String
@@ -157,6 +182,10 @@ final class StuntGroup {
     /// Stunt vs tumbling — default keeps existing stores migrating lightweight
     /// (every pre-kind bucket was a stunt).
     var kindRaw: String = SkillKind.stunt.rawValue
+    /// The team/roster this bucket belongs to. Optional so single-team stores
+    /// migrate lightweight; RootView assigns teamless groups to a default team
+    /// on launch.
+    var team: Team?
     /// Deleting a group deletes its logged attempts with it — stats never see
     /// orphaned reps (which used to leak into deltas/trend but not the rate).
     @Relationship(deleteRule: .cascade, inverse: \Attempt.group)
@@ -218,4 +247,24 @@ final class Attempt {
     }
 
     var outcome: Outcome { Outcome(rawValue: outcomeRaw) ?? .hit }
+}
+
+// MARK: - Team scoping helpers
+
+extension Array where Element == Team {
+    /// The active team for a stored `currentTeamID` (uuidString), falling back
+    /// to the first team. Nil only when there are no teams at all.
+    func current(id: String) -> Team? {
+        first { $0.id.uuidString == id } ?? first
+    }
+}
+
+extension Array where Element == StuntGroup {
+    /// The buckets belonging to one team, in display order. With no team yet
+    /// (pre-migration), every bucket shows — RootView assigns them to a default
+    /// team momentarily.
+    func inTeam(_ team: Team?) -> [StuntGroup] {
+        let scoped = team.map { t in filter { $0.team?.id == t.id } } ?? self
+        return scoped.sorted { $0.orderIndex < $1.orderIndex }
+    }
 }

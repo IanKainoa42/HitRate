@@ -8,6 +8,9 @@ import SwiftUI
 /// numerals, group identity for the badge — no foil, no glow.
 struct WeeklyTournamentCard: View {
     let tournament: WeeklyTournament
+    /// When true, show only the live week (no Week/Season toggle) — the trophy
+    /// room renders the season league as its own section below.
+    var weekOnly = false
     // Toggle lives in the card, same as GroupsCard's Ranked⇄Grid.
     @State private var view = "Week"
 
@@ -17,31 +20,42 @@ struct WeeklyTournamentCard: View {
     /// "SKILL OF THE WEEK" / "GROUP OF THE WEEK".
     private var crownLabel: String { "\(mode.nounTitle.uppercased()) OF THE WEEK" }
 
+    private var showingWeek: Bool { weekOnly || view == "Week" }
+
     var body: some View {
         FeedCard {
-            CardHead(view == "Week" ? "WEEKLY GAME · \(tournament.game.name)" : "SEASON LEAGUE") {
-                MiniSeg(options: ["Week", "Season"], selection: $view)
+            CardHead(showingWeek ? "WEEKLY GAME · \(tournament.game.name)" : "SEASON LEAGUE") {
+                if !weekOnly {
+                    MiniSeg(options: ["Week", "Season"], selection: $view)
+                }
             }
 
-            if view == "Week" {
-                rulesLine
-
-                if let champ = tournament.champion {
-                    topBanner(champ, kicker: crownLabel, icon: "trophy.fill", crowned: true)
-                    others(excluding: champ)
-                } else if let runner = tournament.frontRunner {
-                    topBanner(runner, kicker: "FRONT-RUNNER", icon: "flag.checkered", crowned: false)
-                    runnerNote(runner)
-                    others(excluding: runner)
-                } else {
-                    openPrompt
-                }
-
-                weekFooter
+            if showingWeek {
+                weekView
             } else {
                 leagueTable
             }
         }
+    }
+
+    // MARK: Week view
+
+    @ViewBuilder
+    private var weekView: some View {
+        rulesLine
+
+        if let champ = tournament.champion {
+            topBanner(champ, kicker: crownLabel, icon: "trophy.fill", crowned: true)
+            others(excluding: champ)
+        } else if let runner = tournament.frontRunner {
+            topBanner(runner, kicker: "FRONT-RUNNER", icon: "flag.checkered", crowned: false)
+            runnerNote(runner)
+            others(excluding: runner)
+        } else {
+            openPrompt
+        }
+
+        weekFooter
     }
 
     // MARK: Week — rules line

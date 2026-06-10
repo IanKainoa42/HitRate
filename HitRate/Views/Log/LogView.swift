@@ -12,10 +12,15 @@ struct LogView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
+    @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage("practiceLayout") private var practiceLayoutRaw = ""   // "" auto, "grid", "pad"
+
+    /// Practice logs into the active team's roster only.
+    private var groups: [StuntGroup] { allGroups.inTeam(teams.current(id: currentTeamID)) }
 
     @State private var selectedGroup: StuntGroup?
     @State private var hapticTrigger = 0
