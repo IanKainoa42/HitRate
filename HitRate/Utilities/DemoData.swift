@@ -20,15 +20,25 @@ enum DemoData {
     private static let priorRates = [57, 60, 62, 60, 66, 63, 70, 69, 72, 71]
 
     static func seed(context: ModelContext) {
-        // Replace any existing groups so demo numbers line up.
-        let existing = (try? context.fetch(FetchDescriptor<StuntGroup>())) ?? []
-        let existingSessions = (try? context.fetch(FetchDescriptor<PracticeSession>())) ?? []
-        for s in existingSessions { context.delete(s) }
-        for g in existing { context.delete(g) }
+        // The demo dataset belongs to the active team — resolve (or create) it,
+        // and only replace THAT team's roster so other teams' data is untouched.
+        let allTeams = (try? context.fetch(FetchDescriptor<Team>())) ?? []
+        let currentID = UserDefaults.standard.string(forKey: "currentTeamID") ?? ""
+        let team: Team
+        if let t = allTeams.first(where: { $0.id.uuidString == currentID }) ?? allTeams.first {
+            team = t
+        } else {
+            team = Team(name: "My Team", orderIndex: 0)
+            context.insert(team)
+        }
+
+        let allGroups = (try? context.fetch(FetchDescriptor<StuntGroup>())) ?? []
+        for g in allGroups where g.team?.id == team.id { context.delete(g) }
 
         var groups: [StuntGroup] = []
         for (i, row) in base.enumerated() {
             let g = StuntGroup(name: row.name, number: i + 1, orderIndex: i)
+            g.team = team
             context.insert(g)
             groups.append(g)
         }

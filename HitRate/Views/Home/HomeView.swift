@@ -4,21 +4,28 @@ import SwiftData
 struct HomeView: View {
     @Environment(\.modelContext) private var context
     @Query private var sessions: [PracticeSession]
-    @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
+    @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
-    @AppStorage("teamName") private var teamName = ""
+    @AppStorage("currentTeamID") private var currentTeamID = ""
 
     @State private var timeframe: Timeframe = .today
     @State private var shareOpen = false
     @State private var trophyOpen = false
     @State private var editorOpen = false
+    @State private var addTeamOpen = false
+    @State private var newTeamName = ""
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+
+    /// The active team and its roster — every stat below is scoped to it.
+    private var currentTeam: Team? { teams.current(id: currentTeamID) }
+    private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
 
     /// The stunt/tumbling split only makes sense in athlete mode once BOTH
     /// kinds have logged reps (coach is all-stunt; a single-kind athlete has
@@ -44,18 +51,22 @@ struct HomeView: View {
         sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
     }
 
-    /// Header + share-card identity per mode.
-    private var displayTitle: String {
-        mode == .athlete
-            ? (athleteName.isEmpty ? "Me" : athleteName)
-            : (teamName.isEmpty ? "My Team" : teamName)
+    /// The active team's name (the switchable roster).
+    private var teamLabel: String {
+        currentTeam?.name ?? (mode == .coach ? "My Team" : "My Skills")
     }
 
-    private var displayKicker: String {
+    /// The shared identity that rides on every team's cards.
+    private var identityLabel: String {
         mode == .athlete
-            ? "\(seasonString()) season"
+            ? (athleteName.isEmpty ? "Me" : athleteName)
             : (orgName.isEmpty ? "My program" : orgName)
     }
+
+    /// Share/trophy card title. Coach cards carry the squad name; athlete cards
+    /// carry the athlete's name (the team only scopes which skills are included).
+    /// The crest/org line is always `identityLabel`.
+    private var shareTeamName: String { mode == .coach ? teamLabel : identityLabel }
 
     private var stats: FloorStats {
         StatsEngine.compute(sessions: sessions, groups: groups, timeframe: timeframe)
@@ -66,10 +77,14 @@ struct HomeView: View {
         WeeklyLeague.compute(sessions: sessions, groups: groups)
     }
 
-    /// True once any rep has ever been logged — distinguishes a brand-new app
-    /// (show the big empty state) from a timeframe that just happens to be quiet.
+    /// Whether the active team has any buckets to log into yet.
+    private var hasRoster: Bool { !groups.isEmpty }
+
+    /// True once this team has logged a rep — distinguishes a team that's never
+    /// been practiced (show the big empty state) from a timeframe that's just
+    /// quiet. Scoped to the active team's groups.
     private var lifetimeHasData: Bool {
-        sessions.contains { !$0.attempts.isEmpty }
+        groups.contains { !$0.attempts.isEmpty }
     }
 
     var body: some View {
@@ -113,6 +128,10 @@ struct HomeView: View {
                             SessionTapeCard(snapshot: d.latest!, kind: d.aggregateKind)
                         }
                         actionRow(d)
+                    } else if !hasRoster {
+                        // A freshly added team has no buckets yet — guide to the
+                        // editor instead of an unusable practice prompt.
+                        noRosterState
                     } else if lifetimeHasData || cup.isLive {
                         // Reps exist (this week's cup, or another timeframe) — the
                         // current timeframe is just quiet. Don't show the big
@@ -131,7 +150,8 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
-            .safeAreaInset(edge: .bottom) { practiceCTA }
+            // No roster, no practice — the only action is to build one.
+            .safeAreaInset(edge: .bottom) { if hasRoster { practiceCTA } }
         }
         .background(FloorBackdrop().ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
@@ -140,13 +160,13 @@ struct HomeView: View {
             ShareCardsSheet(stats: stats,
                             milestones: Milestones.evaluate(sessions: sessions,
                                                             groups: groups, mode: mode),
-                            teamName: displayTitle,
-                            orgName: mode == .athlete ? displayTitle : displayKicker,
+                            teamName: shareTeamName,
+                            orgName: identityLabel,
                             mode: mode)
         }
         .fullScreenCover(isPresented: $trophyOpen) {
             TrophyRoomView(sessions: sessions, groups: groups, mode: mode,
-                           orgName: mode == .athlete ? displayTitle : displayKicker)
+                           orgName: identityLabel)
         }
         .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
             LogView(session: s)
@@ -154,6 +174,27 @@ struct HomeView: View {
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
         }
+        .alert("New team", isPresented: $addTeamOpen) {
+            TextField(mode == .coach ? "Team name" : "Roster name", text: $newTeamName)
+            Button("Add") { addTeam() }
+            Button("Cancel", role: .cancel) { newTeamName = "" }
+        } message: {
+            Text(mode == .coach
+                 ? "Track another squad with its own roster and stats."
+                 : "Track another team or gym with its own skills and stats.")
+        }
+    }
+
+    /// Create a team and switch to it. Its roster starts empty — add skills/
+    /// groups from the editor.
+    private func addTeam() {
+        let name = newTeamName.trimmingCharacters(in: .whitespaces)
+        let team = Team(name: name.isEmpty ? "Team \(teams.count + 1)" : name,
+                        orderIndex: teams.count)
+        context.insert(team)
+        try? context.save()
+        currentTeamID = team.id.uuidString
+        newTeamName = ""
     }
 
     // MARK: Practice CTA (the only way into the counter — no tab bar)
@@ -210,6 +251,36 @@ struct HomeView: View {
 
     // MARK: Header (identity well)
 
+    /// Identity subline: shared name + the active team, tap to switch or add.
+    private var sublineText: String {
+        mode == .athlete ? "\(identityLabel) · \(teamLabel)"
+                         : "\(teamLabel) · \(identityLabel)"
+    }
+
+    private var teamSwitcher: some View {
+        Menu {
+            Picker("Team", selection: $currentTeamID) {
+                ForEach(teams) { t in
+                    Text(t.name).tag(t.id.uuidString)
+                }
+            }
+            Divider()
+            Button { addTeamOpen = true } label: { Label("New team", systemImage: "plus") }
+        } label: {
+            HStack(spacing: 4) {
+                Text(sublineText.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.label2)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Theme.label3)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+
     private var header: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
@@ -221,11 +292,7 @@ struct HomeView: View {
                 .font(.system(size: 17, weight: .black))
                 .tracking(0.5)
 
-                Text("\(displayTitle) · \(displayKicker)".uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(Theme.label2)
-                    .lineLimit(1)
+                teamSwitcher
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -426,6 +493,51 @@ struct HomeView: View {
                             .background(Theme.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 26)
+        }
+        .padding(.top, 40)
+    }
+
+    // MARK: No-roster state (a freshly added team)
+
+    private var noRosterState: some View {
+        FeedCard {
+            VStack(spacing: 14) {
+                Image(systemName: "plus.rectangle.on.folder")
+                    .font(.system(size: 34))
+                    .foregroundStyle(Theme.label3)
+                Text("\(teamLabel) has no \(mode.nounPlural) yet")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.label)
+                    .multilineTextAlignment(.center)
+                Text("Add the \(mode.nounPlural) you'll be counting for this team, then start logging reps.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.label2)
+                    .multilineTextAlignment(.center)
+                Button {
+                    editorOpen = true
+                } label: {
+                    Text("Add \(mode.nounPlural)")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if mode == .coach {
+                    Button { DemoData.seed(context: context) } label: {
+                        Text("Load demo data")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.label2)
                     }
                     .buttonStyle(.plain)
                 }

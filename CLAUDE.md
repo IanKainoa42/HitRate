@@ -96,8 +96,20 @@ Key invariants:
 - `Views/Onboarding/OnboardingView.swift` — brand-register (navy) chooser +
   identity + quick-add first skills/groups. Suggestion chips create buckets;
   they are not pre-made.
-- `Models/Models.swift` — SwiftData: StuntGroup, PracticeSession, Attempt.
-  An "active" session is `endedAt == nil`; LogView assumes at most one.
+- `Models/Models.swift` — SwiftData: Team, StuntGroup, PracticeSession,
+  Attempt. An "active" session is `endedAt == nil`; LogView assumes at most
+  one. MULTI-TEAM (both modes): every StuntGroup belongs to a `Team`
+  (`StuntGroup.team`, optional for lightweight migration; deleting a team
+  cascades its roster). The active team is `@AppStorage("currentTeamID")`
+  (a `Team.id` UUID string); `[Team].current(id:)` resolves it (fallback:
+  first team) and `[StuntGroup].inTeam(_:)` scopes a roster. EVERY view that
+  reads groups queries `allGroups` and exposes `groups = allGroups.inTeam(...)`
+  so all stats/cups/milestones are team-scoped automatically (they already
+  filter attempts by group membership — sessions stay global, untagged).
+  The program/org identity stays shared app-wide (AppStorage `orgName`/
+  `athleteName`); only the roster + its stats are per-team. RootView folds
+  pre-multi-team installs into a default team on launch
+  (`migrateGroupsIntoDefaultTeam`).
 - `Stats/StatsEngine.swift` — ALL derived numbers (rates, deltas, trend,
   rough patch, skill-report inputs). Pure function of sessions+groups+timeframe.
   Mirrors `buildData()` from the handoff prototype. Delta baseline depends on
@@ -162,9 +174,14 @@ Key invariants:
   timeframe is empty — in that case the dashboard shows a small "No reps
   logged …" well instead of the first-launch empty state (gated on
   `lifetimeHasData`).
-  Header hosts the wordmark (HIT + green RATE), identity subline, a trophy
-  button (opens `TrophyRoomView`), and the skills/groups editor button — the
-  only path to roster + settings outside a live practice.
+  Header hosts the wordmark (HIT + green RATE), a tappable identity subline
+  that is the TEAM SWITCHER (a Menu picking `currentTeamID` + "New team"),
+  a trophy button (opens `TrophyRoomView`), and the skills/groups editor
+  button — the only path to roster + settings outside a live practice. A
+  freshly added (empty) team shows a `noRosterState` ("Add <skills/groups>")
+  and hides the practice CTA until it has a roster. The editor's Teams
+  section adds/renames/deletes/reorders teams and switches the active one;
+  new groups attach to the active team.
   `TrophyRoomView` (full-screen cover, training-floor register) is the display
   case for everything earned: the SEASON LEAGUE table (reuses `LeagueRow`),
   a CUPS WON grid of `WeeklyLeague.cupHistory` tiles, and an ACCOLADES shelf
