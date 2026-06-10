@@ -145,7 +145,8 @@ Key invariants:
   May — mirroring `seasonString`),
   so last season's points/cups don't carry over. No storage — recomputed from
   attempts every render, like Milestones. THE GHOST (`GhostEntry`, both
-  modes): a synthetic entrant pacing every week at the average WINNING score
+  modes — user-facing name is "THE SPIRIT", the cheer word; code keeps
+  ghost/`isGhost` naming): a synthetic entrant pacing every week at the average WINNING score
   of completed in-season weeks replayed under the live game, plus a
   deterministic wobble seeded from the week index (NEVER a live RNG — the
   engine recomputes every render; an unseeded roll would change the ghost
