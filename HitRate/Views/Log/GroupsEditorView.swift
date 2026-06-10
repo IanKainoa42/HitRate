@@ -118,17 +118,20 @@ struct GroupsEditorView: View {
                                 }
                             }
                         }
-                    }
-                    .onDelete { idx in
-                        guard let i = idx.first else { return }
-                        let g = groups[i]
-                        if g.attempts.isEmpty {
-                            context.delete(g)
-                            renumber()
-                        } else {
-                            // Deleting cascades its logged reps — confirm first.
-                            pendingDelete = g
+                        // Custom swipe action, deliberately NOT role: .destructive:
+                        // a destructive swipe makes iOS animate the row away
+                        // immediately, but a repped skill isn't deleted yet (it
+                        // goes through the confirm alert) — the row snapped back
+                        // and the delete felt like it needed two presses. The
+                        // plain red button skips the eager removal animation;
+                        // the row only leaves when the model actually deletes.
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button("Delete") { requestDelete(g) }.tint(.red)
                         }
+                    }
+                    .onDelete { idx in   // edit-mode minus button path
+                        guard let i = idx.first else { return }
+                        requestDelete(groups[i])
                     }
                     .onMove { from, to in
                         var arr = groups
@@ -286,6 +289,19 @@ struct GroupsEditorView: View {
         try? context.save()
     }
 
+    /// Shared by the swipe action and the edit-mode minus: empty skills delete
+    /// on the spot; repped skills confirm the cascade first.
+    private func requestDelete(_ g: StuntGroup) {
+        if g.attempts.isEmpty {
+            withAnimation {
+                context.delete(g)
+                renumber()
+            }
+        } else {
+            pendingDelete = g
+        }
+    }
+
     // MARK: Teams
 
     @ViewBuilder
@@ -312,8 +328,17 @@ struct GroupsEditorView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
+                // Same no-snap-back treatment as the skills rows — see there.
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    if teams.count > 1 {
+                        Button("Delete") { requestTeamDelete(t) }.tint(.red)
+                    }
+                }
             }
-            .onDelete(perform: deleteTeams)
+            .onDelete { idx in   // edit-mode minus button path
+                guard let i = idx.first else { return }
+                requestTeamDelete(teams[i])
+            }
             .onMove(perform: moveTeams)
 
             Button {
@@ -340,15 +365,13 @@ struct GroupsEditorView: View {
         currentTeamID = t.id.uuidString
     }
 
-    private func deleteTeams(_ idx: IndexSet) {
-        guard let i = idx.first else { return }
+    private func requestTeamDelete(_ t: Team) {
         // Always keep at least one team — there's nowhere to put reps otherwise.
         guard teams.count > 1 else { return }
-        let t = teams[i]
         if allGroups.contains(where: { $0.team?.id == t.id && !$0.attempts.isEmpty }) {
             pendingTeamDelete = t   // has logged reps — confirm the cascade
         } else {
-            removeTeam(t)
+            withAnimation { removeTeam(t) }
         }
     }
 
