@@ -12,6 +12,15 @@ final class WatchSessionBridge: NSObject, WCSessionDelegate {
         super.init()
     }
 
+    var status: WatchConnectionStatus {
+        guard WCSession.isSupported() else { return .unsupported }
+        let session = WCSession.default
+        guard session.activationState == .activated else { return .activating }
+        guard session.isPaired else { return .notPaired }
+        guard session.isWatchAppInstalled else { return .notInstalled }
+        return session.isReachable ? .ready : .installed
+    }
+
     func configure(snapshotProvider: @escaping () -> WatchRosterSnapshot,
                    logHandler: @escaping (WatchLogRequest) -> WatchRosterSnapshot?) {
         self.snapshotProvider = snapshotProvider
@@ -94,6 +103,37 @@ final class WatchSessionBridge: NSObject, WCSessionDelegate {
             default:
                 replyHandler?([WatchPayloadCodec.typeKey: WatchPayloadCodec.error])
             }
+        }
+    }
+}
+
+enum WatchConnectionStatus {
+    case unsupported
+    case activating
+    case notPaired
+    case notInstalled
+    case installed
+    case ready
+
+    var title: String {
+        switch self {
+        case .unsupported: "Watch unavailable"
+        case .activating: "Checking watch"
+        case .notPaired: "No paired watch"
+        case .notInstalled: "Install on watch"
+        case .installed: "Watch installed"
+        case .ready: "Watch ready"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .unsupported: "This iPhone cannot use Apple Watch logging."
+        case .activating: "Open HitRate on iPhone for a moment."
+        case .notPaired: "Pair an Apple Watch with this iPhone."
+        case .notInstalled: "Open the Watch app on iPhone and install HitRate."
+        case .installed: "Open HitRate on Apple Watch to log reps."
+        case .ready: "HitRate is open on Apple Watch."
         }
     }
 }

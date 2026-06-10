@@ -26,6 +26,7 @@
 		80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */; };
 		8472DF181A48BC7407E5698A /* Milestones.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8957D930EDEABBAF6E32BF0 /* Milestones.swift */; };
 		86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD99E08D7FCE2602733C7EF /* CSVExport.swift */; };
+		87356318218FD967A8EA2535 /* WatchLoggingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */; };
 		8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */; };
 		908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */; };
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
@@ -81,6 +82,7 @@
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
 		296943D1F64367EB72E3C679 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLoggingSheet.swift; sourceTree = "<group>"; };
 		3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateWatchApp.swift; sourceTree = "<group>"; };
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
@@ -152,6 +154,7 @@
 				D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */,
 				79288C2661DD00CF6B1AF541 /* TrendCard.swift */,
 				6B06141B674607C1343BF33B /* TrophyRoomView.swift */,
+				2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */,
 				B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */,
 			);
 			path = Home;
@@ -420,6 +423,7 @@
 				14C31D70B78C11075ADB2741 /* Theme.swift in Sources */,
 				491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */,
 				4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */,
+				87356318218FD967A8EA2535 /* WatchLoggingSheet.swift in Sources */,
 				E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */,
 				908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */,
 				A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */,
@@ -454,7 +458,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -471,7 +475,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -609,7 +613,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -632,7 +636,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

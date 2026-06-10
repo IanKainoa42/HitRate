@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var shareOpen = false
     @State private var trophyOpen = false
     @State private var editorOpen = false
+    @State private var watchOpen = false
     @State private var addTeamOpen = false
     @State private var newTeamName = ""
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
@@ -163,6 +164,12 @@ struct HomeView: View {
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
         }
+        .sheet(isPresented: $watchOpen) {
+            WatchLoggingSheet(status: WatchSessionBridge.shared.status,
+                              groups: groups,
+                              activeSessionReps: activeSession?.attempts.count ?? 0,
+                              mode: mode)
+        }
         .alert("New team", isPresented: $addTeamOpen) {
             TextField(mode == .coach ? "Team name" : "Roster name", text: $newTeamName)
             Button("Add") { addTeam() }
@@ -288,6 +295,18 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            Button {
+                watchOpen = true
+            } label: {
+                Image(systemName: "applewatch")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(watchStatusColor)
+                    .frame(width: 34, height: 34)
+                    .background(iconButtonBackground)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
             // Trophy room — cups won, season standing, earned accolade cards.
             Button {
                 trophyOpen = true
@@ -334,6 +353,14 @@ struct HomeView: View {
         .wellBackground()
         .padding(.horizontal, 16)
         .padding(.top, 2)
+    }
+
+    private var watchStatusColor: Color {
+        switch WatchSessionBridge.shared.status {
+        case .ready: Theme.accent
+        case .installed: Theme.label
+        default: Theme.label2
+        }
     }
 
     private var iconButtonBackground: some View {
