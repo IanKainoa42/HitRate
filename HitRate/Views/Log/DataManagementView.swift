@@ -18,6 +18,7 @@ struct DataManagementView: View {
     @Query private var attempts: [Attempt]
 
     @AppStorage("didOnboard") private var didOnboard = false
+    @AppStorage("replayingIntro") private var replayingIntro = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -53,6 +54,21 @@ struct DataManagementView: View {
                 Text("Backup")
             } footer: {
                 Text("Save a spreadsheet of every rep before you delete anything below — these deletes can't be undone.")
+            }
+            .listRowBackground(glassRow)
+
+            Section {
+                Button {
+                    // Non-destructive: flips back to first-launch setup. The
+                    // flag keeps RootView's pre-onboarding migration from
+                    // instantly re-completing it (groups exist).
+                    replayingIntro = true
+                    didOnboard = false
+                } label: {
+                    Label("Replay intro", systemImage: "arrow.counterclockwise")
+                }
+            } footer: {
+                Text("Runs the first-launch setup again. Nothing is deleted — your \(mode.nounPlural) and reps stay, and anything you add joins your current team.")
             }
             .listRowBackground(glassRow)
 

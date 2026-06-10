@@ -33,6 +33,7 @@ struct RootView: View {
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage("teamName") private var teamName = ""
+    @AppStorage("replayingIntro") private var replayingIntro = false
 
     var body: some View {
         Group {
@@ -46,14 +47,6 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .onAppear {
-            print("--- ROOT VIEW APPEAR ---")
-            print("didOnboard: \(didOnboard)")
-            print("teams count: \(teams.count), currentTeamID: \(currentTeamID)")
-            print("groups count: \(groups.count)")
-            for g in groups {
-                print("  Group: \(g.name), team: \(g.team?.name ?? "nil")")
-            }
-            print("------------------------")
             migrateExistingInstallIfNeeded()
             migrateGroupsIntoDefaultTeam()
             sweepOrphanedAttempts()
@@ -66,8 +59,10 @@ struct RootView: View {
 
     /// Pre-onboarding installs already have groups (the old seeded roster).
     /// Treat them as coach installs instead of re-onboarding over their data.
+    /// A deliberate intro replay (Manage Data → Replay intro) also looks like
+    /// "has groups, not onboarded" — the flag keeps this migration out of it.
     private func migrateExistingInstallIfNeeded() {
-        guard !didOnboard, !groups.isEmpty else { return }
+        guard !didOnboard, !groups.isEmpty, !replayingIntro else { return }
         appModeRaw = AppMode.coach.rawValue
         didOnboard = true
     }

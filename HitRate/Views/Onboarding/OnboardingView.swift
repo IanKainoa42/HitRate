@@ -7,7 +7,10 @@ import SwiftData
 /// night") since it's the app's first impression.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var context
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
+    @Query private var allGroups: [StuntGroup]
     @AppStorage("didOnboard") private var didOnboard = false
+    @AppStorage("replayingIntro") private var replayingIntro = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
@@ -21,6 +24,17 @@ struct OnboardingView: View {
 
     private let stuntSuggestions = ["Lib", "Stretch", "Full up", "Rewind", "Toss hands"]
     private let tumblingSuggestions = ["Back handspring", "Tuck", "Layout", "Full"]
+
+    /// Names already on the current roster — on an intro replay the chips
+    /// shouldn't offer buckets the user already has.
+    private var existingNames: Set<String> {
+        Set(allGroups.inTeam(teams.current(id: currentTeamID) ?? teams.first).map(\.name))
+    }
+    private func available(_ suggestions: [String]) -> [String] {
+        suggestions.filter { name in
+            !pending.contains { $0.name == name } && !existingNames.contains(name)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -325,21 +339,30 @@ struct OnboardingView: View {
     }
 
     private func finish(_ mode: AppMode) {
-        // Every bucket lives under a team. The first team is created here; the
-        // program/org identity stays shared app-wide.
-        let firstTeamName = mode == .coach
-            ? (teamName.isEmpty ? "My Team" : teamName)
-            : (athleteName.isEmpty ? "My Skills" : "\(athleteName)'s Skills")
-        let team = Team(name: firstTeamName, orderIndex: 0)
-        context.insert(team)
+        // Every bucket lives under a team. First launch creates it; an intro
+        // REPLAY (Manage Data → Replay intro) keeps the existing roster and
+        // tops it up instead — replaying must never fork a duplicate team.
+        let team: Team
+        if let existing = teams.current(id: currentTeamID) ?? teams.first {
+            team = existing
+        } else {
+            let firstTeamName = mode == .coach
+                ? (teamName.isEmpty ? "My Team" : teamName)
+                : (athleteName.isEmpty ? "My Skills" : "\(athleteName)'s Skills")
+            team = Team(name: firstTeamName, orderIndex: 0)
+            context.insert(team)
+        }
+        let base = allGroups.filter { $0.team?.id == team.id }.count
         for (i, item) in pending.enumerated() {
-            let g = StuntGroup(name: item.name, number: i + 1, orderIndex: i, kind: item.kind)
+            let g = StuntGroup(name: item.name, number: base + i + 1,
+                               orderIndex: base + i, kind: item.kind)
             g.team = team
             context.insert(g)
         }
         try? context.save()
         currentTeamID = team.id.uuidString
         appModeRaw = mode.rawValue
+        replayingIntro = false
         didOnboard = true
     }
 }
