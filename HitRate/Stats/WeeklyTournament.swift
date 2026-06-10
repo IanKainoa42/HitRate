@@ -113,6 +113,7 @@ struct WeeklyStanding: Identifiable {
     let delta: Int?        // score vs the same skill/group last week; nil if it didn't play
     let qualified: Bool    // cleared the game's rep minimum, eligible for the crown
     var rank: Int          // 1-based among qualified entrants; 0 = not ranked
+    var isGhost = false    // the synthetic past-self competitor, not a real bucket
 
     var falls: Int { counts[Outcome.buildingFall.rawValue] + counts[Outcome.majorFall.rawValue] }
 
@@ -127,6 +128,7 @@ struct DefendingChampion {
     let colorIndex: Int
     let game: WeeklyGame   // last week's game, not this week's
     let score: Int
+    var isGhost = false
 
     var scoreDisplay: String { game.scoreDisplay(score) }
 }
@@ -134,13 +136,14 @@ struct DefendingChampion {
 /// One line of the season league — the local competitive ranking the weekly
 /// games build. Points come from placements in completed weeks.
 struct SeasonRank: Identifiable {
-    let id: String         // group persistent id raw
+    let id: String         // group persistent id raw; "ghost" for the ghost
     let name: String
     let number: Int
     let colorIndex: Int
     let points: Int
     let cups: Int          // weeks won
     var rank: Int          // 1-based by points
+    var isGhost = false
 }
 
 /// A banked championship — one completed week a skill/group won, under that
@@ -153,8 +156,25 @@ struct WeeklyCup: Identifiable {
     let winnerNumber: Int
     let colorIndex: Int
     let score: Int
+    var isGhost = false
 
     var scoreDisplay: String { game.scoreDisplay(score) }
+}
+
+// MARK: - The Ghost
+
+/// The synthetic competitor every roster races — a ghost of the team's own
+/// past, à la a handicap ghost player. Its baseline is the average WINNING
+/// score of completed weeks this season replayed under the live game; a
+/// deterministic per-week wobble sits on top, so some weeks the ghost shows
+/// up hot and some weeks it's beatable. The wobble is seeded from the week
+/// index — pure function, stable across launches and devices, no storage.
+struct GhostEntry {
+    let score: Int   // the wobbled metric the ghost plays at this week
+    let rate: Int    // average winning rate — tiebreaks only
+    let total: Int   // average winning volume — tiebreaks only
+
+    static let name = "THE GHOST"
 }
 
 struct WeeklyTournament {
@@ -231,6 +251,22 @@ enum WeeklyLeague {
                 streak: streak, score: score, delta: delta,
                 qualified: total >= game.minReps, rank: 0))
         }
+        // Ghost reps never count toward the week's real volume.
+        let liveReps = entrants.reduce(0) { $0 + $1.total }
+
+        // The ghost enters once the season has a completed week to haunt with.
+        // Always "qualified" — it's the pace to beat, scored under the live
+        // game like everyone else; its delta is vs last week's ghost.
+        if let g = ghost(for: week, game: game, sessions: sessions, groups: ordered, cal: cal) {
+            let prevGhost = ghost(for: prevWeek, game: game, sessions: sessions, groups: ordered, cal: cal)
+            entrants.append(WeeklyStanding(
+                id: PersistentIdentifierBox(raw: "ghost"),
+                name: GhostEntry.name, number: 0, colorIndex: 0,
+                kind: .stunt, counts: [0, 0, 0, 0], total: g.total, hits: 0,
+                rate: g.rate, streak: 0, score: g.score,
+                delta: prevGhost.map { g.score - $0.score },
+                qualified: true, rank: 0, isGhost: true))
+        }
 
         // Qualified entrants race on the game's metric; provisional entrants
         // sort by who's closest to qualifying (most reps).
@@ -245,11 +281,23 @@ enum WeeklyLeague {
         for i in standings.indices { standings[i].rank = i + 1 }
         standings += provisional   // rank stays 0
 
+        // Last week's crown is contested by last week's ghost too (under last
+        // week's game) — losing the week to your own pace is a real loss.
+        let prevWeekGhost = ghost(for: prevWeek, game: prevGame, sessions: sessions,
+                                  groups: ordered, cal: cal)
         let defending = (prevWeek.end > seasonStart(for: now)
-            ? championOf(sessions: lastWeekSessions, groups: ordered, game: prevGame) : nil)
-            .map { DefendingChampion(name: $0.group.name, number: $0.group.number,
-                                     colorIndex: ($0.group.number - 1) % Theme.groupRainbow.count,
-                                     game: prevGame, score: $0.score) }
+            ? championOf(sessions: lastWeekSessions, groups: ordered, game: prevGame,
+                         ghost: prevWeekGhost) : nil)
+            .map { champ in
+                if let g = champ.group {
+                    DefendingChampion(name: g.name, number: g.number,
+                                      colorIndex: (g.number - 1) % Theme.groupRainbow.count,
+                                      game: prevGame, score: champ.score)
+                } else {
+                    DefendingChampion(name: GhostEntry.name, number: 0, colorIndex: 0,
+                                      game: prevGame, score: champ.score, isGhost: true)
+                }
+            }
 
         return WeeklyTournament(
             week: week,
@@ -260,7 +308,7 @@ enum WeeklyLeague {
             defending: defending,
             league: seasonLeague(sessions: sessions, groups: ordered, cal: cal, now: now),
             minReps: game.minReps,
-            totalReps: entrants.reduce(0) { $0 + $1.total })
+            totalReps: liveReps)
     }
 
     /// Tiebreak chain shared by standings and past-week champions:
@@ -273,10 +321,10 @@ enum WeeklyLeague {
         return a.falls < b.falls
     }
 
-    /// Qualified finishers of a given week's sessions under a given game,
-    /// best first — the basis for the crown AND for season points.
-    private static func placements(sessions: [PracticeSession], groups: [StuntGroup],
-                                   game: WeeklyGame) -> [(group: StuntGroup, score: Int)] {
+    /// Each group's qualified tiebreak key under a game — shared by placements
+    /// and the ghost's baseline.
+    private static func qualifiedEntries(sessions: [PracticeSession], groups: [StuntGroup],
+                                         game: WeeklyGame) -> [(key: (Int, Int, Int, Int), g: StuntGroup)] {
         var entries: [(key: (Int, Int, Int, Int), g: StuntGroup)] = []
         for g in groups {
             let counts = outcomeCounts(in: sessions, group: g)
@@ -287,12 +335,66 @@ enum WeeklyLeague {
             let falls = counts[Outcome.buildingFall.rawValue] + counts[Outcome.majorFall.rawValue]
             entries.append(((game.score(rate: rate, total: total, streak: streak), rate, total, falls), g))
         }
+        return entries
+    }
+
+    /// Qualified finishers of a given week's sessions under a given game,
+    /// best first — the basis for the crown AND for season points. The ghost
+    /// (group == nil) races in the same field; it carries zero falls, so a
+    /// tied week goes to the ghost — beat it, don't match it.
+    private static func placements(sessions: [PracticeSession], groups: [StuntGroup],
+                                   game: WeeklyGame, ghost: GhostEntry?) -> [(group: StuntGroup?, score: Int)] {
+        var entries: [(key: (Int, Int, Int, Int), g: StuntGroup?)] = qualifiedEntries(
+            sessions: sessions, groups: groups, game: game).map { ($0.key, $0.g) }
+        if let ghost {
+            entries.append(((ghost.score, ghost.rate, ghost.total, 0), nil))
+        }
         return entries.sorted { outranks($0.key, $1.key) }.map { ($0.g, $0.key.0) }
     }
 
     private static func championOf(sessions: [PracticeSession], groups: [StuntGroup],
-                                   game: WeeklyGame) -> (group: StuntGroup, score: Int)? {
-        placements(sessions: sessions, groups: groups, game: game).first
+                                   game: WeeklyGame, ghost: GhostEntry?) -> (group: StuntGroup?, score: Int)? {
+        placements(sessions: sessions, groups: groups, game: game, ghost: ghost).first
+    }
+
+    /// The ghost's entry for a given week: average the WINNING score of every
+    /// completed week strictly before it (this season, replayed under the
+    /// given game), then apply a seeded wobble so the ghost has good weeks and
+    /// off weeks. Nil until the season has a completed qualifying week.
+    static func ghost(for week: DateInterval, game: WeeklyGame,
+                      sessions: [PracticeSession], groups: [StuntGroup],
+                      cal: Calendar) -> GhostEntry? {
+        guard let firstStart = sessions.map(\.startedAt).min() else { return nil }
+        let floor = max(firstStart, seasonStart(for: week.start))
+        var winners: [(score: Int, rate: Int, total: Int)] = []
+        for back in 1...60 {
+            guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: week.start),
+                  let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
+            if interval.end <= floor { break }
+            let weekSessions = sessions.filter { interval.contains($0.startedAt) }
+            guard !weekSessions.isEmpty else { continue }
+            guard let best = qualifiedEntries(sessions: weekSessions, groups: groups, game: game)
+                .sorted(by: { outranks($0.key, $1.key) }).first else { continue }
+            winners.append((best.key.0, best.key.1, best.key.2))
+        }
+        guard !winners.isEmpty else { return nil }
+
+        let avg = { (vals: [Int]) in Int((Double(vals.reduce(0, +)) / Double(vals.count)).rounded()) }
+        let baseline = avg(winners.map(\.score))
+
+        // Deterministic luck: the week index seeds the roll, so the ghost's
+        // form for any given week is fixed — recomputes can't reroll it.
+        let weekIndex = Int(week.start.timeIntervalSinceReferenceDate / 604_800)
+        var rng = SeededRNG(seed: UInt64(bitPattern: Int64(weekIndex &* 3 &+ game.rawValue)))
+        let wobble = Double.random(in: -1...1, using: &rng)
+        let score: Int
+        switch game {
+        case .rate:
+            score = min(100, max(0, baseline + Int((wobble * 6).rounded())))
+        case .grind, .streak:
+            score = max(1, baseline + Int((wobble * 0.15 * Double(max(7, baseline))).rounded()))
+        }
+        return GhostEntry(score: score, rate: avg(winners.map(\.rate)), total: avg(winners.map(\.total)))
     }
 
     /// Points by weekly placement: win 5, 2nd 3, 3rd 2, any other qualified
@@ -309,7 +411,8 @@ enum WeeklyLeague {
         // Reset every season: never replay past the later of first data or the
         // June rollover, so last season's points don't carry over.
         let floor = max(firstStart, seasonStart(for: now))
-        var acc: [String: (g: StuntGroup, points: Int, cups: Int)] = [:]
+        var acc: [String: (name: String, number: Int, colorIndex: Int, isGhost: Bool,
+                           points: Int, cups: Int)] = [:]
         for back in 1...60 {   // a full season's worth of weeks; bounds the replay
             guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: now),
                   let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
@@ -317,18 +420,27 @@ enum WeeklyLeague {
             let weekSessions = sessions.filter { interval.contains($0.startedAt) }
             guard !weekSessions.isEmpty else { continue }
             let game = WeeklyGame.of(week: interval)
-            for (i, p) in placements(sessions: weekSessions, groups: groups, game: game).enumerated() {
-                let key = "\(p.group.persistentModelID)"
-                var cur = acc[key] ?? (p.group, 0, 0)
+            // Each replayed week races the ghost it had at the time — the
+            // ghost of week W only knows the weeks before W.
+            let weekGhost = ghost(for: interval, game: game, sessions: sessions,
+                                  groups: groups, cal: cal)
+            for (i, p) in placements(sessions: weekSessions, groups: groups, game: game,
+                                     ghost: weekGhost).enumerated() {
+                let key = p.group.map { "\($0.persistentModelID)" } ?? "ghost"
+                var cur = acc[key] ?? (p.group?.name ?? GhostEntry.name,
+                                       p.group?.number ?? 0,
+                                       p.group.map { ($0.number - 1) % Theme.groupRainbow.count } ?? 0,
+                                       p.group == nil, 0, 0)
                 cur.points += i < podiumPoints.count ? podiumPoints[i] : 1
                 if i == 0 { cur.cups += 1 }
                 acc[key] = cur
             }
         }
         var table = acc.map { SeasonRank(
-            id: $0.key, name: $0.value.g.name, number: $0.value.g.number,
-            colorIndex: ($0.value.g.number - 1) % Theme.groupRainbow.count,
-            points: $0.value.points, cups: $0.value.cups, rank: 0) }
+            id: $0.key, name: $0.value.name, number: $0.value.number,
+            colorIndex: $0.value.colorIndex,
+            points: $0.value.points, cups: $0.value.cups, rank: 0,
+            isGhost: $0.value.isGhost) }
         table.sort {
             if $0.points != $1.points { return $0.points > $1.points }
             if $0.cups != $1.cups { return $0.cups > $1.cups }
@@ -356,13 +468,18 @@ enum WeeklyLeague {
             let weekSessions = sessions.filter { interval.contains($0.startedAt) }
             guard !weekSessions.isEmpty else { continue }
             let game = WeeklyGame.of(week: interval)
-            guard let champ = championOf(sessions: weekSessions, groups: ordered, game: game) else { continue }
+            let weekGhost = ghost(for: interval, game: game, sessions: sessions,
+                                  groups: ordered, cal: cal)
+            guard let champ = championOf(sessions: weekSessions, groups: ordered, game: game,
+                                         ghost: weekGhost) else { continue }
             cups.append(WeeklyCup(
                 id: "\(interval.start.timeIntervalSinceReferenceDate)",
                 week: interval, game: game,
-                winnerName: champ.group.name, winnerNumber: champ.group.number,
-                colorIndex: (champ.group.number - 1) % Theme.groupRainbow.count,
-                score: champ.score))
+                winnerName: champ.group?.name ?? GhostEntry.name,
+                winnerNumber: champ.group?.number ?? 0,
+                colorIndex: champ.group.map { ($0.number - 1) % Theme.groupRainbow.count } ?? 0,
+                score: champ.score,
+                isGhost: champ.group == nil))
         }
         return cups   // already newest-first (back grows into the past)
     }

@@ -165,13 +165,22 @@ private struct CupTile: View {
     let cup: WeeklyCup
 
     var body: some View {
-        let color = Theme.groupColor(cup.colorIndex)
+        let color = cup.isGhost ? Theme.label3 : Theme.groupColor(cup.colorIndex)
         HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(color)
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                if cup.isGhost {
+                    // The week your own pace beat you — a hollow, dashed trophy slot.
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Theme.label3, style: StrokeStyle(lineWidth: 1.2, dash: [3.5, 2.5]))
+                    Image(systemName: "wind")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.label2)
+                } else {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(color)
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
             .frame(width: 38, height: 38)
 

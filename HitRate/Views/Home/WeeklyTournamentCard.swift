@@ -45,7 +45,12 @@ struct WeeklyTournamentCard: View {
         rulesLine
 
         if let champ = tournament.champion {
-            topBanner(champ, kicker: crownLabel, icon: "trophy.fill", crowned: true)
+            topBanner(champ,
+                      kicker: champ.isGhost ? "THE GHOST LEADS" : crownLabel,
+                      icon: champ.isGhost ? "wind" : "trophy.fill", crowned: true)
+            if champ.isGhost && tournament.standings.count == 1 {
+                ghostChallengeNote
+            }
             others(excluding: champ)
         } else if let runner = tournament.frontRunner {
             topBanner(runner, kicker: "FRONT-RUNNER", icon: "flag.checkered", crowned: false)
@@ -78,14 +83,19 @@ struct WeeklyTournamentCard: View {
     // MARK: Week — top banner (champion or front-runner)
 
     private func topBanner(_ s: WeeklyStanding, kicker: String, icon: String, crowned: Bool) -> some View {
-        let color = Theme.groupColor(s.colorIndex)
+        let color = s.isGhost ? Theme.label3 : Theme.groupColor(s.colorIndex)
         return HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(color)
+                if s.isGhost {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(Theme.label3, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                } else {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(color)
+                }
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(s.isGhost ? Theme.label2 : .white)
             }
             .frame(width: 46, height: 46)
 
@@ -93,12 +103,13 @@ struct WeeklyTournamentCard: View {
                 Text(kicker)
                     .font(.system(size: 9, weight: .heavy))
                     .tracking(1.6)
-                    .foregroundStyle(crowned ? Theme.accent : Theme.label2)
+                    .foregroundStyle(crowned && !s.isGhost ? Theme.accent : Theme.label2)
                 Text(s.name)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.label)
                     .lineLimit(1)
-                Text("\(mode.nounTitle) \(s.number) · \(s.total) rep\(s.total == 1 ? "" : "s")")
+                Text(s.isGhost ? "Your average week, plus a little luck"
+                     : "\(mode.nounTitle) \(s.number) · \(s.total) rep\(s.total == 1 ? "" : "s")")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.label3)
             }
@@ -142,6 +153,15 @@ struct WeeklyTournamentCard: View {
         }
         .foregroundStyle(tournament.game.scoreUsesRateBands
                          ? Theme.rateColor(s.score) : Theme.label)
+    }
+
+    /// Nudge when the ghost is leading an otherwise empty week.
+    private var ghostChallengeNote: some View {
+        Text("The ghost is pacing at your season average — log reps this week to take it down.")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Theme.label2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 10)
     }
 
     /// Nudge under the front-runner: how many reps to lock the crown.
@@ -284,19 +304,27 @@ private struct StandingRow: View {
             }
             .frame(width: 18)
 
-            Text("\(standing.number)")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(Theme.groupColor(standing.colorIndex))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            if standing.isGhost {
+                GhostBadge(size: 24, corner: 7)
+            } else {
+                Text("\(standing.number)")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Theme.groupColor(standing.colorIndex))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(standing.name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.label)
                     .lineLimit(1)
-                if standing.qualified {
+                if standing.isGhost {
+                    Text("Your average-week pace")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.label3)
+                } else if standing.qualified {
                     StackedBar(counts: standing.counts, total: standing.total, height: 7)
                 } else {
                     Text("\(standing.repsToQualify(min: minReps)) rep\(standing.repsToQualify(min: minReps) == 1 ? "" : "s") to qualify")
@@ -331,6 +359,27 @@ private struct StandingRow: View {
     }
 }
 
+// MARK: - Ghost badge
+
+/// The ghost's identity chip — a dashed chalk outline where a real bucket
+/// shows its solid color. Shared by the standings, league table, and cup
+/// shelf so the ghost reads the same everywhere.
+struct GhostBadge: View {
+    var size: CGFloat = 24
+    var corner: CGFloat = 7
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .strokeBorder(Theme.label3, style: StrokeStyle(lineWidth: 1.2, dash: [3.5, 2.5]))
+            Image(systemName: "wind")
+                .font(.system(size: size * 0.45, weight: .bold))
+                .foregroundStyle(Theme.label2)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 // MARK: - League row (season view)
 
 /// Shared by the card's Season tab and the Trophy Room's season shelf.
@@ -344,12 +393,16 @@ struct LeagueRow: View {
                 .foregroundStyle(rank.rank == 1 ? Theme.accent : Theme.label3)
                 .frame(width: 18)
 
-            Text("\(rank.number)")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(Theme.groupColor(rank.colorIndex))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            if rank.isGhost {
+                GhostBadge(size: 24, corner: 7)
+            } else {
+                Text("\(rank.number)")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Theme.groupColor(rank.colorIndex))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
 
             Text(rank.name)
                 .font(.system(size: 13, weight: .semibold))

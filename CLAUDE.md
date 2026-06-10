@@ -144,7 +144,17 @@ Key invariants:
   replay floors at `seasonStart()` (Jun 1 rollover — cheer season ends in
   May — mirroring `seasonString`),
   so last season's points/cups don't carry over. No storage — recomputed from
-  attempts every render, like Milestones.
+  attempts every render, like Milestones. THE GHOST (`GhostEntry`, both
+  modes): a synthetic entrant pacing every week at the average WINNING score
+  of completed in-season weeks replayed under the live game, plus a
+  deterministic wobble seeded from the week index (NEVER a live RNG — the
+  engine recomputes every render; an unseeded roll would change the ghost
+  mid-week). Always "qualified", zero falls (ties go to the ghost — beat it,
+  don't match it), CAN take the cup/league points/defending title; each
+  replayed week races the ghost it had at the time (ghost of week W only
+  knows weeks before W — the first in-season week has none). Views branch on
+  `isGhost`: dashed-chalk `GhostBadge` instead of the group color chip, a
+  pace line instead of StackedBar, no green accent when the ghost leads.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
