@@ -197,6 +197,16 @@ func seasonString(for date: Date = .now) -> String {
     return "’\(a)–’\(b)"
 }
 
+/// Midnight on Aug 1 of the current season's start year — the cutoff the
+/// season league and cup history reset to (mirrors `seasonString`'s rollover).
+func seasonStart(for date: Date = .now) -> Date {
+    let cal = Calendar.current
+    let y = cal.component(.year, from: date)
+    let m = cal.component(.month, from: date)
+    let startYear = m >= 8 ? y : y - 1
+    return cal.date(from: DateComponents(year: startYear, month: 8, day: 1)) ?? date
+}
+
 /// Initials for a name ("Cheer Force San Diego" → "CFSD", "Senior Coed" → "SC").
 func initials(of name: String, max: Int = 4) -> String {
     name.split(separator: " ").prefix(max).compactMap { $0.first.map(String.init) }.joined().uppercased()

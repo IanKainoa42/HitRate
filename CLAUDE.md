@@ -128,7 +128,10 @@ Key invariants:
   pays placement points (`podiumPoints` 5/3/2, qualifying 1; win also counts
   a cup) — the live week never scores mid-week. `cupHistory` banks each
   COMPLETED week's champion (under its game) as a `WeeklyCup` for the trophy
-  room. No storage — recomputed from attempts every render, like Milestones.
+  room. The league, cups, and `defending` title RESET every season: the
+  replay floors at `seasonStart()` (Aug 1 rollover, mirroring `seasonString`),
+  so last season's points/cups don't carry over. No storage — recomputed from
+  attempts every render, like Milestones.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
