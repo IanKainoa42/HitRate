@@ -60,8 +60,20 @@ struct HomeView: View {
         StatsEngine.compute(sessions: sessions, groups: groups, timeframe: timeframe)
     }
 
+    /// The weekly cup — always "this week", whatever the dashboard timeframe is.
+    private var tournament: WeeklyTournament {
+        WeeklyLeague.compute(sessions: sessions, groups: groups)
+    }
+
+    /// True once any rep has ever been logged — distinguishes a brand-new app
+    /// (show the big empty state) from a timeframe that just happens to be quiet.
+    private var lifetimeHasData: Bool {
+        sessions.contains { !$0.attempts.isEmpty }
+    }
+
     var body: some View {
         let d = stats
+        let cup = tournament
         VStack(spacing: 9) {
             header
 
@@ -70,6 +82,12 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 9) {
+                    // The weekly game sits at the top, above the timeframe-scoped
+                    // dashboard — it's its own always-this-week competition.
+                    if cup.isLive {
+                        WeeklyTournamentCard(tournament: cup)
+                    }
+
                     if d.hasData {
                         if showsKindSplit {
                             // Overall first, then a stunt-only and tumbling-only
@@ -94,6 +112,17 @@ struct HomeView: View {
                             SessionTapeCard(snapshot: d.latest!, kind: d.aggregateKind)
                         }
                         actionRow(d)
+                    } else if lifetimeHasData || cup.isLive {
+                        // Reps exist (this week's cup, or another timeframe) — the
+                        // current timeframe is just quiet. Don't show the big
+                        // first-launch empty state under a live dashboard.
+                        FeedCard {
+                            Text("No reps logged \(timeframe.label.lowercased()).")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.label2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 6)
+                        }
                     } else {
                         emptyState
                     }

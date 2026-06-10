@@ -112,6 +112,15 @@ Key invariants:
   build on that. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
   dashboard split; `FloorStats.bestSkill/worstSkill/cleanestSkill/
   mostConsistentSkill` are gated to skills with ≥`insightMinReps` reps.
+- `Stats/WeeklyTournament.swift` — the built-in weekly game ("the cup").
+  Pure function of sessions+groups, ALWAYS scoped to the current calendar week
+  and deliberately INDEPENDENT of the Home timeframe filter. Ranks every
+  skill/group by clean-hit rate (same hits/total as StatsEngine — a bobble is
+  NOT a hit), crowns the top entrant that cleared `WeeklyLeague.minReps` (10)
+  reps, and computes last week's winner as the `defending` title. Entrants
+  sort qualified-first (by rate, tiebreak reps then fewer falls), then
+  provisional entrants by reps; `rank` is 1-based among qualified only. No
+  storage — recomputed from attempts every render, like Milestones.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
@@ -124,6 +133,18 @@ Key invariants:
   custom timeframe-tabs well fixed, then a 9pt-gutter scroll of `FeedCard`
   wells; the green practice CTA is docked via `safeAreaInset` with a fade
   backstop so scroll content doesn't slide visibly through its corners.
+  `WeeklyTournamentCard` ("WEEKLY CUP") sits at the TOP of the scroll, above
+  every timeframe-scoped section — it's the only card NOT driven by `timeframe`
+  (always this week, from `WeeklyLeague.compute`). It self-handles three
+  states: a crowned champion banner (trophy + group color + Barlow rate), a
+  FRONT-RUNNER banner with a "N reps to lock the crown" nudge while no one has
+  qualified, and an open "cup is open" prompt; below the banner a STANDINGS
+  list ranks the rest (provisional entrants dimmed with a reps-to-qualify
+  line), and a footer names the defending champ. Shown whenever the cup
+  `isLive` (any reps this week OR a title to defend), so it can appear even
+  when the selected timeframe is empty — in that case the dashboard shows a
+  small "No reps logged …" well instead of the first-launch empty state
+  (gated on `lifetimeHasData`).
   Header hosts the wordmark (HIT + green RATE), identity subline, and the
   skills/groups editor button — the only path to roster + settings outside a
   live practice. In athlete mode with BOTH kinds logged (`showsKindSplit`),
