@@ -112,6 +112,23 @@ Key invariants:
   build on that. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
   dashboard split; `FloorStats.bestSkill/worstSkill/cleanestSkill/
   mostConsistentSkill` are gated to skills with ≥`insightMinReps` reps.
+- `Stats/WeeklyTournament.swift` — the built-in weekly competition + season
+  ranking. Pure function of sessions+groups, ALWAYS scoped to calendar weeks
+  and deliberately INDEPENDENT of the Home timeframe filter. THREE GAMES
+  rotate weekly (`WeeklyGame`, derived from week-of-epoch mod 3 — pure, no
+  stored rotation state): RATE CUP (best clean-hit rate, min 10 reps), GRIND
+  CUP (most reps, min 1), STREAK CUP (longest clean-hit run, min 5 reps).
+  Rate is the same hits/total as StatsEngine (a bobble is NOT a hit) and a
+  bobble BREAKS a streak. Standings score on the live game's metric
+  (`WeeklyStanding.score`), qualified-first (tiebreak: rate → reps → fewer
+  falls), then provisional entrants by reps; `rank` is 1-based among
+  qualified only; `delta` is the same game-metric vs last week. Last week's
+  winner (under last week's game) is the `defending` title. The SEASON
+  LEAGUE (`SeasonRank`) replays every COMPLETED week under its own game and
+  pays placement points (`podiumPoints` 5/3/2, qualifying 1; win also counts
+  a cup) — the live week never scores mid-week. `cupHistory` banks each
+  COMPLETED week's champion (under its game) as a `WeeklyCup` for the trophy
+  room. No storage — recomputed from attempts every render, like Milestones.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
@@ -124,9 +141,32 @@ Key invariants:
   custom timeframe-tabs well fixed, then a 9pt-gutter scroll of `FeedCard`
   wells; the green practice CTA is docked via `safeAreaInset` with a fade
   backstop so scroll content doesn't slide visibly through its corners.
-  Header hosts the wordmark (HIT + green RATE), identity subline, and the
-  skills/groups editor button — the only path to roster + settings outside a
-  live practice. In athlete mode with BOTH kinds logged (`showsKindSplit`),
+  `WeeklyTournamentCard` ("WEEKLY GAME · <cup>") sits at the TOP of the
+  scroll, above every timeframe-scoped section — it's the only card NOT
+  driven by `timeframe` (always this week, from `WeeklyLeague.compute`). A
+  Week⇄Season `MiniSeg` flips it between the live game and the season league
+  table. Week view self-handles three states: a crowned champion banner
+  (trophy + group color + big Barlow score in the game's unit — only the
+  RATE CUP's % gets rate-band colors; reps/streak scores stay chalk), a
+  FRONT-RUNNER banner with a "N reps to lock the crown" nudge while no one
+  has qualified, and an open prompt; below it a STANDINGS list (provisional
+  entrants dimmed with reps-to-qualify), then a footer with the defending
+  champ + a "Next week: <game>" rotation teaser. Season view is the
+  `SeasonRank` league table (rank, badge, cups ×N, PTS) with the scoring
+  legend. Shown whenever the cup `isLive` (reps this week, a title to
+  defend, OR a non-empty league), so it can appear even when the selected
+  timeframe is empty — in that case the dashboard shows a small "No reps
+  logged …" well instead of the first-launch empty state (gated on
+  `lifetimeHasData`).
+  Header hosts the wordmark (HIT + green RATE), identity subline, a trophy
+  button (opens `TrophyRoomView`), and the skills/groups editor button — the
+  only path to roster + settings outside a live practice.
+  `TrophyRoomView` (full-screen cover, training-floor register) is the display
+  case for everything earned: the SEASON LEAGUE table (reuses `LeagueRow`),
+  a CUPS WON grid of `WeeklyLeague.cupHistory` tiles, and an ACCOLADES shelf
+  of earned milestone cards rendered via `HoloCardView(isSnapshot: true)`
+  (court-register cards as objects on the graphite shelf). Read-only —
+  sharing stays on the Stunt Cards sheet. In athlete mode with BOTH kinds logged (`showsKindSplit`),
   the scroll STACKS three sections — OVERALL, then STUNT, then TUMBLING — each
   introduced by a floor-level `sectionHeader` (icon + label + rep count + a
   hairline rule; NOT a well) over a `dashboardCards(_:)` block (summary / trend
