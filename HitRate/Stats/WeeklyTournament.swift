@@ -307,7 +307,7 @@ enum WeeklyLeague {
                                      cal: Calendar, now: Date) -> [SeasonRank] {
         guard let firstStart = sessions.map(\.startedAt).min() else { return [] }
         // Reset every season: never replay past the later of first data or the
-        // August rollover, so last season's points don't carry over.
+        // June rollover, so last season's points don't carry over.
         let floor = max(firstStart, seasonStart(for: now))
         var acc: [String: (g: StuntGroup, points: Int, cups: Int)] = [:]
         for back in 1...60 {   // a full season's worth of weeks; bounds the replay
