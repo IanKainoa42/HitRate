@@ -179,3 +179,9 @@
 - **Category:** best_practice
 - **What happened:** While building the ghost-competitor feature, another agent session was editing the same repo: it duplicated a `ghostChallengeNote` view into WeeklyTournamentCard.swift mid-edit (would not compile), modified DataManagementView/OnboardingView, added a commit, and switched the checkout from the feature branch to main.
 - **Rule:** In HitRate (and any repo with multiple live agents): before committing, run `git status` + `git log -1` and stage ONLY the files you touched by name — never `git add -A`. If an Edit fails with "file modified since read", re-read and check for foreign duplicate declarations before re-applying.
+
+## 2026-06-10 — onDelete + confirm alert = row snap-back jank
+
+- **Category:** best_practice
+- **What happened:** Skills editor deletes used ForEach.onDelete with a deferred confirm (set pendingDelete, show alert) for rows with data. iOS treats onDelete's swipe button as destructive and animates the row off-screen on press; since the code didn't delete, the row snapped back before the alert appeared — felt like the delete needed a second press.
+- **Rule:** When a swipe delete needs a confirmation step, don't use ForEach.onDelete for the swipe. Use `.swipeActions { Button("Delete") { ... }.tint(.red) }` WITHOUT `role: .destructive` so the row never auto-animates out; let the row leave only when the model actually deletes. Keep .onDelete alongside it for the edit-mode minus button (both can route to the same request-delete function).
