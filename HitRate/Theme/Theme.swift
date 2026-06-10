@@ -7,18 +7,20 @@ enum Theme {
     // tight diagonal hairline, inset wells, chalk text, ONE green signal
     // accent. Replaces the court-at-night glass app UI (which lives on for
     // onboarding + share cards). Views still consume only these tokens.
-    static let appBG = Color(hex: 0x181A1D)             // graphite floor (FloorBackdrop adds gradient + hairline)
-    static let appBGTop = Color(hex: 0x1F2125)
-    static let appBGBottom = Color(hex: 0x151719)
-    static let well = Color(hex: 0x101114)              // recessed module surface
+    static let appBG = Color(hex: 0x141820)             // graphite/navy floor (FloorBackdrop adds gradient + hairline)
+    static let appBGTop = Color(hex: 0x1A202A)
+    static let appBGBottom = Color(hex: 0x090D15)
+    static let iconTile = Color(hex: 0x101621)          // app-icon badge face
+    static let iconTileEdge = Color(hex: 0x2A3445)      // app-icon bevel outline
+    static let well = Color(hex: 0x0C1119)              // recessed module surface
     static let surface = Color(hex: 0x101114)           // legacy alias — wells
-    static let surface2 = Color(hex: 0x2A2C31)          // raised chip on a well
-    static let label = Color(hex: 0xECEBE7)             // chalk
+    static let surface2 = Color(hex: 0x18202B)          // raised chip on a well
+    static let label = Color(hex: 0xF3F4F1)             // chalk / icon white
     static let label2 = Color(hex: 0x8D8B86)            // warm gray
     static let label3 = Color(hex: 0x5C5B57)
-    static let separator = Color(hex: 0x1F2125)         // hairline inside a well
-    static let fill = Color(hex: 0x1D1F23)              // track behind bars
-    static let accent = Color(hex: 0x34D26A)            // the green signal — go/hit/improving
+    static let separator = Color(hex: 0x26303D)         // hairline inside a well
+    static let fill = Color(hex: 0x151B24)              // track behind bars
+    static let accent = Color(hex: 0x29F06D)            // the green signal — go/hit/improving
     static let accentText = Color(hex: 0x0E1511)        // dark ink on green chips/CTA
 
     // Outcomes (severity hues tuned to the graphite register)

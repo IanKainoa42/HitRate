@@ -203,18 +203,25 @@ struct HomeView: View {
             hapticTrigger += 1
             logSession = s
         } label: {
-            Text(activeSession.map {
-                    "RESUME PRACTICE · \($0.attempts.count) REP\($0.attempts.count == 1 ? "" : "S")"
-                 } ?? "START PRACTICE")
-                .font(.system(size: 13, weight: .heavy))
-                .tracking(1.5)
-                .foregroundStyle(Theme.accentText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: Theme.accent.opacity(0.3), radius: 10, y: 3)
-                .contentShape(Rectangle())
+            HStack(spacing: 9) {
+                BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
+                    .shadow(color: .black.opacity(0.24), radius: 2, y: 1)
+                Text(activeSession.map {
+                        "RESUME PRACTICE · \($0.attempts.count) REP\($0.attempts.count == 1 ? "" : "S")"
+                     } ?? "START PRACTICE")
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(Theme.accentText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.accent)
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(.white.opacity(0.28), lineWidth: 1))
+                    .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -273,13 +280,9 @@ struct HomeView: View {
     private var header: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                // Wordmark — the green RATE is the one brand moment up here.
-                HStack(spacing: 0) {
-                    Text("HIT").foregroundStyle(Theme.label)
-                    Text("RATE").foregroundStyle(Theme.accent)
-                }
-                .font(.system(size: 17, weight: .black))
-                .tracking(0.5)
+                // Wordmark mirrors the app icon: solid HIT, outlined RATE,
+                // single green signal dot.
+                IconWordmark(size: 17, rateFill: Theme.well, dotSize: 8)
 
                 teamSwitcher
             }
@@ -293,8 +296,7 @@ struct HomeView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.label2)
                     .frame(width: 34, height: 34)
-                    .background(Theme.surface2)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(iconButtonBackground)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -308,8 +310,7 @@ struct HomeView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.label2)
                     .frame(width: 34, height: 34)
-                    .background(Theme.surface2)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(iconButtonBackground)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -321,8 +322,7 @@ struct HomeView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.accent)
                     .frame(width: 34, height: 34)
-                    .background(Theme.surface2)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(iconButtonBackground)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -334,6 +334,15 @@ struct HomeView: View {
         .wellBackground()
         .padding(.horizontal, 16)
         .padding(.top, 2)
+    }
+
+    private var iconButtonBackground: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Theme.iconTile)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Theme.iconTileEdge.opacity(0.85), lineWidth: 1))
+            .shadow(color: .black.opacity(0.24), radius: 6, y: 3)
     }
 
     // MARK: Timeframe tabs (well)

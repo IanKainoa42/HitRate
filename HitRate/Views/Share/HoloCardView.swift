@@ -169,6 +169,9 @@ struct HoloCardView: View {
             LinearGradient(
                 colors: [Color(hex: 0x141A2B), Color(hex: 0x0D1322), Color(hex: 0x0A0F1E)],
                 startPoint: .topLeading, endPoint: .bottomTrailing)
+            RoundedRectangle(cornerRadius: 31, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 1.4)
+                .padding(14)
             CourtGrid(cell: 30, lineColor: .white.opacity(0.06))
                 .mask(RadialGradient(colors: [.white, .clear], center: .center,
                                      startRadius: 40, endRadius: 260))
@@ -381,6 +384,7 @@ struct HoloCardView: View {
     private var footer: some View {
         HStack(alignment: .bottom, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
+                IconWordmark(size: 10, rateFill: Color(hex: 0x0A0F1E), dotSize: 5)
                 Text(initials(of: orgName))
                     .font(Theme.grotesk(9))
                     .tracking(1.62)

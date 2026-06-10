@@ -41,6 +41,10 @@ struct FloorBackdrop: View {
             LinearGradient(
                 colors: [Theme.appBGTop, Theme.appBG, Theme.appBGBottom],
                 startPoint: .top, endPoint: .bottom)
+            RadialGradient(
+                colors: [Theme.iconTile.opacity(0.72), .clear],
+                center: UnitPoint(x: 0.5, y: 0.08),
+                startRadius: 40, endRadius: 470)
             Canvas { ctx, size in
                 var p = Path()
                 var x: CGFloat = -size.height
@@ -66,10 +70,103 @@ extension View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(Theme.well
                     .shadow(.inner(color: .black.opacity(0.6), radius: 4, y: 2))
-                    .shadow(.inner(color: .white.opacity(0.05), radius: 0.5, y: -1)))
-                .shadow(color: .white.opacity(0.05), radius: 0, y: 1)
+                    .shadow(.inner(color: Theme.iconTileEdge.opacity(0.26), radius: 0.5, y: -1)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.15), Theme.iconTileEdge.opacity(0.42), .black.opacity(0.55)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 1))
+                .shadow(color: .black.opacity(0.32), radius: 10, y: 6)
         )
     }
+}
+
+// MARK: - Icon-derived brand chrome
+
+struct BrandSignalDot: View {
+    var size: CGFloat = 9
+    var color: Color = Theme.accent
+    var shadowOpacity: Double = 0.34
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: max(0.7, size * 0.08)))
+            .shadow(color: color.opacity(shadowOpacity), radius: size * 0.55, y: 0)
+            .accessibilityHidden(true)
+    }
+}
+
+struct IconWordmark: View {
+    var size: CGFloat = 17
+    var rateFill: Color = Theme.well
+    var dotSize: CGFloat? = nil
+    var showsDot = true
+
+    var body: some View {
+        HStack(alignment: .lastTextBaseline, spacing: size * 0.08) {
+            Text("HIT")
+                .font(.system(size: size, weight: .black))
+                .italic()
+                .foregroundStyle(Theme.label)
+            OutlinedBrandText("RATE", size: size, fill: rateFill)
+            if showsDot {
+                BrandSignalDot(size: dotSize ?? size * 0.55)
+                    .baselineOffset(size * -0.10)
+                    .padding(.leading, size * 0.04)
+            }
+        }
+        .tracking(0)
+        .accessibilityLabel("Hit Rate")
+    }
+}
+
+private struct OutlinedBrandText: View {
+    let text: String
+    let size: CGFloat
+    let fill: Color
+
+    init(_ text: String, size: CGFloat, fill: Color) {
+        self.text = text
+        self.size = size
+        self.fill = fill
+    }
+
+    private var brandFont: Font {
+        .system(size: size, weight: .black)
+    }
+
+    var body: some View {
+        ZStack {
+            ForEach(OutlineOffset.all, id: \.self) { offset in
+                Text(text)
+                    .font(brandFont)
+                    .italic()
+                    .foregroundStyle(Theme.label)
+                    .offset(x: offset.x * max(0.8, size * 0.055),
+                            y: offset.y * max(0.8, size * 0.055))
+            }
+            Text(text)
+                .font(brandFont)
+                .italic()
+                .foregroundStyle(fill)
+        }
+        .compositingGroup()
+    }
+}
+
+private struct OutlineOffset: Hashable {
+    let x: CGFloat
+    let y: CGFloat
+
+    static let all = [
+        OutlineOffset(x: -1, y: -1), OutlineOffset(x: 0, y: -1), OutlineOffset(x: 1, y: -1),
+        OutlineOffset(x: -1, y: 0),                                OutlineOffset(x: 1, y: 0),
+        OutlineOffset(x: -1, y: 1),  OutlineOffset(x: 0, y: 1),  OutlineOffset(x: 1, y: 1),
+    ]
 }
 
 /// A dashboard module: content in an inset well.

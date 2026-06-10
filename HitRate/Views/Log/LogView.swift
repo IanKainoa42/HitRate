@@ -107,7 +107,14 @@ struct LogView: View {
         return VStack(spacing: 9) {
             // Session header (well)
             HStack {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        IconWordmark(size: 11, rateFill: Theme.well, dotSize: 5)
+                        Text("PRACTICE")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(Theme.label3)
+                    }
                     Text("\(attempts.count)")
                         .font(Theme.barlow(30, .extrabold))
                         .monospacedDigit()
@@ -139,7 +146,9 @@ struct LogView: View {
                         .padding(.vertical, 9)
                         .background(
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(Theme.majorFall.opacity(0.4), lineWidth: 1))
+                                .fill(Theme.iconTile)
+                                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .stroke(Theme.majorFall.opacity(0.5), lineWidth: 1)))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -187,10 +196,10 @@ struct LogView: View {
                             }
                             .padding(.horizontal, 11)
                             .padding(.vertical, 8)
-                            .background(on ? Theme.label : Theme.well)
+                            .background(on ? Theme.label : Theme.iconTile)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(on ? .clear : Color.white.opacity(0.07), lineWidth: 1))
+                                .stroke(on ? .clear : Theme.iconTileEdge.opacity(0.65), lineWidth: 1))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)

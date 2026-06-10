@@ -40,10 +40,8 @@ struct OnboardingView: View {
     private var chooser: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer()
-            Text("HITRATE")
-                .font(Theme.grotesk(11))
-                .tracking(3.3)
-                .foregroundStyle(.white.opacity(0.5))
+            IconWordmark(size: 34, rateFill: Theme.navy, dotSize: 15)
+                .padding(.bottom, 2)
             Text("Who's counting?")
                 .font(Theme.grotesk(30))
                 .foregroundStyle(.white)
@@ -96,10 +94,10 @@ struct OnboardingView: View {
                     .foregroundStyle(.white.opacity(0.35))
             }
             .padding(15)
-            .background(.white.opacity(0.06))
+            .background(Theme.iconTile.opacity(0.74))
             .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(.white.opacity(0.14), lineWidth: 1))
+                .stroke(Theme.iconTileEdge.opacity(0.95), lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -123,6 +121,9 @@ struct OnboardingView: View {
             }
             .buttonStyle(.plain)
             .padding(.top, 8)
+
+            IconWordmark(size: 15, rateFill: Theme.navy, dotSize: 7)
+                .padding(.top, 2)
 
             Text(mode == .athlete ? "Make it yours" : "Set up your floor")
                 .font(Theme.grotesk(26))
@@ -263,14 +264,19 @@ struct OnboardingView: View {
             Button {
                 finish(mode)
             } label: {
-                Text("Start counting")
-                    .font(Theme.grotesk(16))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(Theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .contentShape(Rectangle())
+                HStack(spacing: 9) {
+                    BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
+                    Text("Start counting")
+                        .font(Theme.grotesk(16))
+                }
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(.white.opacity(0.24), lineWidth: 1))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(.bottom, 12)
