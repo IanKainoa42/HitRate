@@ -76,6 +76,17 @@ platform :ios do
     ipa
   end
 
+  desc "Build and upload to TestFlight (openrsync-safe). Does not notify testers."
+  lane :beta do
+    ipa = build_signed_ipa
+    upload_to_testflight(
+      api_key: app_store_api_key,
+      ipa: ipa,
+      skip_waiting_for_build_processing: true,
+      notify_external_testers: false
+    )
+  end
+
   desc "Build + upload binary to App Store Connect. Does NOT submit. (openrsync-safe)"
   lane :ship_upload do
     ipa = build_signed_ipa
