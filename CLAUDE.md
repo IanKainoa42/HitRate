@@ -126,8 +126,9 @@ Key invariants:
   winner (under last week's game) is the `defending` title. The SEASON
   LEAGUE (`SeasonRank`) replays every COMPLETED week under its own game and
   pays placement points (`podiumPoints` 5/3/2, qualifying 1; win also counts
-  a cup) — the live week never scores mid-week. No storage — recomputed from
-  attempts every render, like Milestones.
+  a cup) — the live week never scores mid-week. `cupHistory` banks each
+  COMPLETED week's champion (under its game) as a `WeeklyCup` for the trophy
+  room. No storage — recomputed from attempts every render, like Milestones.
 - `Stats/Milestones.swift` — the unlockable-card engine. Pure function of
   ALL sessions+groups (lifetime — deliberately ignores the Home timeframe);
   milestones have no storage of their own, "earned" is recomputed from the
@@ -157,9 +158,15 @@ Key invariants:
   timeframe is empty — in that case the dashboard shows a small "No reps
   logged …" well instead of the first-launch empty state (gated on
   `lifetimeHasData`).
-  Header hosts the wordmark (HIT + green RATE), identity subline, and the
-  skills/groups editor button — the only path to roster + settings outside a
-  live practice. In athlete mode with BOTH kinds logged (`showsKindSplit`),
+  Header hosts the wordmark (HIT + green RATE), identity subline, a trophy
+  button (opens `TrophyRoomView`), and the skills/groups editor button — the
+  only path to roster + settings outside a live practice.
+  `TrophyRoomView` (full-screen cover, training-floor register) is the display
+  case for everything earned: the SEASON LEAGUE table (reuses `LeagueRow`),
+  a CUPS WON grid of `WeeklyLeague.cupHistory` tiles, and an ACCOLADES shelf
+  of earned milestone cards rendered via `HoloCardView(isSnapshot: true)`
+  (court-register cards as objects on the graphite shelf). Read-only —
+  sharing stays on the Stunt Cards sheet. In athlete mode with BOTH kinds logged (`showsKindSplit`),
   the scroll STACKS three sections — OVERALL, then STUNT, then TUMBLING — each
   introduced by a floor-level `sectionHeader` (icon + label + rep count + a
   hairline rule; NOT a well) over a `dashboardCards(_:)` block (summary / trend

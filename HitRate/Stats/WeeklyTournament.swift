@@ -143,6 +143,20 @@ struct SeasonRank: Identifiable {
     var rank: Int          // 1-based by points
 }
 
+/// A banked championship — one completed week a skill/group won, under that
+/// week's game. The trophy room's cup shelf.
+struct WeeklyCup: Identifiable {
+    let id: String         // week-start timestamp
+    let week: DateInterval
+    let game: WeeklyGame
+    let winnerName: String
+    let winnerNumber: Int
+    let colorIndex: Int
+    let score: Int
+
+    var scoreDisplay: String { game.scoreDisplay(score) }
+}
+
 struct WeeklyTournament {
     let week: DateInterval
     let game: WeeklyGame
@@ -318,6 +332,33 @@ enum WeeklyLeague {
         }
         for i in table.indices { table[i].rank = i + 1 }
         return table
+    }
+
+    /// Every championship banked in COMPLETED weeks this season, most recent
+    /// first — each week judged under ITS own game. Drives the trophy room's
+    /// cup shelf; the in-progress current week isn't banked until it ends.
+    static func cupHistory(sessions: [PracticeSession], groups: [StuntGroup],
+                           now: Date = .now) -> [WeeklyCup] {
+        let cal = Calendar.current
+        guard let firstStart = sessions.map(\.startedAt).min() else { return [] }
+        let ordered = groups.sorted { $0.orderIndex < $1.orderIndex }
+        var cups: [WeeklyCup] = []
+        for back in 1...60 {
+            guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: now),
+                  let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
+            if interval.end <= firstStart { break }
+            let weekSessions = sessions.filter { interval.contains($0.startedAt) }
+            guard !weekSessions.isEmpty else { continue }
+            let game = WeeklyGame.of(week: interval)
+            guard let champ = championOf(sessions: weekSessions, groups: ordered, game: game) else { continue }
+            cups.append(WeeklyCup(
+                id: "\(interval.start.timeIntervalSinceReferenceDate)",
+                week: interval, game: game,
+                winnerName: champ.group.name, winnerNumber: champ.group.number,
+                colorIndex: (champ.group.number - 1) % Theme.groupRainbow.count,
+                score: champ.score))
+        }
+        return cups   // already newest-first (back grows into the past)
     }
 
     /// Longest run of consecutive clean hits across the week's sessions,

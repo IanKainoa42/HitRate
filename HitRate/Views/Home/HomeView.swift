@@ -13,6 +13,7 @@ struct HomeView: View {
 
     @State private var timeframe: Timeframe = .today
     @State private var shareOpen = false
+    @State private var trophyOpen = false
     @State private var editorOpen = false
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
@@ -143,6 +144,10 @@ struct HomeView: View {
                             orgName: mode == .athlete ? displayTitle : displayKicker,
                             mode: mode)
         }
+        .fullScreenCover(isPresented: $trophyOpen) {
+            TrophyRoomView(sessions: sessions, groups: groups, mode: mode,
+                           orgName: mode == .athlete ? displayTitle : displayKicker)
+        }
         .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
             LogView(session: s)
         }
@@ -223,6 +228,20 @@ struct HomeView: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Trophy room — cups won, season standing, earned accolade cards.
+            Button {
+                trophyOpen = true
+            } label: {
+                Image(systemName: "trophy")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.label2)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
             // Skills/groups editor — with the Log tab gone, this is the only
             // path to roster + settings outside a live practice.

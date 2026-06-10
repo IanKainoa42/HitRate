@@ -319,7 +319,8 @@ private struct StandingRow: View {
 
 // MARK: - League row (season view)
 
-private struct LeagueRow: View {
+/// Shared by the card's Season tab and the Trophy Room's season shelf.
+struct LeagueRow: View {
     let rank: SeasonRank
 
     var body: some View {
