@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
+		309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD1AA942B68F4E661CF6471 /* HomeView.swift */; };
 		380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */; };
 		491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79288C2661DD00CF6B1AF541 /* TrendCard.swift */; };
@@ -19,10 +21,13 @@
 		79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */; };
 		7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B8E106687D6F5AA09DD3A66E /* Assets.xcassets */; };
 		7EFC99951270AF184F534565 /* BarlowCondensed-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */; };
+		7F1698913059B1F0EFD9696B /* WatchLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */; };
+		7FA02A21787C00777C5DDCF6 /* HitRateWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */; };
 		80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */; };
 		8472DF181A48BC7407E5698A /* Milestones.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8957D930EDEABBAF6E32BF0 /* Milestones.swift */; };
 		86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD99E08D7FCE2602733C7EF /* CSVExport.swift */; };
 		8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */; };
+		908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */; };
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
 		A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
@@ -34,7 +39,9 @@
 		CA745130292CAC719774B178 /* HitRateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354E38DADE87EAEA70210445 /* HitRateApp.swift */; };
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
 		DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */; };
+		DBFACF79DEB82E9341905CE5 /* WatchLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E6D11E0FC569761032886D /* WatchLogView.swift */; };
 		E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */; };
+		E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20184832604D05CBF0C04210 /* HoloCardView.swift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
 		FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296943D1F64367EB72E3C679 /* DemoData.swift */; };
@@ -42,17 +49,44 @@
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		408A56F4773C5C975FFE9E38 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC2F2365CD63E505D88A5A30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0F8C1A10770E28C7B23F8162;
+			remoteInfo = HitRateWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		271217C077C36B39B07DC151 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		05982546BF2BB526C6B9356D /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionBridge.swift; sourceTree = "<group>"; };
 		138B89E3489E75197EA700F8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
 		296943D1F64367EB72E3C679 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateWatchApp.swift; sourceTree = "<group>"; };
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
+		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -67,14 +101,18 @@
 		ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-Bold.ttf"; sourceTree = "<group>"; };
 		AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-ExtraBold.ttf"; sourceTree = "<group>"; };
 		B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournamentCard.swift; sourceTree = "<group>"; };
+		B5E6D11E0FC569761032886D /* WatchLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogView.swift; sourceTree = "<group>"; };
 		B8E106687D6F5AA09DD3A66E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BC4A053415866660A35A4745 /* SummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryCard.swift; sourceTree = "<group>"; };
 		BCD1AA942B68F4E661CF6471 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		CA8E6F0EF3500932ED680415 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
+		F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogStore.swift; sourceTree = "<group>"; };
 		FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngine.swift; sourceTree = "<group>"; };
 		FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsCard.swift; sourceTree = "<group>"; };
 		FFD34ACD23F8DA7A6168614F /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
@@ -133,6 +171,7 @@
 			isa = PBXGroup;
 			children = (
 				9CBF43E65D81D52A8C010E7C /* HitRate */,
+				D61303D10F0D3692EF85FFBE /* HitRateWatch */,
 				F668D95A08DD886D33B73867 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -173,6 +212,7 @@
 				D1870CC2DD804EF04D126191 /* Theme */,
 				DFC17AE42C08FC73979F1F9D /* Utilities */,
 				206EFAC21916481E2022D35D /* Views */,
+				D5B083AB163031D018ECF5AA /* WatchSync */,
 			);
 			path = HitRate;
 			sourceTree = "<group>";
@@ -208,6 +248,26 @@
 			path = Theme;
 			sourceTree = "<group>";
 		};
+		D5B083AB163031D018ECF5AA /* WatchSync */ = {
+			isa = PBXGroup;
+			children = (
+				E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */,
+				0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */,
+			);
+			path = WatchSync;
+			sourceTree = "<group>";
+		};
+		D61303D10F0D3692EF85FFBE /* HitRateWatch */ = {
+			isa = PBXGroup;
+			children = (
+				3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */,
+				CA8E6F0EF3500932ED680415 /* Info.plist */,
+				F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */,
+				B5E6D11E0FC569761032886D /* WatchLogView.swift */,
+			);
+			path = HitRateWatch;
+			sourceTree = "<group>";
+		};
 		DFC17AE42C08FC73979F1F9D /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
@@ -230,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */,
+				49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -237,16 +298,35 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0F8C1A10770E28C7B23F8162 /* HitRateWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0861D340FD6FF14830B65D7 /* Build configuration list for PBXNativeTarget "HitRateWatch" */;
+			buildPhases = (
+				6F541C21A03BF478B7D7B28A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HitRateWatch;
+			packageProductDependencies = (
+			);
+			productName = HitRateWatch;
+			productReference = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 		CEC6694572E5FFFE2F6AB38B /* HitRate */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 77A548233DF5A74CE3CE5A3D /* Build configuration list for PBXNativeTarget "HitRate" */;
 			buildPhases = (
 				5ACCFDE164491C41AF0DEA12 /* Sources */,
 				E49910887B82B9A43446F6C5 /* Resources */,
+				271217C077C36B39B07DC151 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8DAB4B4163E3C863972BCFD0 /* PBXTargetDependency */,
 			);
 			name = HitRate;
 			packageProductDependencies = (
@@ -264,6 +344,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					0F8C1A10770E28C7B23F8162 = {
+						DevelopmentTeam = WC46K49VFA;
+						ProvisioningStyle = Automatic;
+					};
 					CEC6694572E5FFFE2F6AB38B = {
 						DevelopmentTeam = WC46K49VFA;
 						ProvisioningStyle = Automatic;
@@ -285,6 +369,7 @@
 			projectRoot = "";
 			targets = (
 				CEC6694572E5FFFE2F6AB38B /* HitRate */,
+				0F8C1A10770E28C7B23F8162 /* HitRateWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -335,14 +420,69 @@
 				14C31D70B78C11075ADB2741 /* Theme.swift in Sources */,
 				491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */,
 				4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */,
+				E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */,
+				908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */,
 				A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */,
 				92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6F541C21A03BF478B7D7B28A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7FA02A21787C00777C5DDCF6 /* HitRateWatchApp.swift in Sources */,
+				7F1698913059B1F0EFD9696B /* WatchLogStore.swift in Sources */,
+				DBFACF79DEB82E9341905CE5 /* WatchLogView.swift in Sources */,
+				309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8DAB4B4163E3C863972BCFD0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0F8C1A10770E28C7B23F8162 /* HitRateWatch */;
+			targetProxy = 408A56F4773C5C975FFE9E38 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		017F7BBFED655B16473A1FB7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = WC46K49VFA;
+				INFOPLIST_FILE = HitRateWatch/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
+				PRODUCT_NAME = HitRate;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		1F9BD7A168C21520EFE5B244 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = WC46K49VFA;
+				INFOPLIST_FILE = HitRateWatch/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
+				PRODUCT_NAME = HitRate;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
 		37ABAA6B07D7B4FF816AC86A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -399,10 +539,10 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Debug;
 		};
@@ -455,10 +595,10 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Release;
 		};
@@ -525,6 +665,15 @@
 			buildConfigurations = (
 				7EDFA82A3C9CE328096669EF /* Debug */,
 				E0F981D0EA6D69B7C27B3C26 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C0861D340FD6FF14830B65D7 /* Build configuration list for PBXNativeTarget "HitRateWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F9BD7A168C21520EFE5B244 /* Debug */,
+				017F7BBFED655B16473A1FB7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -175,6 +175,9 @@ final class Team {
 
 @Model
 final class StuntGroup {
+    /// Stable cross-device id used by the watch companion. SwiftData's
+    /// persistent id is store-local and not a good wire format.
+    var id: UUID = UUID()
     var name: String
     var number: Int        // badge number shown in chips/cards
     var orderIndex: Int    // display order
@@ -192,7 +195,9 @@ final class StuntGroup {
     var attempts: [Attempt] = []
 
     init(name: String, number: Int, orderIndex: Int, kind: SkillKind = .stunt,
+         id: UUID = UUID(),
          createdAt: Date = .now) {
+        self.id = id
         self.name = name
         self.number = number
         self.orderIndex = orderIndex

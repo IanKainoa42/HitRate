@@ -51,10 +51,90 @@ struct RootView: View {
             migrateGroupsIntoDefaultTeam()
             sweepOrphanedAttempts()
             endStaleSessions()
+            configureWatchLogging()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { endStaleSessions() }
+            if phase == .active {
+                endStaleSessions()
+                syncWatchLogging()
+            }
         }
+        .onChange(of: watchSnapshot) { _, snapshot in
+            WatchSessionBridge.shared.publishSnapshot(snapshot)
+        }
+    }
+
+    private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+    private var currentTeam: Team? { teams.current(id: currentTeamID) }
+    private var watchGroups: [StuntGroup] { groups.inTeam(currentTeam) }
+    private var activeSession: PracticeSession? {
+        sessions.filter(\.isActive).max { $0.startedAt < $1.startedAt }
+    }
+
+    private var watchTeamLabel: String {
+        currentTeam?.name ?? (mode == .coach ? "My Team" : "My Skills")
+    }
+
+    private var watchSnapshot: WatchRosterSnapshot {
+        let session = activeSession
+        return WatchRosterSnapshot(modeRaw: mode.rawValue,
+                                   teamName: watchTeamLabel,
+                                   noun: mode.noun,
+                                   nounPlural: mode.nounPlural,
+                                   groups: watchGroups.map { group in
+            WatchGroupSnapshot(id: group.id,
+                               name: group.name,
+                               number: group.number,
+                               kindRaw: group.kindRaw,
+                               counts: countsFor(group: group, in: session?.attempts ?? []),
+                               outcomes: Outcome.allCases.map { outcome in
+                WatchOutcomeSnapshot(rawValue: outcome.rawValue,
+                                     label: outcome.label(group.kind),
+                                     shortLabel: outcome.short(group.kind))
+            })
+        },
+                                   activeSessionReps: session?.attempts.count ?? 0,
+                                   generatedAt: .now)
+    }
+
+    private func configureWatchLogging() {
+        WatchSessionBridge.shared.configure(snapshotProvider: { watchSnapshot },
+                                            logHandler: handleWatchLog(_:))
+    }
+
+    private func syncWatchLogging() {
+        WatchSessionBridge.shared.publishSnapshot(watchSnapshot)
+    }
+
+    private func handleWatchLog(_ request: WatchLogRequest) -> WatchRosterSnapshot? {
+        guard let group = watchGroups.first(where: { $0.id == request.groupID }),
+              let outcome = Outcome(rawValue: request.outcomeRaw) else {
+            return nil
+        }
+
+        let session: PracticeSession
+        if let live = activeSession {
+            session = live
+        } else {
+            session = PracticeSession(startedAt: request.timestamp)
+            context.insert(session)
+        }
+
+        context.insert(Attempt(outcome: outcome,
+                               group: group,
+                               session: session,
+                               timestamp: request.timestamp))
+        try? context.save()
+        return watchSnapshot
+    }
+
+    private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
+        var counts = [0, 0, 0, 0]
+        for attempt in attempts where attempt.group === group {
+            guard let outcome = Outcome(rawValue: attempt.outcomeRaw) else { continue }
+            counts[outcome.rawValue] += 1
+        }
+        return counts
     }
 
     /// Pre-onboarding installs already have groups (the old seeded roster).
