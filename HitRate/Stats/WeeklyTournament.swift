@@ -45,13 +45,13 @@ enum WeeklyGame: Int, CaseIterable {
     }
 
     /// Reps a skill/group needs this week to be eligible for the crown — keeps
-    /// one lucky rep from "winning" the week. Grind is pure volume, so any
-    /// rep enters the race.
+    /// a lucky handful of reps from "winning" the week. Grind is pure volume,
+    /// so any rep enters the race.
     var minReps: Int {
         switch self {
-        case .rate: 10
+        case .rate: 25
         case .grind: 1
-        case .streak: 5
+        case .streak: 25
         }
     }
 
