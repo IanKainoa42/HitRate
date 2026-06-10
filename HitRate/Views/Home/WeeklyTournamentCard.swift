@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// "WEEKLY CUP" — the built-in weekly game. Crowns the skill/group with the
-/// best clean-hit rate this week, ranks the field beneath it, and names the
-/// title to defend. Lives in the training-floor register: inset well, chalk
-/// text, Barlow numerals, group identity for the badge — no foil, no glow.
+/// "WEEKLY GAME" — the built-in rotating competition. Each week one of three
+/// games is live (RATE CUP / GRIND CUP / STREAK CUP); the card crowns the
+/// week's champion, ranks the field, and flips (Week ⇄ Season) to the season
+/// league — the local ranking the games build, scored by weekly placements.
+/// Lives in the training-floor register: inset well, chalk text, Barlow
+/// numerals, group identity for the badge — no foil, no glow.
 struct WeeklyTournamentCard: View {
     let tournament: WeeklyTournament
+    // Toggle lives in the card, same as GroupsCard's Ranked⇄Grid.
+    @State private var view = "Week"
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
@@ -15,29 +19,49 @@ struct WeeklyTournamentCard: View {
 
     var body: some View {
         FeedCard {
-            CardHead("WEEKLY CUP") {
-                Text(tournament.week.weekLabel)
-                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                    .tracking(1)
-                    .foregroundStyle(Theme.label3)
+            CardHead(view == "Week" ? "WEEKLY GAME · \(tournament.game.name)" : "SEASON LEAGUE") {
+                MiniSeg(options: ["Week", "Season"], selection: $view)
             }
 
-            if let champ = tournament.champion {
-                topBanner(champ, kicker: crownLabel, icon: "trophy.fill", crowned: true)
-                others(excluding: champ)
-            } else if let runner = tournament.frontRunner {
-                topBanner(runner, kicker: "FRONT-RUNNER", icon: "flag.checkered", crowned: false)
-                runnerNote(runner)
-                others(excluding: runner)
+            if view == "Week" {
+                rulesLine
+
+                if let champ = tournament.champion {
+                    topBanner(champ, kicker: crownLabel, icon: "trophy.fill", crowned: true)
+                    others(excluding: champ)
+                } else if let runner = tournament.frontRunner {
+                    topBanner(runner, kicker: "FRONT-RUNNER", icon: "flag.checkered", crowned: false)
+                    runnerNote(runner)
+                    others(excluding: runner)
+                } else {
+                    openPrompt
+                }
+
+                weekFooter
             } else {
-                openPrompt
+                leagueTable
             }
-
-            footer
         }
     }
 
-    // MARK: Top banner (champion or front-runner)
+    // MARK: Week — rules line
+
+    private var rulesLine: some View {
+        HStack(spacing: 5) {
+            Image(systemName: tournament.game.icon)
+                .font(.system(size: 9, weight: .bold))
+            Text(tournament.game.rules)
+                .font(.system(size: 10.5, weight: .semibold))
+            Spacer()
+            Text(tournament.week.weekLabel)
+                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                .tracking(1)
+        }
+        .foregroundStyle(Theme.label3)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: Week — top banner (champion or front-runner)
 
     private func topBanner(_ s: WeeklyStanding, kicker: String, icon: String, crowned: Bool) -> some View {
         let color = Theme.groupColor(s.colorIndex)
@@ -67,14 +91,7 @@ struct WeeklyTournamentCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .trailing, spacing: 2) {
-                HStack(alignment: .lastTextBaseline, spacing: 1) {
-                    Text("\(s.rate)")
-                        .font(Theme.barlow(34, .extrabold))
-                        .monospacedDigit()
-                    Text("%")
-                        .font(Theme.barlow(17, .bold))
-                }
-                .foregroundStyle(Theme.rateColor(s.rate))
+                bigScore(s)
                 if let delta = s.delta {
                     DeltaLabel(delta: delta, font: .system(size: 10, weight: .bold, design: .monospaced), iconSize: 10)
                 }
@@ -86,12 +103,31 @@ struct WeeklyTournamentCard: View {
                 .fill(Theme.surface2)
         )
         .overlay(
-            // A hairline of the champion's color along the leading edge — identity
+            // A hairline of the champion's color along the edge — identity
             // without glow.
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(color.opacity(crowned ? 0.5 : 0.25), lineWidth: 1)
         )
         .padding(.bottom, tournament.standings.count > 1 ? 12 : 0)
+    }
+
+    /// The banner's big number in the live game's language — % gets the rate
+    /// bands, reps/streak stay chalk with a small unit cap.
+    private func bigScore(_ s: WeeklyStanding) -> some View {
+        HStack(alignment: .lastTextBaseline, spacing: 2) {
+            Text("\(s.score)")
+                .font(Theme.barlow(34, .extrabold))
+                .monospacedDigit()
+            if tournament.game == .rate {
+                Text("%").font(Theme.barlow(17, .bold))
+            } else {
+                Text(tournament.game.unit)
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(1)
+            }
+        }
+        .foregroundStyle(tournament.game.scoreUsesRateBands
+                         ? Theme.rateColor(s.score) : Theme.label)
     }
 
     /// Nudge under the front-runner: how many reps to lock the crown.
@@ -104,7 +140,7 @@ struct WeeklyTournamentCard: View {
             .padding(.bottom, tournament.standings.count > 1 ? 12 : 0)
     }
 
-    // MARK: The rest of the field
+    // MARK: Week — the rest of the field
 
     @ViewBuilder
     private func others(excluding top: WeeklyStanding) -> some View {
@@ -117,7 +153,8 @@ struct WeeklyTournamentCard: View {
                 .padding(.bottom, 4)
             VStack(spacing: 0) {
                 ForEach(Array(rest.enumerated()), id: \.element.id) { i, s in
-                    StandingRow(standing: s, minReps: tournament.minReps, nounTitle: mode.nounTitle)
+                    StandingRow(standing: s, game: tournament.game,
+                                minReps: tournament.minReps)
                     if i < rest.count - 1 {
                         Rectangle().fill(Theme.separator).frame(height: 1)
                     }
@@ -126,17 +163,17 @@ struct WeeklyTournamentCard: View {
         }
     }
 
-    // MARK: Empty / open state
+    // MARK: Week — empty / open state
 
     private var openPrompt: some View {
         VStack(spacing: 10) {
             Image(systemName: "trophy")
                 .font(.system(size: 26))
                 .foregroundStyle(Theme.label3)
-            Text("The cup is open")
+            Text("The \(tournament.game.name) is open")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.label)
-            Text("Log reps this week — the \(mode.noun) with the best hit rate (min \(tournament.minReps) reps) takes the crown.")
+            Text("Log reps this week to enter — \(tournament.game.rules.lowercased()).")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.label2)
                 .multilineTextAlignment(.center)
@@ -145,45 +182,81 @@ struct WeeklyTournamentCard: View {
         .padding(.vertical, 14)
     }
 
-    // MARK: Footer (defending title + qualify note)
+    // MARK: Week — footer (defending title + next game)
 
-    @ViewBuilder
-    private var footer: some View {
-        let parts = footerLine
-        if !parts.isEmpty {
-            HStack(spacing: 6) {
-                Image(systemName: "shield.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Theme.label3)
-                Text(parts)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.label2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+    private var weekFooter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let d = tournament.defending {
+                footRow(icon: "shield.fill",
+                        text: "Defending champ: \(d.name) · \(d.scoreDisplay) in last week's \(d.game.name)")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 12)
+            footRow(icon: "arrow.triangle.2.circlepath",
+                    text: "Next week: \(tournament.game.next.name)")
         }
+        .padding(.top, 12)
     }
 
-    private var footerLine: String {
-        guard let d = tournament.defending else { return "" }
-        return "Defending champ: \(d.name) · \(d.rate)% last week"
+    private func footRow(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.label3)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.label2)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Season — league table
+
+    @ViewBuilder
+    private var leagueTable: some View {
+        if tournament.league.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "list.number")
+                    .font(.system(size: 26))
+                    .foregroundStyle(Theme.label3)
+                Text("No weeks scored yet")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.label)
+                Text("Each week's game pays points when it ends — win 5, 2nd 3, 3rd 2, qualifying 1. The table builds from there.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.label2)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(tournament.league.enumerated()), id: \.element.id) { i, r in
+                    LeagueRow(rank: r)
+                    if i < tournament.league.count - 1 {
+                        Rectangle().fill(Theme.separator).frame(height: 1)
+                    }
+                }
+            }
+            footRow(icon: "info.circle",
+                    text: "Win 5 · 2nd 3 · 3rd 2 · qualifying 1 — this week scores when it ends.")
+                .padding(.top, 12)
+        }
     }
 }
 
-// MARK: - Standings row
+// MARK: - Standings row (week view)
 
 /// One line beneath the banner. Qualified entrants carry a rank; provisional
 /// entrants are dimmed and show how many reps they still owe.
 private struct StandingRow: View {
     let standing: WeeklyStanding
+    let game: WeeklyGame
     let minReps: Int
-    let nounTitle: String
 
     var body: some View {
         HStack(spacing: 10) {
-            // Rank for qualified racers; a dash for those still chasing the minimum.
+            // Rank for qualified racers; a waiting glyph for those still
+            // chasing the minimum.
             Group {
                 if standing.qualified {
                     Text("\(standing.rank)")
@@ -225,18 +298,71 @@ private struct StandingRow: View {
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 1) {
-                Text("\(standing.rate)")
+                Text("\(standing.score)")
                     .font(Theme.barlow(19, .extrabold))
                     .monospacedDigit()
-                Text("%")
-                    .font(Theme.barlow(12, .bold))
+                if game == .rate {
+                    Text("%").font(Theme.barlow(12, .bold))
+                }
             }
             .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .foregroundStyle(Theme.rateColor(standing.rate, hasData: standing.total > 0))
+            .minimumScaleFactor(0.8)   // "100%" must not wrap in the fixed column
+            .foregroundStyle(game.scoreUsesRateBands
+                             ? Theme.rateColor(standing.score, hasData: standing.total > 0)
+                             : Theme.label)
             .frame(width: 48, alignment: .trailing)
         }
         .padding(.vertical, 10)
         .opacity(standing.qualified ? 1 : 0.55)
+    }
+}
+
+// MARK: - League row (season view)
+
+private struct LeagueRow: View {
+    let rank: SeasonRank
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(rank.rank)")
+                .font(Theme.barlow(14, .extrabold))
+                .foregroundStyle(rank.rank == 1 ? Theme.accent : Theme.label3)
+                .frame(width: 18)
+
+            Text("\(rank.number)")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(Theme.groupColor(rank.colorIndex))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            Text(rank.name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.label)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if rank.cups > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("×\(rank.cups)")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                }
+                .foregroundStyle(Theme.label2)
+            }
+
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text("\(rank.points)")
+                    .font(Theme.barlow(19, .extrabold))
+                    .monospacedDigit()
+                Text("PTS")
+                    .font(.system(size: 8, weight: .heavy))
+                    .tracking(1)
+            }
+            .foregroundStyle(Theme.label)
+            .frame(width: 56, alignment: .trailing)
+        }
+        .padding(.vertical, 10)
     }
 }
