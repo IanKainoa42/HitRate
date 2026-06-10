@@ -46,7 +46,7 @@ struct WeeklyTournamentCard: View {
 
         if let champ = tournament.champion {
             topBanner(champ,
-                      kicker: champ.isGhost ? "THE GHOST LEADS" : crownLabel,
+                      kicker: champ.isGhost ? "THE SPIRIT LEADS" : crownLabel,
                       icon: champ.isGhost ? "wind" : "trophy.fill", crowned: true)
             if champ.isGhost && tournament.standings.count == 1 {
                 ghostChallengeNote
@@ -157,7 +157,7 @@ struct WeeklyTournamentCard: View {
 
     /// Nudge when the ghost is leading an otherwise empty week.
     private var ghostChallengeNote: some View {
-        Text("The ghost is pacing at your season average — log reps this week to take it down.")
+        Text("The Spirit is pacing at your season average — log reps this week to take it down.")
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(Theme.label2)
             .frame(maxWidth: .infinity, alignment: .leading)

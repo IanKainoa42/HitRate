@@ -174,7 +174,8 @@ struct GhostEntry {
     let rate: Int    // average winning rate — tiebreaks only
     let total: Int   // average winning volume — tiebreaks only
 
-    static let name = "THE GHOST"
+    // Display name — "spirit" is the cheer word for it; code keeps "ghost".
+    static let name = "THE SPIRIT"
 }
 
 struct WeeklyTournament {
