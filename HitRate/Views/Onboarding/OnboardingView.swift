@@ -258,24 +258,18 @@ struct OnboardingView: View {
 
                         // Starter ideas — tapping one still *creates* it; nothing is pre-made.
                         suggestionHeader("STUNTS")
-                        FlowChips(options: stuntSuggestions.filter { name in
-                            !pending.contains { $0.name == name }
-                        }) { name in
+                        FlowChips(options: available(stuntSuggestions)) { name in
                             pending.append((name, .stunt))
                         }
                         suggestionHeader("TUMBLING")
-                        FlowChips(options: tumblingSuggestions.filter { name in
-                            !pending.contains { $0.name == name }
-                        }) { name in
+                        FlowChips(options: available(tumblingSuggestions)) { name in
                             pending.append((name, .tumbling))
                         }
                     } else {
                         // Coach starter ideas
                         let groupSuggestions = ["Group 1", "Group 2", "Group 3", "Group 4", "Group 5"]
                         suggestionHeader("STARTER GROUPS")
-                        FlowChips(options: groupSuggestions.filter { name in
-                            !pending.contains { $0.name == name }
-                        }) { name in
+                        FlowChips(options: available(groupSuggestions)) { name in
                             pending.append((name, .stunt))
                         }
                     }
