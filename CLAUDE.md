@@ -157,23 +157,11 @@ Key invariants:
   custom timeframe-tabs well fixed, then a 9pt-gutter scroll of `FeedCard`
   wells; the green practice CTA is docked via `safeAreaInset` with a fade
   backstop so scroll content doesn't slide visibly through its corners.
-  `WeeklyTournamentCard` ("WEEKLY GAME · <cup>") sits at the TOP of the
-  scroll, above every timeframe-scoped section — it's the only card NOT
-  driven by `timeframe` (always this week, from `WeeklyLeague.compute`). A
-  Week⇄Season `MiniSeg` flips it between the live game and the season league
-  table. Week view self-handles three states: a crowned champion banner
-  (trophy + group color + big Barlow score in the game's unit — only the
-  RATE CUP's % gets rate-band colors; reps/streak scores stay chalk), a
-  FRONT-RUNNER banner with a "N reps to lock the crown" nudge while no one
-  has qualified, and an open prompt; below it a STANDINGS list (provisional
-  entrants dimmed with reps-to-qualify), then a footer with the defending
-  champ + a "Next week: <game>" rotation teaser. Season view is the
-  `SeasonRank` league table (rank, badge, cups ×N, PTS) with the scoring
-  legend. Shown whenever the cup `isLive` (reps this week, a title to
-  defend, OR a non-empty league), so it can appear even when the selected
-  timeframe is empty — in that case the dashboard shows a small "No reps
-  logged …" well instead of the first-launch empty state (gated on
-  `lifetimeHasData`).
+  The dashboard is ANALYTICS ONLY — the weekly game + league live in the
+  Trophy Room, deliberately SEPARATE from these stats. The dashboard empty
+  branch shows the first-launch empty state, or (once the team has logged
+  before, `lifetimeHasData`) a small "No reps logged …" well for a quiet
+  timeframe.
   Header hosts the wordmark (HIT + green RATE), a tappable identity subline
   that is the TEAM SWITCHER (a Menu picking `currentTeamID` + "New team"),
   a trophy button (opens `TrophyRoomView`), and the skills/groups editor
@@ -182,12 +170,15 @@ Key invariants:
   and hides the practice CTA until it has a roster. The editor's Teams
   section adds/renames/deletes/reorders teams and switches the active one;
   new groups attach to the active team.
-  `TrophyRoomView` (full-screen cover, training-floor register) is the display
-  case for everything earned: the SEASON LEAGUE table (reuses `LeagueRow`),
-  a CUPS WON grid of `WeeklyLeague.cupHistory` tiles, and an ACCOLADES shelf
-  of earned milestone cards rendered via `HoloCardView(isSnapshot: true)`
-  (court-register cards as objects on the graphite shelf). Read-only —
-  sharing stays on the Stunt Cards sheet. In athlete mode with BOTH kinds logged (`showsKindSplit`),
+  `TrophyRoomView` (full-screen cover, training-floor register) is the
+  COMPETITION HUB — everything tournament/leaderboard, kept out of Home's
+  analytics: the live `WeeklyTournamentCard(weekOnly: true)` (week game with
+  NO Week/Season toggle — the room shows the league as its own section), the
+  SEASON LEAGUE table (reuses `LeagueRow`), a CUPS WON grid of
+  `WeeklyLeague.cupHistory` tiles, and an ACCOLADES shelf of earned milestone
+  cards rendered via `HoloCardView(isSnapshot: true)` (court-register cards as
+  objects on the graphite shelf). Read-only — sharing stays on the Stunt Cards
+  sheet. In athlete mode with BOTH kinds logged (`showsKindSplit`),
   the scroll STACKS three sections — OVERALL, then STUNT, then TUMBLING — each
   introduced by a floor-level `sectionHeader` (icon + label + rep count + a
   hairline rule; NOT a well) over a `dashboardCards(_:)` block (summary / trend

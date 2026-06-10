@@ -72,11 +72,6 @@ struct HomeView: View {
         StatsEngine.compute(sessions: sessions, groups: groups, timeframe: timeframe)
     }
 
-    /// The weekly cup — always "this week", whatever the dashboard timeframe is.
-    private var tournament: WeeklyTournament {
-        WeeklyLeague.compute(sessions: sessions, groups: groups)
-    }
-
     /// Whether the active team has any buckets to log into yet.
     private var hasRoster: Bool { !groups.isEmpty }
 
@@ -89,7 +84,6 @@ struct HomeView: View {
 
     var body: some View {
         let d = stats
-        let cup = tournament
         VStack(spacing: 9) {
             header
 
@@ -98,12 +92,8 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 9) {
-                    // The weekly game sits at the top, above the timeframe-scoped
-                    // dashboard — it's its own always-this-week competition.
-                    if cup.isLive {
-                        WeeklyTournamentCard(tournament: cup)
-                    }
-
+                    // The weekly game + league live in the Trophy Room (header
+                    // trophy button), kept separate from the analytics here.
                     if d.hasData {
                         if showsKindSplit {
                             // Overall first, then a stunt-only and tumbling-only
@@ -132,10 +122,9 @@ struct HomeView: View {
                         // A freshly added team has no buckets yet — guide to the
                         // editor instead of an unusable practice prompt.
                         noRosterState
-                    } else if lifetimeHasData || cup.isLive {
-                        // Reps exist (this week's cup, or another timeframe) — the
-                        // current timeframe is just quiet. Don't show the big
-                        // first-launch empty state under a live dashboard.
+                    } else if lifetimeHasData {
+                        // This team has logged before — the current timeframe is
+                        // just quiet. Don't show the big first-launch empty state.
                         FeedCard {
                             Text("No reps logged \(timeframe.label.lowercased()).")
                                 .font(.system(size: 13))
