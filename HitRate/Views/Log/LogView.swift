@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Combine
 
 /// The counter, presented full-screen from Home's practice pill for the
 /// duration of one session. Built for the floor: pick a group once, then
@@ -78,6 +77,7 @@ struct LogView: View {
     private var stagedCount: Int { groups.filter { staged[$0.persistentModelID] != nil }.count }
     /// Coach mental model is a wave of stunt groups; athlete is a routine pass.
     private var waveNoun: String { mode == .coach ? "wave" : "routine" }
+    private var gridNameColumnWidth: CGFloat { 96 }
 
     var body: some View {
         NavigationStack {
@@ -329,7 +329,7 @@ struct LogView: View {
 
             // Column headers — one kind (see gridAvailable), via OutcomeNames.
             HStack(spacing: 6) {
-                Color.clear.frame(width: 78, height: 1)
+                Color.clear.frame(width: gridNameColumnWidth, height: 1)
                 ForEach(Outcome.allCases) { o in
                     VStack(spacing: 3) {
                         Circle().fill(o.color).frame(width: 7, height: 7)
@@ -358,12 +358,12 @@ struct LogView: View {
                                     .background(g.color)
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 Text(g.name)
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 11.5, weight: .semibold))
                                     .foregroundStyle(Theme.label)
-                                    .lineLimit(1)
+                                    .lineLimit(2)
                                     .minimumScaleFactor(0.7)
                             }
-                            .frame(width: 78, alignment: .leading)
+                            .frame(width: gridNameColumnWidth, alignment: .leading)
 
                             ForEach(Outcome.allCases) { o in
                                 let v = c[o.rawValue]
@@ -632,11 +632,10 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
-    /// The grid's compact bottom recent strip — an ESPN/CheerCenter-style
-    /// continuous marquee: a pinned Undo on the left, then the rep chips scroll
-    /// right-to-left forever, looping seamlessly (`MarqueeRow`). Wave/routine reps
-    /// ride together in a bordered cluster. Display-only motion over HitRate's
-    /// engraved floor chips — no scoreboard skin; frees the room for the group rows.
+    /// The grid's compact bottom recent strip. A pinned Undo on the left, then a
+    /// horizontally swipeable run of rep chips (newest at the leading edge, next
+    /// to Undo). A tap — or any new rep — snaps back to the live edge. This keeps
+    /// the strip readable and avoids a perpetual animation on the practice screen.
     @ViewBuilder
     private func recentTicker(_ attempts: [Attempt]) -> some View {
         let segs = Array(logSegments(attempts).reversed())   // newest-first
@@ -659,8 +658,25 @@ struct LogView: View {
                     .foregroundStyle(Theme.label3)
                 Spacer(minLength: 0)
             } else {
-                MarqueeRow(spacing: 6, loopGap: 50, speed: 30) {
-                    ForEach(segs) { tickerChip($0) }
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            Color.clear.frame(width: 0, height: 1).id("live")
+                            ForEach(segs) { tickerChip($0) }
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo("live", anchor: .leading)
+                            }
+                        }
+                    }
+                    .onChange(of: attempts.count) { _, _ in
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo("live", anchor: .leading)
+                        }
+                    }
                 }
             }
         }
@@ -718,86 +734,9 @@ struct LogView: View {
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
         var counts = [0, 0, 0, 0]
         for a in attempts where a.group === group {
-            counts[a.outcomeRaw] += 1
+            guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
+            counts[outcome.rawValue] += 1
         }
         return counts
-    }
-}
-
-// MARK: - Marquee
-
-/// ESPN/CheerCenter-style horizontal marquee. Lays its content in a row and
-/// scrolls it right-to-left forever, looping seamlessly by drawing the row twice
-/// and wrapping the offset at one content-width (+ gap). Display-only — no
-/// gestures. The width is read directly from a GeometryReader background (a
-/// PreferenceKey would not propagate out of this tree) and fed to a 60fps timer
-/// engine that drives the offset.
-private struct MarqueeRow<Content: View>: View {
-    private let spacing: CGFloat        // gap between chips inside one copy
-    private let loopGap: CGFloat        // gap before the loop repeats (CheerCenter: 50)
-    private let content: Content
-    @StateObject private var engine: MarqueeEngine
-
-    init(spacing: CGFloat = 6, loopGap: CGFloat = 50, speed: CGFloat = 30,
-         @ViewBuilder content: () -> Content) {
-        self.spacing = spacing
-        self.loopGap = loopGap
-        self.content = content()
-        _engine = StateObject(wrappedValue: MarqueeEngine(speed: speed))
-    }
-
-    var body: some View {
-        // GeometryReader is a flexible-width host so the wide content can't stretch
-        // the screen. The doubled HStack is a STABLE structure (not regenerated per
-        // frame) — its `.offset` is driven by an external timer engine, and its
-        // width is measured here and fed to the engine (this is the placement that
-        // actually propagates; measuring inside a TimelineView did not).
-        GeometryReader { _ in
-            HStack(spacing: loopGap) {
-                row.background(GeometryReader { g -> Color in
-                    let w = g.size.width
-                    DispatchQueue.main.async { engine.setWidth(w + loopGap) }
-                    return Color.clear
-                })
-                row
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(maxHeight: .infinity, alignment: .center)
-            .offset(x: engine.offset)
-            .animation(nil, value: engine.offset)
-        }
-        .frame(maxWidth: .infinity)
-        .clipped()
-    }
-
-    private var row: some View {
-        HStack(spacing: spacing) { content }
-    }
-}
-
-/// Drives the marquee offset off a 60fps timer; resets seamlessly at one
-/// content-width so the duplicated row loops without a seam. Mirrors
-/// CheerCenter's ScoringTickerView coordinator.
-@MainActor
-private final class MarqueeEngine: ObservableObject {
-    @Published var offset: CGFloat = 0
-    private let speed: CGFloat          // points per second
-    private var width: CGFloat = 0
-    private var cancellable: AnyCancellable?
-
-    init(speed: CGFloat) { self.speed = speed }
-
-    func setWidth(_ w: CGFloat) {
-        guard w != width else { return }
-        width = w
-        offset = 0
-        cancellable?.cancel()
-        guard w > 0 else { return }
-        cancellable = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
-            .sink { [weak self] _ in
-                guard let self, self.width > 0 else { return }
-                self.offset -= self.speed / 60.0
-                if self.offset <= -self.width { self.offset = 0 }
-            }
     }
 }

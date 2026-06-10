@@ -34,10 +34,14 @@ struct CSVExportItem: Transferable {
 
     private func write() throws -> URL {
         let iso = ISO8601DateFormatter()
-        var csv = "timestamp,session_start,\(noun),outcome\n"
+        var csv = ["timestamp", "session_start", noun, "outcome"].map(Self.csvField).joined(separator: ",") + "\n"
         for r in rows {
-            let group = r.group.replacingOccurrences(of: ",", with: " ")
-            csv += "\(iso.string(from: r.timestamp)),\(iso.string(from: r.sessionStart)),\(group),\(r.outcome)\n"
+            csv += [
+                iso.string(from: r.timestamp),
+                iso.string(from: r.sessionStart),
+                r.group,
+                r.outcome
+            ].map(Self.csvField).joined(separator: ",") + "\n"
         }
 
         let f = DateFormatter()
@@ -46,6 +50,15 @@ struct CSVExportItem: Transferable {
             .appendingPathComponent("HitRate-\(f.string(from: .now)).csv")
         try csv.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    private static func csvField(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        if escaped.contains(",") || escaped.contains("\"") ||
+            escaped.contains("\n") || escaped.contains("\r") {
+            return "\"\(escaped)\""
+        }
+        return escaped
     }
 
     static var transferRepresentation: some TransferRepresentation {

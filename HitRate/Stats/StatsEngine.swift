@@ -122,30 +122,40 @@ enum StatsEngine {
         // other kind's reps into the trend, tape, or rough patch.
         let allowed = Set(groups.map { $0.persistentModelID })
 
-        // Partition sessions into current period vs the previous comparable period.
+        // Partition attempts by timestamp, not just session start. A live
+        // session can span midnight; today's reps still belong to today.
         let current: [PracticeSession]
+        let currentInterval: DateInterval?
         let previous: [PracticeSession]
+        let previousInterval: DateInterval?
         let deltaNote: String
         let rangeNote: String
 
         switch timeframe {
         case .today:
-            current = sorted.filter { cal.isDateInToday($0.startedAt) }
-            previous = sorted.last { !cal.isDateInToday($0.startedAt) }.map { [$0] } ?? []
+            let day = cal.dateInterval(of: .day, for: now)!
+            current = sorted
+            currentInterval = day
+            previous = sorted.last { $0.startedAt < day.start }.map { [$0] } ?? []
+            previousInterval = DateInterval(start: .distantPast, end: day.start)
             deltaNote = "vs last session"
             let n = min(8, max(sorted.count, 1))
             rangeNote = n == 1 ? "last session" : "last \(n) sessions"
         case .week:
             let week = cal.dateInterval(of: .weekOfYear, for: now)!
-            current = sorted.filter { week.contains($0.startedAt) }
+            current = sorted
+            currentInterval = week
             let prevRef = cal.date(byAdding: .weekOfYear, value: -1, to: now)!
             let prevWeek = cal.dateInterval(of: .weekOfYear, for: prevRef)!
-            previous = sorted.filter { prevWeek.contains($0.startedAt) }
+            previous = sorted
+            previousInterval = prevWeek
             deltaNote = "vs last week"
             rangeNote = "last 4 weeks"
         case .all:
             current = sorted
+            currentInterval = nil
             previous = sorted.first.map { [$0] } ?? []
+            previousInterval = nil
             if let first = sorted.first {
                 let f = DateFormatter()
                 f.dateFormat = "MMM"
@@ -161,12 +171,12 @@ enum StatsEngine {
         var groupStats: [GroupStat] = []
         var prevOverall = [0, 0, 0, 0]
         for g in ordered {
-            let counts = outcomeCounts(in: current, group: g)
+            let counts = outcomeCounts(in: current, group: g, within: currentInterval)
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
             let rate = total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : 0
 
-            let prevCounts = outcomeCounts(in: previous, group: g)
+            let prevCounts = outcomeCounts(in: previous, group: g, within: previousInterval)
             let prevTotal = prevCounts.reduce(0, +)
             for i in 0..<4 { prevOverall[i] += prevCounts[i] }
             var delta: Int?
@@ -218,10 +228,12 @@ enum StatsEngine {
     private static func trendSeries(sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
                                     timeframe: Timeframe, now: Date) -> [Int] {
         let cal = Calendar.current
-        func rate(of sessions: [PracticeSession]) -> Int? {
+        func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
             var hits = 0, total = 0
             for s in sessions {
-                for a in s.attempts where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
+                for a in s.attempts
+                    where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
+                    if let interval, !interval.contains(a.timestamp) { continue }
                     total += 1
                     if a.outcome.isHit { hits += 1 }
                 }
@@ -239,8 +251,7 @@ enum StatsEngine {
             for back in stride(from: 3, through: 0, by: -1) {
                 guard let ref = cal.date(byAdding: .weekOfYear, value: -back, to: now),
                       let interval = cal.dateInterval(of: .weekOfYear, for: ref) else { continue }
-                let inWeek = sorted.filter { interval.contains($0.startedAt) }
-                if let r = rate(of: inWeek) { points.append(r) }
+                if let r = rate(of: sorted, within: interval) { points.append(r) }
             }
             return points
         case .all:
@@ -293,11 +304,14 @@ enum StatsEngine {
         return best >= minMisses ? bestStart..<(bestStart + window) : nil
     }
 
-    private static func outcomeCounts(in sessions: [PracticeSession], group: StuntGroup) -> [Int] {
+    private static func outcomeCounts(in sessions: [PracticeSession], group: StuntGroup,
+                                      within interval: DateInterval? = nil) -> [Int] {
         var counts = [0, 0, 0, 0]
         for s in sessions {
             for a in s.attempts where a.group === group {
-                counts[a.outcomeRaw] += 1
+                if let interval, !interval.contains(a.timestamp) { continue }
+                guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
+                counts[outcome.rawValue] += 1
             }
         }
         return counts

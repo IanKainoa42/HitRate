@@ -506,7 +506,8 @@ enum WeeklyLeague {
         var counts = [0, 0, 0, 0]
         for s in sessions {
             for a in s.attempts where a.group === group {
-                counts[a.outcomeRaw] += 1
+                guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
+                counts[outcome.rawValue] += 1
             }
         }
         return counts
