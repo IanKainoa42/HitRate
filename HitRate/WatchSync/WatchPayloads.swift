@@ -31,6 +31,26 @@ struct WatchRosterSnapshot: Codable, Equatable {
                                            selectedGroupID: nil,
                                            activeSessionReps: 0,
                                            generatedAt: .distantPast)
+
+    /// Seed for `--demo-roster` watch screenshots — never reachable in
+    /// production (launch-arg gated).
+    static let screenshotDemo: WatchRosterSnapshot = {
+        let id = UUID()
+        let stunt = "stunt"
+        let outcomes = [
+            WatchOutcomeSnapshot(rawValue: 0, label: "Hit", shortLabel: "HIT"),
+            WatchOutcomeSnapshot(rawValue: 1, label: "Bobble", shortLabel: "BOB"),
+            WatchOutcomeSnapshot(rawValue: 2, label: "Building fall", shortLabel: "BF"),
+            WatchOutcomeSnapshot(rawValue: 3, label: "Major fall", shortLabel: "MF"),
+        ]
+        return WatchRosterSnapshot(
+            modeRaw: "athlete", teamName: "My Skills",
+            noun: "skill", nounPlural: "skills",
+            groups: [WatchGroupSnapshot(id: id, name: "Full Up", number: 1,
+                                        kindRaw: stunt, counts: [14, 2, 1, 0],
+                                        outcomes: outcomes)],
+            selectedGroupID: id, activeSessionReps: 17, generatedAt: .now)
+    }()
 }
 
 struct WatchGroupSnapshot: Codable, Equatable, Identifiable {
