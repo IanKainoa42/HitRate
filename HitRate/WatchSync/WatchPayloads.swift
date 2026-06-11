@@ -6,6 +6,10 @@ struct WatchRosterSnapshot: Codable, Equatable {
     var noun: String
     var nounPlural: String
     var groups: [WatchGroupSnapshot]
+    /// The skill "pulled up" on the iPhone pad — the watch shows ONLY this
+    /// bucket's outcome buttons (no picker on the wrist). Optional so old
+    /// payloads still decode; nil falls back to the first group.
+    var selectedGroupID: UUID?
     var activeSessionReps: Int
     var generatedAt: Date
 
@@ -15,6 +19,7 @@ struct WatchRosterSnapshot: Codable, Equatable {
         lhs.noun == rhs.noun &&
         lhs.nounPlural == rhs.nounPlural &&
         lhs.groups == rhs.groups &&
+        lhs.selectedGroupID == rhs.selectedGroupID &&
         lhs.activeSessionReps == rhs.activeSessionReps
     }
 
@@ -23,6 +28,7 @@ struct WatchRosterSnapshot: Codable, Equatable {
                                            noun: "skill",
                                            nounPlural: "skills",
                                            groups: [],
+                                           selectedGroupID: nil,
                                            activeSessionReps: 0,
                                            generatedAt: .distantPast)
 }

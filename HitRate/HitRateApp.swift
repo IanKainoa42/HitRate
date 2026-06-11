@@ -34,6 +34,9 @@ struct RootView: View {
     @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage("teamName") private var teamName = ""
     @AppStorage("replayingIntro") private var replayingIntro = false
+    // The pad's pulled-up skill (written by LogView) — forwarded to the watch
+    // so the wrist mirrors whatever the phone has up.
+    @AppStorage("selectedGroupID") private var padSelectedGroupID = ""
 
     var body: some View {
         Group {
@@ -47,6 +50,7 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .onAppear {
+            CardCatalogRenderer.runIfRequested()
             dedupeSyncIDs()
             migrateExistingInstallIfNeeded()
             migrateGroupsIntoDefaultTeam()
@@ -94,6 +98,9 @@ struct RootView: View {
                                      shortLabel: outcome.short(group.kind))
             })
         },
+                                   selectedGroupID: watchGroups.first {
+                                       $0.id.uuidString == padSelectedGroupID
+                                   }?.id ?? watchGroups.first?.id,
                                    activeSessionReps: session?.attempts.count ?? 0,
                                    generatedAt: .now)
     }

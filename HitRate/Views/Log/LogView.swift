@@ -21,7 +21,9 @@ struct LogView: View {
     /// Practice logs into the active team's roster only.
     private var groups: [StuntGroup] { allGroups.inTeam(teams.current(id: currentTeamID)) }
 
-    @State private var selectedGroup: StuntGroup?
+    // Persisted (not @State) so the watch can mirror the pulled-up skill via
+    // RootView's snapshot — and the pad remembers it between practices.
+    @AppStorage("selectedGroupID") private var selectedGroupIDRaw = ""
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
 
@@ -37,12 +39,11 @@ struct LogView: View {
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
-    /// The group the pad logs into. Validates membership so a selection that
-    /// was deleted in the editor can't receive new attempts (deleted SwiftData
-    /// models crash on property access).
+    /// The group the pad logs into. Resolves the persisted id against the
+    /// CURRENT roster so a selection that was deleted in the editor can't
+    /// receive new attempts (deleted SwiftData models crash on property access).
     private var activeGroup: StuntGroup? {
-        if let sel = selectedGroup, groups.contains(where: { $0 === sel }) { return sel }
-        return groups.first
+        groups.first { $0.id.uuidString == selectedGroupIDRaw } ?? groups.first
     }
 
     /// The tap-to-log matrix has ONE outcome-label header row, so it's only
@@ -182,8 +183,9 @@ struct LogView: View {
                 HStack(spacing: 8) {
                     ForEach(groups) { g in
                         let on = activeGroup === g
+                        let streakN = hotStreak(group: g, in: attempts)
                         Button {
-                            selectedGroup = g
+                            selectedGroupIDRaw = g.id.uuidString
                             hapticTrigger += 1
                         } label: {
                             HStack(spacing: 7) {
@@ -196,6 +198,7 @@ struct LogView: View {
                                 Text(g.name)
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(on ? Theme.well : Theme.label)
+                                flameBadge(streakN)
                             }
                             .padding(.horizontal, 11)
                             .padding(.vertical, 8)
@@ -203,6 +206,7 @@ struct LogView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(on ? .clear : Theme.iconTileEdge.opacity(0.65), lineWidth: 1))
+                            .modifier(FireBorder(active: streakN >= 3))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -220,7 +224,7 @@ struct LogView: View {
                         Button {
                             context.insert(Attempt(outcome: o, group: group, session: session))
                             try? context.save()
-                            selectedGroup = group
+                            selectedGroupIDRaw = group.id.uuidString
                             hapticTrigger += 1
                             Sounds.shared.play(.outcome(o))
                         } label: {
@@ -351,8 +355,10 @@ struct LogView: View {
                 VStack(spacing: 6) {
                     ForEach(groups) { g in
                         let c = countsFor(group: g, in: attempts)
+                        let streakN = hotStreak(group: g, in: attempts)
                         HStack(spacing: 6) {
-                            // Row label — colored number badge + name.
+                            // Row label — colored number badge + name (+ flame
+                            // once the group strings clean hits together).
                             HStack(spacing: 6) {
                                 Text("\(g.number)")
                                     .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -365,7 +371,11 @@ struct LogView: View {
                                     .foregroundStyle(Theme.label)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.7)
+                                flameBadge(streakN)
                             }
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 4)
+                            .modifier(FireBorder(active: streakN >= 3, cornerRadius: 7))
                             .frame(width: gridNameColumnWidth, alignment: .leading)
 
                             ForEach(Outcome.allCases) { o in
@@ -783,5 +793,60 @@ struct LogView: View {
             counts[outcome.rawValue] += 1
         }
         return counts
+    }
+
+    // MARK: Hot streak (heating up / on fire)
+
+    /// Trailing run of clean hits for one group in this session — fuel for the
+    /// streak indicator. A bobble or fall breaks it (a bobble is NOT a hit,
+    /// same rule as everywhere else). 2 = heating up, 3+ = on fire.
+    private func hotStreak(group: StuntGroup, in attempts: [Attempt]) -> Int {
+        var run = 0
+        for a in attempts.reversed() {
+            guard a.group === group else { continue }
+            guard a.outcome == .hit else { break }
+            run += 1
+        }
+        return run
+    }
+
+    /// Ember at 2 straight hits, pulsing flame at 3+. Rides next to the group
+    /// name in both layouts.
+    @ViewBuilder
+    private func flameBadge(_ streak: Int) -> some View {
+        if streak >= 2 {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(streak >= 3 ? Theme.fireHot : Theme.fireWarm)
+                .symbolEffect(.pulse, options: .repeating, isActive: streak >= 3)
+                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) hits in a row"
+                                                : "Heating up — 2 hits in a row")
+        }
+    }
+}
+
+/// "On fire" chrome: a slow warm gradient sweeping around the group's chip or
+/// row label once it has 3+ straight hits. The one sanctioned flame on the
+/// training floor — Ian asked for it (2026-06-11); keep it small and warm,
+/// never sparkle.
+private struct FireBorder: ViewModifier {
+    let active: Bool
+    var cornerRadius: CGFloat = 8
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if active {
+                TimelineView(.animation(minimumInterval: 1 / 20)) { tl in
+                    let t = tl.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 2.5) / 2.5
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(AngularGradient(
+                            colors: [Theme.fireHot, Theme.fireWarm, Theme.fireHot.opacity(0.25),
+                                     Theme.fireWarm, Theme.fireHot],
+                            center: .center, angle: .degrees(t * 360)), lineWidth: 2)
+                }
+                .allowsHitTesting(false)
+            }
+        }
     }
 }

@@ -5,18 +5,16 @@ import WatchConnectivity
 @Observable
 final class WatchLogStore: NSObject, WCSessionDelegate {
     var snapshot: WatchRosterSnapshot = .empty
-    var selectedGroupID: UUID?
     var statusText = "Connecting to iPhone"
     var isLogging = false
 
     private var session: WCSession? { WCSession.isSupported() ? WCSession.default : nil }
 
+    /// The skill pulled up on the iPhone — the watch has no picker of its own,
+    /// it just mirrors the phone's selection (first group until one syncs).
     var selectedGroup: WatchGroupSnapshot? {
-        if let selectedGroupID,
-           let selected = snapshot.groups.first(where: { $0.id == selectedGroupID }) {
-            return selected
-        }
-        return snapshot.groups.first
+        snapshot.groups.first { $0.id == snapshot.selectedGroupID }
+            ?? snapshot.groups.first
     }
 
     override init() {
@@ -113,9 +111,6 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
         }
 
         self.snapshot = snapshot
-        if selectedGroupID == nil || !snapshot.groups.contains(where: { $0.id == selectedGroupID }) {
-            selectedGroupID = snapshot.groups.first?.id
-        }
         statusText = snapshot.groups.isEmpty
             ? "Add \(snapshot.nounPlural) on iPhone"
             : "\(snapshot.activeSessionReps) reps live"
