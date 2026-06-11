@@ -215,3 +215,9 @@
 - **Category:** correction
 - **What happened:** After a rebuild, the catalog-pull loop waited for "≥ N files" in the app's Documents/card-catalog and immediately passed on the PREVIOUS pass's renders — the proof sent to Ian showed the old copy. The harness deletes the folder itself, but only after launch; the host-side count can't tell old from new.
 - **Rule:** `rm -rf` the catalog dir from the host BEFORE `simctl launch --render-cards`, then wait for the count. Never gate on a file count that the old state already satisfies.
+
+## 2026-06-11 — ASC privacy endpoint needs Apple ID 2FA, not the API key
+
+- **Category:** knowledge_gap
+- **What happened:** `upload_app_privacy_details_to_app_store` has no api_key option and ignores `Spaceship::ConnectAPI.token` — it requires an Apple ID web session. Headless run died "Unauthorized Access"; with FASTLANE_USER + FASTLANE_PASSWORD (1Password "Apple Developer Portal", vault SecretAgent) it prompts for a 6-digit 2FA code on stdin. First code expired (each login attempt invalidates prior codes); piping the freshest code worked: `printf 'CODE\n' | fastlane ship_privacy`.
+- **Rule:** For App Privacy updates, expect an interactive 2FA round-trip with Ian. Age rating + screenshots + metadata all go through `ship_listing` (deliver + API key, no 2FA). Watch screenshots: capture on an Ultra sim with `--demo-roster` (WCSession between sims is unreliable; `simctl pair_activate` switches the active watch but sync still may not arrive), then `sips -z 502 410` to the ASC-accepted size.
