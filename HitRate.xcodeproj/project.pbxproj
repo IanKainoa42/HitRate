@@ -37,6 +37,7 @@
 		BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD34ACD23F8DA7A6168614F /* Components.swift */; };
 		BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */; };
 		C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724ED0A599E2826857191AD3 /* DataManagementView.swift */; };
+		C6CE9FFACF20F129D966110D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 682FC96676B2F3C23E0A2C50 /* Assets.xcassets */; };
 		CA745130292CAC719774B178 /* HitRateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354E38DADE87EAEA70210445 /* HitRateApp.swift */; };
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
 		DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */; };
@@ -95,6 +96,7 @@
 		586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-SemiBold.ttf"; sourceTree = "<group>"; };
 		5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsEditorView.swift; sourceTree = "<group>"; };
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
+		682FC96676B2F3C23E0A2C50 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6B06141B674607C1343BF33B /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
 		724ED0A599E2826857191AD3 /* DataManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManagementView.swift; sourceTree = "<group>"; };
 		79288C2661DD00CF6B1AF541 /* TrendCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendCard.swift; sourceTree = "<group>"; };
@@ -263,6 +265,7 @@
 		D61303D10F0D3692EF85FFBE /* HitRateWatch */ = {
 			isa = PBXGroup;
 			children = (
+				682FC96676B2F3C23E0A2C50 /* Assets.xcassets */,
 				3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */,
 				CA8E6F0EF3500932ED680415 /* Info.plist */,
 				F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */,
@@ -306,6 +309,7 @@
 			buildConfigurationList = C0861D340FD6FF14830B65D7 /* Build configuration list for PBXNativeTarget "HitRateWatch" */;
 			buildPhases = (
 				6F541C21A03BF478B7D7B28A /* Sources */,
+				F89919470D62C673639D1BEF /* Resources */,
 			);
 			buildRules = (
 			);
@@ -389,6 +393,14 @@
 				BA5DE252AC6CBCD0335F8489 /* SpaceGrotesk-Bold.ttf in Resources */,
 				EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */,
 				80D87718AF33311E5767F3E5 /* SpaceGrotesk-Regular.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F89919470D62C673639D1BEF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C6CE9FFACF20F129D966110D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
