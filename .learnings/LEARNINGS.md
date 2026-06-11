@@ -197,3 +197,21 @@
 - **Category:** knowledge_gap
 - **What happened:** Codex's watch-sync commit added `var id: UUID = UUID()` to StuntGroup. SwiftData lightweight migration evaluates the default ONCE and writes the same UUID into every pre-existing row. ForEach keyed on that id collapsed the whole practice grid into copies of the first group — Ian: "when I give one group a hit, it gives everybody a hit."
 - **Rule:** Never trust `= UUID()` defaults to be unique for rows that already exist; after adding a synced-id property to a SwiftData model, ship a launch sweep that reassigns duplicates (HitRate: RootView.dedupeSyncIDs()). Symptom signature: every ForEach row renders the first element's content.
+
+## 2026-06-11 — Simulator build/install traps with watch companion + multiple booted sims
+
+- **Category:** knowledge_gap
+- **What happened:** `xcodebuild ... | tail -5` reported exit 0 on a build that never compiled — the pipeline exit code is tail's, and the "BUILD SUCCEEDED" never appeared (the log was a destination-eligibility dump because the iOS 18.5 sim couldn't satisfy the watchOS 26.5 companion dependency). Separately, `simctl install booted` picked a booted Apple Watch sim (3 sims were booted) and failed with device-family mismatch; and `strings HitRate` shows nothing for debug builds because code lives in `HitRate.debug.dylib` (Xcode debug-dylib split).
+- **Rule:** (1) Never pipe xcodebuild through tail and trust the exit code — redirect to a log file and check `$?` + grep for "BUILD SUCCEEDED". (2) Since HitRate gained the watch companion, build/install against an iOS 26.x sim with a paired watch, and always target sims by UDID, never `booted`. (3) To verify a symbol/string made it into a debug build, check `HitRate.debug.dylib`, not the stub binary.
+
+## 2026-06-11 — Share-card catalog render harness
+
+- **Category:** best_practice
+- **What happened:** Reviewed every share card by adding `CardCatalogRenderer.swift` (worktree `card-catalog-review`, uncommitted): launch the app with `--render-cards` and it writes all 42 variants (6 stat, 24 milestone, 12 pucks) to Documents/card-catalog via the exact ImageRenderer path ShareCardsSheet uses. CardSpec/Milestone are plain structs, so no SwiftData seeding is needed.
+- **Rule:** For visual reviews of the card deck, reuse this harness pattern instead of hand-navigating the share sheet; pull renders with `simctl get_app_container <udid> com.ianrichardson.HitRate data`.
+
+## 2026-06-11 — Stale render pull: file-count waits pass on old files
+
+- **Category:** correction
+- **What happened:** After a rebuild, the catalog-pull loop waited for "≥ N files" in the app's Documents/card-catalog and immediately passed on the PREVIOUS pass's renders — the proof sent to Ian showed the old copy. The harness deletes the folder itself, but only after launch; the host-side count can't tell old from new.
+- **Rule:** `rm -rf` the catalog dir from the host BEFORE `simctl launch --render-cards`, then wait for the count. Never gate on a file count that the old state already satisfies.
