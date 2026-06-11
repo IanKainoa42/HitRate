@@ -185,3 +185,9 @@
 - **Category:** best_practice
 - **What happened:** Skills editor deletes used ForEach.onDelete with a deferred confirm (set pendingDelete, show alert) for rows with data. iOS treats onDelete's swipe button as destructive and animates the row off-screen on press; since the code didn't delete, the row snapped back before the alert appeared — felt like the delete needed a second press.
 - **Rule:** When a swipe delete needs a confirmation step, don't use ForEach.onDelete for the swipe. Use `.swipeActions { Button("Delete") { ... }.tint(.red) }` WITHOUT `role: .destructive` so the row never auto-animates out; let the row leave only when the model actually deletes. Keep .onDelete alongside it for the edit-mode minus button (both can route to the same request-delete function).
+
+## 2026-06-10 — Wave/routine staging must allow multiple reps per group
+
+- **Category:** correction
+- **What happened:** The wave/routine staging in LogView's grid stored ONE outcome per group (`[PersistentIdentifier: Outcome]`) and auto-committed when every group was staged. Ian: "i cant log multiple outcomes, i can only give every group a hit or a fall, thats wrong" — a real pass can have a group throw several skills (2 hits + a bobble).
+- **Rule:** Batch-staging UIs for rep logging must stage COUNTS per (bucket, outcome), not a single choice per bucket, and commit manually — "everyone has one" is not a finish line. Also: in SwiftUI, tap-to-increment + long-press-to-decrement cannot share a Button (the Button action fires on release after the hold, re-incrementing); use onTapGesture + onLongPressGesture on a plain view.
