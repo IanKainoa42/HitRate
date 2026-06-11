@@ -47,6 +47,7 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .onAppear {
+            dedupeSyncIDs()
             migrateExistingInstallIfNeeded()
             migrateGroupsIntoDefaultTeam()
             sweepOrphanedAttempts()
@@ -135,6 +136,28 @@ struct RootView: View {
             counts[outcome.rawValue] += 1
         }
         return counts
+    }
+
+    /// `StuntGroup.id`/`Team.id` arrived after stores already had rows, and
+    /// SwiftData backfills a `UUID()` default by evaluating it ONCE for the
+    /// whole migration — every pre-existing group woke up sharing one id.
+    /// Duplicate ids collapse any `ForEach` keyed on them: the practice grid
+    /// rendered the first group on every row, so tapping one cell visibly
+    /// logged/staged "for everybody". Reassign fresh ids to duplicates once;
+    /// runs before the team-pinning migration in case a team id changes.
+    private func dedupeSyncIDs() {
+        var seen = Set<UUID>()
+        var dirty = false
+        for t in teams where !seen.insert(t.id).inserted {
+            t.id = UUID()
+            dirty = true
+        }
+        seen.removeAll()
+        for g in groups where !seen.insert(g.id).inserted {
+            g.id = UUID()
+            dirty = true
+        }
+        if dirty { try? context.save() }
     }
 
     /// Pre-onboarding installs already have groups (the old seeded roster).

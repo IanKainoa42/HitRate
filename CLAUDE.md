@@ -251,6 +251,13 @@ Key invariants:
 
 ## Gotchas discovered
 
+- Adding a `var id: UUID = UUID()` property to an @Model with existing stores
+  backfills EVERY pre-existing row with the SAME UUID (the default is
+  evaluated once during lightweight migration, not per row). Duplicate ids
+  collapse every `ForEach` keyed on Identifiable — the practice grid rendered
+  one group on all rows and "logged a hit for everybody". RootView's
+  `dedupeSyncIDs()` heals affected stores on launch; keep it if more synced-id
+  properties are ever added.
 - Session tape must be a Canvas — 171 bars in an HStack with spacing collapse
   to zero width.
 - `figure.cheerleading` SF Symbol doesn't exist; use `figure.gymnastics`.

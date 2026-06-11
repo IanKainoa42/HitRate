@@ -191,3 +191,9 @@
 - **Category:** correction
 - **What happened:** The wave/routine staging in LogView's grid stored ONE outcome per group (`[PersistentIdentifier: Outcome]`) and auto-committed when every group was staged. Ian: "i cant log multiple outcomes, i can only give every group a hit or a fall, thats wrong" — a real pass can have a group throw several skills (2 hits + a bobble).
 - **Rule:** Batch-staging UIs for rep logging must stage COUNTS per (bucket, outcome), not a single choice per bucket, and commit manually — "everyone has one" is not a finish line. Also: in SwiftUI, tap-to-increment + long-press-to-decrement cannot share a Button (the Button action fires on release after the hold, re-incrementing); use onTapGesture + onLongPressGesture on a plain view.
+
+## 2026-06-10 — SwiftData UUID() default backfills one shared value into existing rows
+
+- **Category:** knowledge_gap
+- **What happened:** Codex's watch-sync commit added `var id: UUID = UUID()` to StuntGroup. SwiftData lightweight migration evaluates the default ONCE and writes the same UUID into every pre-existing row. ForEach keyed on that id collapsed the whole practice grid into copies of the first group — Ian: "when I give one group a hit, it gives everybody a hit."
+- **Rule:** Never trust `= UUID()` defaults to be unique for rows that already exist; after adding a synced-id property to a SwiftData model, ship a launch sweep that reassigns duplicates (HitRate: RootView.dedupeSyncIDs()). Symptom signature: every ForEach row renders the first element's content.
