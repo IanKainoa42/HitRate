@@ -37,6 +37,11 @@ enum Theme {
     static let gold = Color(hex: 0xFFD43B)
     static let brandGreen = Color(hex: 0x51CF66)
 
+    // Hot-streak indicator (LogView heating-up / on-fire) — warm only, never
+    // the green accent; fire is a streak signal, not a "go" signal.
+    static let fireWarm = Color(hex: 0xFFB02E)   // ember at 2 straight hits
+    static let fireHot = Color(hex: 0xFF6B35)    // flame at 3+
+
     // Group identity rainbow (cycled) — desaturated athletic tones; the candy
     // iOS-system hues read as toy against the graphite floor.
     static let groupRainbow: [Color] = [
@@ -146,17 +151,43 @@ struct Rarity {
 
     /// Flat chrome for stat cards: static navy edge, no foil, no stars — the
     /// holographic treatment is reserved for earned milestones.
-    static func stats(rate: Int, noun: String = "group") -> Rarity {
+    /// `seed` picks between voice variants in bands that have more than one
+    /// line — derived from the card name (stable), NEVER a live RNG: snapshots
+    /// re-render and the line must not change between the sheet and the export.
+    static func stats(rate: Int, noun: String = "group", stunt: Bool = true,
+                      seed: Int = 0) -> Rarity {
         Rarity(tier: "STATS", stars: 0, tag: Color.white.opacity(0.55),
                edgeColors: navyEdge, foil: .none,
-               flavor: statFlavor(rate: rate, noun: noun))
+               flavor: statFlavor(rate: rate, noun: noun, stunt: stunt, seed: seed))
     }
 
-    private static func statFlavor(rate: Int, noun: String) -> String {
-        if rate >= 90 { return "Untouchable. Cleanest \(noun) on the floor." }
-        if rate >= 78 { return "Locked in — hits land with room to spare." }
-        if rate >= 60 { return "Solid base — a few bobbles to tighten." }
-        return "Work in progress — spot the falls."
+    /// The stat-card narrative ladder (Ian's voice — sarcastic by default).
+    /// Bands: 99 / 95 / 90 / 80 / 60 / floor. (78 was a leftover from the
+    /// retired rate-derived rarity bands; rounded to 80 on 2026-06-11.)
+    private static func statFlavor(rate: Int, noun: String, stunt: Bool,
+                                   seed: Int) -> String {
+        if rate >= 99 {
+            return "You actually know what you're doing, and I respect that… or you're a liar and I hate you."
+        }
+        if rate >= 95 { return "Wow. You want a cookie?" }
+        if rate >= 90 {
+            return "You're probably not the problem — spread good energy to the rest of the team. PS: you're not perfect."
+        }
+        if rate >= 80 {
+            return seed.isMultiple(of: 2)
+                ? "Just because you can stay up doesn't mean you didn't lose any points."
+                : "You could still do better."
+        }
+        if rate >= 60 {
+            return "You are so close. Keep pushing — you've almost had your breakthrough. You almost understand what you're doing."
+        }
+        // Kind-specific call-outs rotate with the universal pouting line.
+        if seed.isMultiple(of: 2) {
+            return stunt
+                ? "If you're blaming the flyer, it's probably you that's the problem."
+                : "And you threw this at tryouts? Did you land it?"
+        }
+        return "Pouting never helped nobody."
     }
 }
 

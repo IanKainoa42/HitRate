@@ -83,7 +83,9 @@ struct HoloCardView: View {
 
     private var rarity: Rarity {
         switch card.content {
-        case .stats(let s): Rarity.stats(rate: s.rate, noun: s.flavorNoun)
+        case .stats(let s): Rarity.stats(rate: s.rate, noun: s.flavorNoun,
+                                         stunt: s.kind == .stunt,
+                                         seed: s.name.unicodeScalars.reduce(0) { $0 + Int($1.value) })
         case .milestone(let m): Rarity.of(tier: m.tier)
         }
     }

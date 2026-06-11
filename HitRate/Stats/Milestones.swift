@@ -90,27 +90,36 @@ enum Milestones {
 
         var list: [Milestone] = []
 
-        // Lifetime volume
+        // Lifetime volume (copy is Ian's voice — see card-narrative memory)
         list.append(volume(id: "reps10", name: "First Ten", icon: "checkmark.seal.fill",
                            tier: .common, target: 10, total: total,
-                           flavor: "Ten on the board. Everyone starts at zero."))
+                           flavor: "Okay. You just downloaded the app."))
         list.append(volume(id: "reps100", name: "Century Club", icon: "rosette",
                            tier: .rare, target: 100, total: total,
-                           flavor: "Triple digits. The grind is officially real."))
+                           flavor: "Getting pretty serious."))
         list.append(volume(id: "reps500", name: "Grinder", icon: "flame.fill",
                            tier: .holo, target: 500, total: total,
-                           flavor: "Five hundred reps deep — calluses included."))
+                           flavor: "Cheerleading must be your hobby."))
         list.append(volume(id: "reps1000", name: "Four Digits", icon: "crown.fill",
                            tier: .legendary, target: 1000, total: total,
-                           flavor: "A thousand logged reps. Floor royalty."))
+                           flavor: "Thank you for your sacrifice."))
 
-        // Hit streaks
+        // Hit streaks. Hot Hand reads differently per mode; Untouchable picks
+        // between two lines off the streak length that earned it — stable
+        // until the streak record changes, never a live RNG (cards re-render).
+        list.append(streak(id: "streak5", name: "High Five", icon: "hand.raised.fill",
+                           tier: .common, target: 5, best: bestHitRun,
+                           flavor: "Five in a row. Don't let it go to your head."))
         list.append(streak(id: "streak10", name: "Hot Hand", icon: "bolt.fill",
                            tier: .rare, target: 10, best: bestHitRun,
-                           flavor: "Ten straight hits. Don't look down."))
+                           flavor: mode == .coach
+                               ? "Pure luck. If you're a coach, this doesn't count."
+                               : "Pure luck. The owner is getting something wrong."))
         list.append(streak(id: "streak25", name: "Untouchable", icon: "sparkles",
                            tier: .legendary, target: 25, best: bestHitRun,
-                           flavor: "Twenty-five in a row. Nobody's touching that."))
+                           flavor: bestHitRun.isMultiple(of: 2)
+                               ? "You should probably start working on other skills."
+                               : "Twenty-five in a row. Nobody's touching that."))
 
         // Session quality
         let dialedEarned = dialedShape != nil

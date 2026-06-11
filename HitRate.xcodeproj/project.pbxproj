@@ -42,6 +42,7 @@
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
 		DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */; };
 		DBFACF79DEB82E9341905CE5 /* WatchLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E6D11E0FC569761032886D /* WatchLogView.swift */; };
+		E033839C9325BA8B73DF9AA4 /* CardCatalogRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */; };
 		E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */; };
 		E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20184832604D05CBF0C04210 /* HoloCardView.swift */; };
@@ -77,6 +78,7 @@
 
 /* Begin PBXFileReference section */
 		05982546BF2BB526C6B9356D /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCatalogRenderer.swift; sourceTree = "<group>"; };
 		0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionBridge.swift; sourceTree = "<group>"; };
 		138B89E3489E75197EA700F8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
@@ -277,6 +279,7 @@
 		DFC17AE42C08FC73979F1F9D /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */,
 				EDD99E08D7FCE2602733C7EF /* CSVExport.swift */,
 				296943D1F64367EB72E3C679 /* DemoData.swift */,
 				138B89E3489E75197EA700F8 /* Sounds.swift */,
@@ -412,6 +415,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */,
+				E033839C9325BA8B73DF9AA4 /* CardCatalogRenderer.swift in Sources */,
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
 				FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */,
