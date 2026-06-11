@@ -25,13 +25,14 @@ struct LogView: View {
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
 
-    // Wave/Routine staging (grid only): stage one outcome per bucket, then
-    // commit the whole batch at once so simultaneous groups — or every skill
-    // in a routine — can't get double-logged. `waveMode` persists; `staged`
-    // holds the pending outcome per group; `lastWave` is the just-committed
-    // batch, kept for one-tap Undo.
+    // Wave/Routine staging (grid only): stage any number of reps per bucket
+    // (tap +1, hold −1), then commit the whole batch at once. A group can
+    // carry several outcomes in one pass (2 hits + a bobble), so staging is
+    // a 4-slot count array per group, NOT one outcome — and commit is manual
+    // only (with multi-staging there is no "everyone staged" finish line).
+    // `waveMode` persists; `lastWave` is the just-committed batch for Undo.
     @AppStorage("waveMode") private var waveMode = false
-    @State private var staged: [PersistentIdentifier: Outcome] = [:]
+    @State private var staged: [PersistentIdentifier: [Int]] = [:]
     @State private var lastWave: [Attempt] = []
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
@@ -72,9 +73,11 @@ struct LogView: View {
 
     /// Wave staging is grid-only; the switch is offered whenever the grid is.
     private var waveActive: Bool { useGrid && waveMode }
-    /// Staged buckets among the CURRENT roster — a deleted group's stale key
-    /// can't false-trigger the all-staged auto-commit.
-    private var stagedCount: Int { groups.filter { staged[$0.persistentModelID] != nil }.count }
+    /// Total staged reps among the CURRENT roster — a deleted group's stale
+    /// key never counts.
+    private var stagedReps: Int {
+        groups.reduce(0) { $0 + (staged[$1.persistentModelID]?.reduce(0, +) ?? 0) }
+    }
     /// Coach mental model is a wave of stunt groups; athlete is a routine pass.
     private var waveNoun: String { mode == .coach ? "wave" : "routine" }
     private var gridNameColumnWidth: CGFloat { 96 }
@@ -321,7 +324,7 @@ struct LogView: View {
     @ViewBuilder
     private func logGrid(_ attempts: [Attempt]) -> some View {
         VStack(spacing: 8) {
-            Text(waveActive ? "TAP CELLS TO STAGE A \(waveNoun.uppercased())" : "TAP A CELL TO LOG A REP")
+            Text(waveActive ? "TAP TO STAGE \(waveNoun.uppercased()) REPS · HOLD TO REMOVE ONE" : "TAP A CELL TO LOG A REP")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.6)
                 .foregroundStyle(Theme.label3)
@@ -367,41 +370,32 @@ struct LogView: View {
 
                             ForEach(Outcome.allCases) { o in
                                 let v = c[o.rawValue]
-                                let isStaged = waveActive && staged[g.persistentModelID] == o
-                                Button {
+                                let stagedN = waveActive
+                                    ? (staged[g.persistentModelID]?[o.rawValue] ?? 0) : 0
+                                let cell = gridCellLabel(v, outcome: o, stagedN: stagedN)
+                                Group {
                                     if waveActive {
-                                        toggleStage(g, o)
+                                        // NOT a Button: a Button fires its action on
+                                        // release even after a hold, so a long-press
+                                        // decrement would be re-incremented on lift.
+                                        cell
+                                            .onTapGesture { stage(g, o) }
+                                            .onLongPressGesture(minimumDuration: 0.4) { unstage(g, o) }
                                     } else {
-                                        context.insert(Attempt(outcome: o, group: g, session: session))
-                                        try? context.save()
-                                        hapticTrigger += 1
-                                        Sounds.shared.play(.outcome(o))
+                                        Button {
+                                            context.insert(Attempt(outcome: o, group: g, session: session))
+                                            try? context.save()
+                                            hapticTrigger += 1
+                                            Sounds.shared.play(.outcome(o))
+                                        } label: {
+                                            cell
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                } label: {
-                                    Text("\(v)")
-                                        .font(Theme.barlow(20, .extrabold))
-                                        .monospacedDigit()
-                                        .foregroundStyle(isStaged ? o.color : (v == 0 ? Theme.label3 : Theme.label))
-                                        .contentTransition(.numericText(value: Double(v)))
-                                        .animation(.spring(duration: 0.3), value: v)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 50)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                .fill(Theme.well
-                                                    .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
-                                                    .shadow(.inner(color: o.color.opacity(0.85), radius: 1, y: -2)))
-                                        )
-                                        // Staged cell stays lit until the wave commits.
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                .stroke(o.color, lineWidth: isStaged ? 2.5 : 0)
-                                        )
-                                        .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
                                 .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(o.label(gridKind)) for \(g.name)")
-                                .accessibilityValue("\(v)\(isStaged ? ", staged" : "")")
+                                .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
+                                .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
                             }
                         }
                     }
@@ -410,6 +404,44 @@ struct LogView: View {
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
+    }
+
+    /// One engraved matrix cell: the session count in chalk, and — while
+    /// staging — a "+n" pip in the outcome color showing this cell's pending
+    /// reps. Shared by both the tap-to-log Button and the wave gesture view.
+    private func gridCellLabel(_ v: Int, outcome o: Outcome, stagedN: Int) -> some View {
+        Text("\(v)")
+            .font(Theme.barlow(20, .extrabold))
+            .monospacedDigit()
+            .foregroundStyle(stagedN > 0 ? o.color : (v == 0 ? Theme.label3 : Theme.label))
+            .contentTransition(.numericText(value: Double(v)))
+            .animation(.spring(duration: 0.3), value: v)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Theme.well
+                        .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
+                        .shadow(.inner(color: o.color.opacity(0.85), radius: 1, y: -2)))
+            )
+            // Staged cell stays lit until the wave commits.
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(o.color, lineWidth: stagedN > 0 ? 2.5 : 0)
+            )
+            .overlay(alignment: .topTrailing) {
+                if stagedN > 0 {
+                    Text("+\(stagedN)")
+                        .font(Theme.barlow(11, .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.well)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(Capsule().fill(o.color))
+                        .padding(3)
+                }
+            }
+            .contentShape(Rectangle())
     }
 
     // MARK: Wave / Routine staging
@@ -441,18 +473,18 @@ struct LogView: View {
         .accessibilityValue(waveMode ? "on" : "off")
     }
 
-    /// Docked under the matrix in wave mode. While staging: count + Clear +
-    /// Submit (partial commit). After a commit (nothing staged): Undo. The
-    /// all-staged auto-commit happens in `toggleStage`; this is the manual
-    /// partial-submit and step-back surface.
+    /// Docked under the matrix in wave mode. While staging: rep count + Clear +
+    /// Submit. After a commit (nothing staged): Undo. Commit is ALWAYS manual —
+    /// with multi-rep staging there is no "everyone staged" finish line to
+    /// auto-commit on.
     private var waveBar: some View {
         HStack(spacing: 10) {
-            Text("\(stagedCount) OF \(groups.count) \(mode.nounPlural.uppercased()) STAGED")
+            Text("\(stagedReps) REP\(stagedReps == 1 ? "" : "S") STAGED")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label2)
             Spacer()
-            if stagedCount > 0 {
+            if stagedReps > 0 {
                 Button {
                     staged = [:]
                     hapticTrigger += 1
@@ -464,7 +496,7 @@ struct LogView: View {
                 }
                 .buttonStyle(.plain)
                 Button { commitWave() } label: {
-                    Text("Submit \(stagedCount)")
+                    Text("Submit \(stagedReps)")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.well)
                         .padding(.horizontal, 14)
@@ -489,27 +521,40 @@ struct LogView: View {
         .padding(.horizontal, 16)
     }
 
-    /// Tap a cell in wave mode: set this group's pending outcome, or clear it
-    /// if the same outcome was already staged. Auto-commits once the whole
-    /// roster is staged.
-    private func toggleStage(_ g: StuntGroup, _ o: Outcome) {
-        let id = g.persistentModelID
-        if staged[id] == o { staged[id] = nil } else { staged[id] = o }
+    /// Tap a cell in wave mode: stage one more rep of that outcome for that
+    /// group. No cap and no auto-commit — a group can carry several outcomes
+    /// in one pass, so only the user knows when the batch is done (Submit).
+    private func stage(_ g: StuntGroup, _ o: Outcome) {
+        var c = staged[g.persistentModelID] ?? [0, 0, 0, 0]
+        c[o.rawValue] += 1
+        staged[g.persistentModelID] = c
         hapticTrigger += 1
         Sounds.shared.play(.outcome(o))
-        if stagedCount == groups.count && !groups.isEmpty { commitWave() }
     }
 
-    /// Write one Attempt per staged group, then clear the staging row. Keeps
+    /// Hold a cell in wave mode: take one staged rep of that outcome back off.
+    private func unstage(_ g: StuntGroup, _ o: Outcome) {
+        guard var c = staged[g.persistentModelID], c[o.rawValue] > 0 else { return }
+        c[o.rawValue] -= 1
+        staged[g.persistentModelID] = c.reduce(0, +) == 0 ? nil : c
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
+    }
+
+    /// Write one Attempt per staged rep, then clear the staging row. Keeps
     /// the batch in `lastWave` so it can be pulled back in one tap.
     private func commitWave() {
         let waveID = UUID()   // ties this batch together for the grouped log container
         var committed: [Attempt] = []
         for g in groups {
-            if let o = staged[g.persistentModelID] {
-                let a = Attempt(outcome: o, group: g, session: session, waveID: waveID)
-                context.insert(a)
-                committed.append(a)
+            guard let c = staged[g.persistentModelID] else { continue }
+            for (oi, n) in c.enumerated() where n > 0 {
+                guard let o = Outcome(rawValue: oi) else { continue }
+                for _ in 0..<n {
+                    let a = Attempt(outcome: o, group: g, session: session, waveID: waveID)
+                    context.insert(a)
+                    committed.append(a)
+                }
             }
         }
         guard !committed.isEmpty else { return }

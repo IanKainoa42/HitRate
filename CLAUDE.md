@@ -221,6 +221,15 @@ Key invariants:
   `gridAvailable`; `useGrid` defaults coach→Grid, athlete→Pad. Cells reuse the
   engraved-well style and `countsFor` per-session counts; column headers/cell
   a11y route outcome words through `OutcomeNames` via `o.short/label(gridKind)`.
+  WAVE/ROUTINE staging (grid-only, `waveMode`; "wave" coach / "routine"
+  athlete): staging is a 4-slot COUNT array per group (`staged`), NOT one
+  outcome per group — a group can carry several outcomes in one pass (2 hits
+  + a bobble). Tap stages +1, LONG-PRESS removes one; commit is MANUAL only
+  (Submit in `waveBar`) — never auto-commit on "all groups staged", that
+  finish line doesn't exist with multi-rep staging. In wave mode cells are
+  gesture views, not Buttons (a Button fires on release after a hold, so a
+  long-press decrement would re-increment on lift). Committed batches share
+  a `waveID` and render as one container/cluster in the recent log.
   **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
