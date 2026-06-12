@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		10757E7F931CDCA4A35580C2 /* HitRate.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRate.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
@@ -69,7 +69,7 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */,
+				10757E7F931CDCA4A35580C2 /* HitRate.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -91,7 +91,7 @@
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
-		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		49A344CA1D109DBBE1B63C8B /* HitRate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -115,7 +115,7 @@
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
-		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
 		F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogStore.swift; sourceTree = "<group>"; };
@@ -299,7 +299,7 @@
 			isa = PBXGroup;
 			children = (
 				E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */,
-				49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */,
+				49A344CA1D109DBBE1B63C8B /* HitRate.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -322,7 +322,7 @@
 			packageProductDependencies = (
 			);
 			productName = HitRateWatch;
-			productReference = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */;
+			productReference = 49A344CA1D109DBBE1B63C8B /* HitRate.app */;
 			productType = "com.apple.product-type.application";
 		};
 		CEC6694572E5FFFE2F6AB38B /* HitRate */ = {
@@ -352,7 +352,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					0F8C1A10770E28C7B23F8162 = {
 						DevelopmentTeam = WC46K49VFA;
@@ -475,7 +475,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
@@ -492,7 +491,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
@@ -537,9 +535,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = WC46K49VFA;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -559,6 +560,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -600,9 +602,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = WC46K49VFA;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -615,6 +620,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -630,7 +636,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -653,7 +658,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
