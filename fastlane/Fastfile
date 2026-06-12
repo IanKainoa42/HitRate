@@ -64,6 +64,26 @@ platform :ios do
 
     # 2. Hand-assemble + re-sign the IPA (documented openrsync workaround).
     sh("cp -R #{"#{archive}/Products/Applications/#{scheme}.app".shellescape} #{payload.shellescape}/")
+
+    # 2a. Nested watch app must be re-signed FIRST (inner before outer) with
+    # its own App Store profile, or ASC rejects the dev-signed watchkitapp.
+    watch_app = "#{app}/Watch/#{scheme}.app"
+    if File.directory?(watch_app)
+      watch_prof_name = ENV["SHIP_WATCH_PROFILE_NAME"] || "HitRate Watch AppStore"
+      watch_profile = prof_dirs.flat_map { |d| Dir["#{d}/*.mobileprovision"] }.find do |p|
+        `security cms -D -i "#{p}" 2>/dev/null | plutil -extract Name raw - 2>/dev/null`.strip == watch_prof_name
+      end
+      UI.user_error!("Watch App Store profile '#{watch_prof_name}' is not installed — run `fastlane sigh --app_identifier #{APP_IDENTIFIER}.watchkitapp --provisioning_name '#{watch_prof_name}'` first") if watch_profile.nil?
+      UI.message("Using watch App Store profile #{File.basename(watch_profile)} (#{watch_prof_name})")
+      watch_ent = "#{work}/watch_entitlements.plist"
+      sh("cp #{watch_profile.shellescape} #{"#{watch_app}/embedded.mobileprovision".shellescape}")
+      sh("codesign -d --entitlements - --xml #{watch_app.shellescape} > #{watch_ent.shellescape}")
+      sh("plutil -remove get-task-allow #{watch_ent.shellescape} || true")
+      sh("codesign --force --sign #{cert_sha1.shellescape} " \
+         "--entitlements #{watch_ent.shellescape} --generate-entitlement-der #{watch_app.shellescape}")
+      sh("codesign --verify --strict --verbose=2 #{watch_app.shellescape}")
+    end
+
     sh("cp #{profile.shellescape} #{"#{app}/embedded.mobileprovision".shellescape}")
     sh("codesign -d --entitlements - --xml #{app.shellescape} > #{ent.shellescape}")
     sh("plutil -remove get-task-allow #{ent.shellescape} || true")
@@ -74,6 +94,12 @@ platform :ios do
 
     UI.success("Signed App Store IPA ready: #{ipa}")
     ipa
+  end
+
+  desc "Build + sign the App Store IPA only (no upload). Prints the IPA path."
+  lane :build_ipa_only do
+    ipa = build_signed_ipa
+    UI.success("IPA_PATH=#{ipa}")
   end
 
   desc "Build and upload to TestFlight (openrsync-safe). Does not notify testers."
