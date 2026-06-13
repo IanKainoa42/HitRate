@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
@@ -50,6 +51,30 @@
 		FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */; };
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		408A56F4773C5C975FFE9E38 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC2F2365CD63E505D88A5A30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0F8C1A10770E28C7B23F8162;
+			remoteInfo = HitRateWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		271217C077C36B39B07DC151 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		05982546BF2BB526C6B9356D /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
@@ -306,10 +331,12 @@
 			buildPhases = (
 				5ACCFDE164491C41AF0DEA12 /* Sources */,
 				E49910887B82B9A43446F6C5 /* Resources */,
+				271217C077C36B39B07DC151 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8DAB4B4163E3C863972BCFD0 /* PBXTargetDependency */,
 			);
 			name = HitRate;
 			packageProductDependencies = (
@@ -433,13 +460,21 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8DAB4B4163E3C863972BCFD0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0F8C1A10770E28C7B23F8162 /* HitRateWatch */;
+			targetProxy = 408A56F4773C5C975FFE9E38 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		017F7BBFED655B16473A1FB7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -456,7 +491,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -594,7 +629,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -617,7 +652,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
