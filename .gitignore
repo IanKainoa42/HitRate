@@ -17,6 +17,8 @@ pr_description.txt
 
 ## fastlane
 fastlane/AuthKey.json
+# sigh drops downloaded profiles into the repo root — signing artifacts, not source
+*.mobileprovision
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/test_output/

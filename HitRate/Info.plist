@@ -26,6 +26,10 @@
 	<array>
 		<string>instagram</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>HitRate starts a workout when you begin a practice so the Apple Watch app opens automatically and stays ready while you log reps.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>HitRate starts a workout when you begin a practice so the Apple Watch app opens automatically and stays ready while you log reps.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>HitRate saves your stunt cards to Photos so you can post them.</string>
 	<key>UIAppFonts</key>

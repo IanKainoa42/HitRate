@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
+		17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */; };
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
 		309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
@@ -18,6 +19,7 @@
 		4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B06141B674607C1343BF33B /* TrophyRoomView.swift */; };
 		52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */; };
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
+		717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */; };
 		79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */; };
 		7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B8E106687D6F5AA09DD3A66E /* Assets.xcassets */; };
 		7EFC99951270AF184F534565 /* BarlowCondensed-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */; };
@@ -89,6 +91,7 @@
 		3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateWatchApp.swift; sourceTree = "<group>"; };
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
+		3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRate.entitlements; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,10 +103,13 @@
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
 		682FC96676B2F3C23E0A2C50 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6B06141B674607C1343BF33B /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
+		6D653ADB1DFF52C863B43EE3 /* HitRateWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRateWatch.entitlements; sourceTree = "<group>"; };
 		724ED0A599E2826857191AD3 /* DataManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManagementView.swift; sourceTree = "<group>"; };
 		79288C2661DD00CF6B1AF541 /* TrendCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendCard.swift; sourceTree = "<group>"; };
 		8CACDF028181ABDC147D68BB /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutManager.swift; sourceTree = "<group>"; };
 		9E30AC6D5D161DB570B82771 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWatchLauncher.swift; sourceTree = "<group>"; };
 		ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-Bold.ttf"; sourceTree = "<group>"; };
 		AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-ExtraBold.ttf"; sourceTree = "<group>"; };
 		B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournamentCard.swift; sourceTree = "<group>"; };
@@ -211,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				B8E106687D6F5AA09DD3A66E /* Assets.xcassets */,
+				3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */,
 				354E38DADE87EAEA70210445 /* HitRateApp.swift */,
 				52C560E527E5730D7DB1B4D4 /* Info.plist */,
 				7E0A280BAB4AC01C806E74AD /* Models */,
@@ -258,6 +265,7 @@
 		D5B083AB163031D018ECF5AA /* WatchSync */ = {
 			isa = PBXGroup;
 			children = (
+				AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */,
 				E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */,
 				0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */,
 			);
@@ -268,10 +276,12 @@
 			isa = PBXGroup;
 			children = (
 				682FC96676B2F3C23E0A2C50 /* Assets.xcassets */,
+				6D653ADB1DFF52C863B43EE3 /* HitRateWatch.entitlements */,
 				3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */,
 				CA8E6F0EF3500932ED680415 /* Info.plist */,
 				F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */,
 				B5E6D11E0FC569761032886D /* WatchLogView.swift */,
+				947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */,
 			);
 			path = HitRateWatch;
 			sourceTree = "<group>";
@@ -428,6 +438,7 @@
 				8472DF181A48BC7407E5698A /* Milestones.swift in Sources */,
 				D9E1104B0EB188559FA6F688 /* Models.swift in Sources */,
 				B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */,
+				717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */,
 				79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,
@@ -455,6 +466,7 @@
 				7F1698913059B1F0EFD9696B /* WatchLogStore.swift in Sources */,
 				DBFACF79DEB82E9341905CE5 /* WatchLogView.swift in Sources */,
 				309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */,
+				17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -473,8 +485,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -490,8 +503,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -627,9 +641,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -650,9 +665,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

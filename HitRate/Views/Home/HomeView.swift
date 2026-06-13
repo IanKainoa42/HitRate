@@ -206,6 +206,9 @@ struct HomeView: View {
                 context.insert(s)
                 try? context.save()
                 Sounds.shared.play(.start)
+                // Wake the Apple Watch app so reps can be logged from the wrist
+                // the instant practice begins (no-op without an installed watch).
+                PracticeWatchLauncher.launchIfWatchAvailable()
             }
             hapticTrigger += 1
             logSession = s

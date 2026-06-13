@@ -11,6 +11,10 @@ struct WatchRosterSnapshot: Codable, Equatable {
     /// payloads still decode; nil falls back to the first group.
     var selectedGroupID: UUID?
     var activeSessionReps: Int
+    /// True while the iPhone has a live practice session — the watch starts an
+    /// HKWorkoutSession to stay foregrounded/alive, and ends it when this
+    /// flips false. Optional decode (defaults false) keeps old payloads valid.
+    var isPracticeLive: Bool = false
     var generatedAt: Date
 
     static func == (lhs: WatchRosterSnapshot, rhs: WatchRosterSnapshot) -> Bool {
@@ -20,7 +24,8 @@ struct WatchRosterSnapshot: Codable, Equatable {
         lhs.nounPlural == rhs.nounPlural &&
         lhs.groups == rhs.groups &&
         lhs.selectedGroupID == rhs.selectedGroupID &&
-        lhs.activeSessionReps == rhs.activeSessionReps
+        lhs.activeSessionReps == rhs.activeSessionReps &&
+        lhs.isPracticeLive == rhs.isPracticeLive
     }
 
     static let empty = WatchRosterSnapshot(modeRaw: "athlete",
@@ -30,6 +35,7 @@ struct WatchRosterSnapshot: Codable, Equatable {
                                            groups: [],
                                            selectedGroupID: nil,
                                            activeSessionReps: 0,
+                                           isPracticeLive: false,
                                            generatedAt: .distantPast)
 
     /// Seed for `--demo-roster` watch screenshots — never reachable in

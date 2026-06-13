@@ -22,8 +22,16 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.</string>
 	<key>WKApplication</key>
 	<true/>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.ianrichardson.HitRate</string>
 </dict>

@@ -24,7 +24,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 7
+        CURRENT_PROJECT_VERSION: 8
         MARKETING_VERSION: "1.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
@@ -32,10 +32,16 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: YES
+    entitlements:
+      path: HitRate/HitRate.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     info:
       path: HitRate/Info.plist
       properties:
         CFBundleDisplayName: HitRate
+        NSHealthShareUsageDescription: HitRate starts a workout when you begin a practice so the Apple Watch app opens automatically and stays ready while you log reps.
+        NSHealthUpdateUsageDescription: HitRate starts a workout when you begin a practice so the Apple Watch app opens automatically and stays ready while you log reps.
         # Wire the plist version to the build settings so bumping
         # CURRENT_PROJECT_VERSION / MARKETING_VERSION in this file actually
         # changes the built binary (xcodegen otherwise hardcodes "1"/"1.0").
@@ -68,11 +74,15 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate.watchkitapp
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 7
+        CURRENT_PROJECT_VERSION: 8
         MARKETING_VERSION: "1.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
         TARGETED_DEVICE_FAMILY: "4"
+    entitlements:
+      path: HitRateWatch/HitRateWatch.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     info:
       path: HitRateWatch/Info.plist
       properties:
@@ -81,4 +91,8 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.ianrichardson.HitRate
+        WKBackgroundModes:
+          - workout-processing
+        NSHealthShareUsageDescription: HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.
+        NSHealthUpdateUsageDescription: HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.
         ITSAppUsesNonExemptEncryption: false

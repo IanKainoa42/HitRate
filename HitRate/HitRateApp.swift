@@ -102,6 +102,7 @@ struct RootView: View {
                                        $0.id.uuidString == padSelectedGroupID
                                    }?.id ?? watchGroups.first?.id,
                                    activeSessionReps: session?.attempts.count ?? 0,
+                                   isPracticeLive: session != nil,
                                    generatedAt: .now)
     }
 

@@ -21,6 +21,15 @@ final class WatchSessionBridge: NSObject, WCSessionDelegate {
         return session.isReachable ? .ready : .installed
     }
 
+    /// The watch app is installed on a paired watch — gate HealthKit launch on
+    /// this so iPhone-only users never get a Health permission prompt.
+    var isWatchAppAvailable: Bool {
+        switch status {
+        case .installed, .ready: return true
+        default: return false
+        }
+    }
+
     func configure(snapshotProvider: @escaping () -> WatchRosterSnapshot,
                    logHandler: @escaping (WatchLogRequest) -> WatchRosterSnapshot?) {
         self.snapshotProvider = snapshotProvider

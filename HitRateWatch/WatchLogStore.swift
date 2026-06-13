@@ -8,17 +8,30 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     var statusText = "Connecting to iPhone"
     var isLogging = false
 
+    /// Crown-driven selection. The watch now owns which skill is "up" — the
+    /// crown scrolls `selectionIndex` through the roster and a tap toggles
+    /// `locked` so an accidental turn mid-log can't bump the group. Seeded once
+    /// from the iPhone's selection, then the wrist drives it.
+    var selectionIndex = 0
+    var locked = false
+    private var didSeedSelection = false
+
+    /// Runs an HKWorkoutSession whenever the phone has a live practice so the
+    /// app stays foregrounded/reachable while logging from the wrist.
+    let workout = WatchWorkoutManager()
+
     private var session: WCSession? { WCSession.isSupported() ? WCSession.default : nil }
 
-    /// The skill pulled up on the iPhone — the watch has no picker of its own,
-    /// it just mirrors the phone's selection (first group until one syncs).
+    /// The skill the wrist currently has up (crown selection, clamped).
     var selectedGroup: WatchGroupSnapshot? {
-        snapshot.groups.first { $0.id == snapshot.selectedGroupID }
-            ?? snapshot.groups.first
+        guard !snapshot.groups.isEmpty else { return nil }
+        let i = min(max(0, selectionIndex), snapshot.groups.count - 1)
+        return snapshot.groups[i]
     }
 
     override init() {
         super.init()
+        workout.requestAuthorization()
         activate()
     }
 
@@ -111,6 +124,24 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
         }
 
         self.snapshot = snapshot
+
+        // Seed the crown selection from the phone's pulled-up skill on first
+        // sync; afterwards the wrist owns it. Always clamp in case the roster
+        // shrank under us.
+        if !didSeedSelection, !snapshot.groups.isEmpty {
+            if let target = snapshot.selectedGroupID,
+               let idx = snapshot.groups.firstIndex(where: { $0.id == target }) {
+                selectionIndex = idx
+            }
+            didSeedSelection = true
+        }
+        if !snapshot.groups.isEmpty {
+            selectionIndex = min(max(0, selectionIndex), snapshot.groups.count - 1)
+        }
+
+        // Mirror the phone's live-practice state onto the workout session.
+        workout.sync(live: snapshot.isPracticeLive)
+
         statusText = snapshot.groups.isEmpty
             ? "Add \(snapshot.nounPlural) on iPhone"
             : "\(snapshot.activeSessionReps) reps live"
