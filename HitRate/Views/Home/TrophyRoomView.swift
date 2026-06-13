@@ -146,7 +146,7 @@ struct TrophyRoomView: View {
                         HoloCardView(card: DeckCard(id: i, content: .milestone(m)),
                                      index: i, count: earned.count,
                                      orgName: orgName, isSnapshot: true)
-                            .scaleEffect(scale, anchor: .topLeading)
+                            .scaleEffect(scale)
                             .frame(width: 290 * scale, height: 430 * scale)
                     }
                 }

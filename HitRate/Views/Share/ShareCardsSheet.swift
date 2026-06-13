@@ -70,7 +70,7 @@ struct ShareCardsSheet: View {
                     .font(Theme.grotesk(10))
                     .tracking(1.8)
                     .foregroundStyle(.white.opacity(0.5))
-                Text("Stunt Cards")
+                Text(mode == .athlete ? "Trading Cards" : "Stunt Cards")
                     .font(Theme.grotesk(21))
                     .foregroundStyle(.white)
             }
@@ -98,12 +98,17 @@ struct ShareCardsSheet: View {
 
     private func carousel(_ deck: [DeckCard]) -> some View {
         GeometryReader { geo in
-            let margin = max(16, (geo.size.width - 290) / 2)
+            let scale = min(1.0, geo.size.height / 460)
+            let scaledWidth = 290 * scale
+            let margin = max(16, (geo.size.width - scaledWidth) / 2)
+            
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 18) {
                     ForEach(deck) { card in
                         HoloCardView(card: card, index: card.id, count: deck.count, orgName: orgName)
                             .id(card.id)
+                            .scaleEffect(scale)
+                            .frame(width: scaledWidth, height: 430 * scale)
                     }
                 }
                 .scrollTargetLayout()

@@ -351,9 +351,8 @@ struct LogView: View {
                 }
             }
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 6) {
-                    ForEach(groups) { g in
+            let gridRows = VStack(spacing: groups.count > 8 ? 4 : 6) {
+                ForEach(groups) { g in
                         let c = countsFor(group: g, in: attempts)
                         let streakN = hotStreak(group: g, in: attempts)
                         HStack(spacing: 6) {
@@ -373,10 +372,11 @@ struct LogView: View {
                                     .minimumScaleFactor(0.7)
                                 flameBadge(streakN)
                             }
-                            .padding(.vertical, 3)
+                            .padding(.vertical, groups.count > 8 ? 1 : 3)
                             .padding(.horizontal, 4)
                             .modifier(FireBorder(active: streakN >= 3, cornerRadius: 7))
                             .frame(width: gridNameColumnWidth, alignment: .leading)
+                            .frame(maxHeight: .infinity)
 
                             ForEach(Outcome.allCases) { o in
                                 let v = c[o.rawValue]
@@ -408,8 +408,15 @@ struct LogView: View {
                                 .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
                             }
                         }
-                    }
+                        .frame(maxHeight: 50)
                 }
+            }
+
+            if groups.count > 10 {
+                ScrollView(showsIndicators: false) { gridRows }
+            } else {
+                gridRows
+                Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, 16)
@@ -427,7 +434,7 @@ struct LogView: View {
             .contentTransition(.numericText(value: Double(v)))
             .animation(.spring(duration: 0.3), value: v)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(maxHeight: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Theme.well

@@ -27,6 +27,7 @@ struct Milestone: Identifiable {
     let earned: Bool
     let progress: Double    // 0…1 toward unlocking (1 when earned)
     let detail: String      // "412 / 500 reps" while locked, "523 reps logged" when earned
+    var currentCount: Int? = nil // HP value (running count)
 }
 
 // MARK: - Engine
@@ -258,40 +259,38 @@ let reps10Id = "reps10\(suffix)"
 
             let fallsId = "falls25\(suffix)"
             let fallsV = getVariant("falls25")
-            var fallsFlavor = "Twenty-five falls survived. The mat knows your name."
+            var fallsFlavor = "You're really good at falling."
             var fallsIcon = "arrow.down.circle.fill"
             if fallsV == 1 { fallsFlavor = "Wile E. Coyote wants his gimmick back."; fallsIcon = "smoke.fill" }
             else if fallsV == 2 { fallsFlavor = "RIP to your joints. Gone but not forgotten."; fallsIcon = "cross.fill" }
-            list.append(create(id: fallsId, kind: kind, kicker: "DUBIOUS HONOR", name: "Gravity Check",
+            list.append(create(id: fallsId, kind: kind, kicker: "TOUGH LOVE", name: "Gravity Check",
                                icon: fallsIcon, tier: .common,
                                flavor: fallsFlavor,
                                earned: falls >= 25, progress: min(1, Double(falls) / 25),
-                               detail: falls >= 25 ? "\(falls) falls survived" : "\(falls) / 25 falls", unlocked: unlocked))
+                               detail: "25 falls", currentCount: falls, unlocked: unlocked))
 
             let coldId = "coldstreak\(suffix)"
             let coldV = getVariant("coldstreak")
             var coldFlavor = "Five misses in a row. Somebody check the thermostat."
             var coldIcon = "snowflake"
             if coldV == 1 { coldFlavor = "Are you still on the team? Did you quit and not tell anybody?"; coldIcon = "questionmark.square.dashed" }
-            list.append(create(id: coldId, kind: kind, kicker: "DUBIOUS HONOR", name: "Cold Streak",
+            list.append(create(id: coldId, kind: kind, kicker: "TOUGH LOVE", name: "Cold Streak",
                                icon: coldIcon, tier: .rare,
                                flavor: coldFlavor,
                                earned: bestMissRun >= 5, progress: min(1, Double(bestMissRun) / 5),
-                               detail: bestMissRun >= 5 ? "\(bestMissRun) misses in a row"
-                                                        : "worst run \(bestMissRun) / 5 misses", unlocked: unlocked))
+                               detail: "5 misses in a row", currentCount: bestMissRun, unlocked: unlocked))
 
             let demoId = "demolition\(suffix)"
             let demoV = getVariant("demolition")
-            var demoFlavor = "Total demolition."
+            var demoFlavor = "Total demolition. There were no survivors."
             var demoIcon = "hammer.fill"
             if demoV == 1 { demoFlavor = "I'm calling the Cheerleading Protective Services hotline."; demoIcon = "phone.fill" }
             else if demoV == 2 { demoFlavor = "You came in like a wrecking ball."; demoIcon = "record.circle.fill" }
-            list.append(create(id: demoId, kind: kind, kicker: "DUBIOUS HONOR", name: "Demolition Day",
+            list.append(create(id: demoId, kind: kind, kicker: "TOUGH LOVE", name: "Demolition Day",
                                icon: demoIcon, tier: .holo,
                                flavor: demoFlavor,
                                earned: worstFallsSession >= 8, progress: min(1, Double(worstFallsSession) / 8),
-                               detail: worstFallsSession >= 8 ? "\(worstFallsSession) falls in one session"
-                                                              : "worst session: \(worstFallsSession) / 8 falls", unlocked: unlocked))
+                               detail: "8 falls in one session", currentCount: worstFallsSession, unlocked: unlocked))
 
             allMilestones.append(contentsOf: list)
         }
@@ -320,9 +319,9 @@ let reps10Id = "reps10\(suffix)"
 
     // MARK: Builders
 
-    private static func create(id: String, kind: SkillKind, kicker: String, name: String, icon: String, tier: Milestone.Tier, flavor: String, earned: Bool, progress: Double, detail: String, unlocked: [UnlockedMilestone]) -> Milestone {
+    private static func create(id: String, kind: SkillKind, kicker: String, name: String, icon: String, tier: Milestone.Tier, flavor: String, earned: Bool, progress: Double, detail: String, currentCount: Int? = nil, unlocked: [UnlockedMilestone]) -> Milestone {
         let variant = unlocked.first(where: { $0.milestoneID == id })?.variantIndex
-        return Milestone(id: id, kind: kind, variantIndex: variant, kicker: kicker, name: name, icon: icon, tier: tier, flavor: flavor, earned: earned, progress: progress, detail: detail)
+        return Milestone(id: id, kind: kind, variantIndex: variant, kicker: kicker, name: name, icon: icon, tier: tier, flavor: flavor, earned: earned, progress: progress, detail: detail, currentCount: currentCount)
     }
 
     private static func volume(id: String, kind: SkillKind, name: String, icon: String, tier: Milestone.Tier,
@@ -330,7 +329,7 @@ let reps10Id = "reps10\(suffix)"
         create(id: id, kind: kind, kicker: "MILESTONE", name: name, icon: icon, tier: tier,
                flavor: flavor, earned: total >= target,
                progress: min(1, Double(total) / Double(target)),
-               detail: total >= target ? "\(total) reps logged" : "\(total) / \(target) reps", unlocked: unlocked)
+               detail: "\(target) reps", currentCount: total, unlocked: unlocked)
     }
 
     private static func streak(id: String, kind: SkillKind, name: String, icon: String, tier: Milestone.Tier,
@@ -338,6 +337,6 @@ let reps10Id = "reps10\(suffix)"
         create(id: id, kind: kind, kicker: "MILESTONE", name: name, icon: icon, tier: tier,
                flavor: flavor, earned: best >= target,
                progress: min(1, Double(best) / Double(target)),
-               detail: best >= target ? "\(best) hits in a row" : "best streak \(best) / \(target)", unlocked: unlocked)
+               detail: "\(target) hits in a row", currentCount: best, unlocked: unlocked)
     }
 }

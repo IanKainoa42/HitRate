@@ -191,7 +191,8 @@ struct HoloCardView: View {
         ZStack {
             VStack(spacing: 0) {
                 header(badge: Text(spec.badge), color: spec.color,
-                       kicker: spec.kicker, name: spec.name)
+                       kicker: spec.kicker, name: spec.name,
+                       kind: spec.kind)
                 gauge(spec)
                 powerBar(spec)
                 energyChips(spec)
@@ -204,7 +205,7 @@ struct HoloCardView: View {
             if let delta = spec.delta {
                 deltaStamp(delta)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(11)
+                    .padding(EdgeInsets(top: 48, leading: 0, bottom: 0, trailing: 13))
             }
         }
     }
@@ -275,7 +276,8 @@ struct HoloCardView: View {
             VStack(spacing: 0) {
                 header(badge: MilestoneIcon(icon: m.icon).font(.system(size: 13, weight: .bold)),
                        color: rarity.tag.opacity(m.earned ? 1 : 0.5),
-                       kicker: m.kicker, name: m.name)
+                       kicker: m.kicker, name: m.name,
+                       hp: m.currentCount, kind: m.kind)
 
                 // Progress ring with the milestone icon at its center
                 ZStack {
@@ -332,7 +334,7 @@ struct HoloCardView: View {
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(.white.opacity(0.25), lineWidth: 1))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(11)
+                .padding(EdgeInsets(top: 48, leading: 0, bottom: 0, trailing: 13))
             }
         }
     }
@@ -340,7 +342,8 @@ struct HoloCardView: View {
     // MARK: Shared chrome
 
     private func header(badge: some View, color: Color,
-                        kicker: String, name: String) -> some View {
+                        kicker: String, name: String,
+                        hp: Int? = nil, kind: SkillKind? = nil) -> some View {
         HStack(alignment: .top, spacing: 9) {
             badge
                 .font(Theme.grotesk(14))
@@ -363,8 +366,33 @@ struct HoloCardView: View {
                     .minimumScaleFactor(0.7)
             }
             Spacer(minLength: 0)
+
+            HStack(alignment: .top, spacing: 6) {
+                if let hp = hp {
+                    HStack(alignment: .top, spacing: 1) {
+                        Text("\(hp)")
+                            .font(Theme.grotesk(22, .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                if let kind = kind {
+                    Image(systemName: kind == .stunt ? "figure.gymnastics" : "figure.run")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            Circle()
+                                .fill(
+                                    LinearGradient(colors: [.white.opacity(0.3), .white.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                )
+                                .shadow(color: .black.opacity(0.3), radius: 2)
+                        )
+                        .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 0.5))
+                        .padding(.top, 1)
+                }
+            }
         }
-        .padding(EdgeInsets(top: 14, leading: 13, bottom: 8, trailing: 52))
+        .padding(EdgeInsets(top: 14, leading: 13, bottom: 8, trailing: 13))
     }
 
     private func tagAndFlavor(_ flavor: String) -> some View {
