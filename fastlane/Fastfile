@@ -140,8 +140,7 @@ platform :ios do
       force: true,
       run_precheck_before_submit: false,  # precheck needs Apple ID auth, not API key
       submit_for_review: true,
-      automatic_release: false,
-      automatic_release_after_approval: true,
+      automatic_release: true,  # release as soon as Apple approves
       submission_information: { export_compliance_uses_encryption: false }
     )
   end
@@ -196,6 +195,32 @@ platform :ios do
           uploaded: b.uploaded_date }
       end
       UI.message("ASC_BUILD_STATUS_JSON=" + rows.to_json)
+    end
+  end
+
+  desc "Set copyright + mark App Review sign-in NOT required (no-login app). Surgical; no metadata overwrite."
+  lane :ship_fix_review do
+    require "spaceship"
+    p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: "6H24WZ2RQ5", issuer_id: "7642a25e-aca7-402d-8b7d-de18dfef1756",
+      key: File.read(p8_path)
+    )
+    app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+    UI.user_error!("App not found in ASC") if app.nil?
+    version = app.get_edit_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS)
+    UI.user_error!("No editable App Store version (1.0) found") if version.nil?
+
+    version.update(attributes: { copyright: "© 2026 Ian Kainoa Richardson" })
+    UI.success("Copyright set on version #{version.version_string}")
+
+    detail = version.fetch_app_store_review_detail rescue nil
+    if detail.nil?
+      version.create_app_store_review_detail(attributes: { demoAccountRequired: false })
+      UI.success("Created review detail with demoAccountRequired=false")
+    else
+      detail.update(attributes: { demoAccountRequired: false })
+      UI.success("Set demoAccountRequired=false on existing review detail")
     end
   end
 end
