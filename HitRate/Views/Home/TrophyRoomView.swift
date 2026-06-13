@@ -15,11 +15,13 @@ struct TrophyRoomView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    @Query private var unlockedMilestones: [UnlockedMilestone]
+
     private var tournament: WeeklyTournament {
         WeeklyLeague.compute(sessions: sessions, groups: groups)
     }
     private var earned: [Milestone] {
-        Milestones.evaluate(sessions: sessions, groups: groups, mode: mode).filter(\.earned)
+        Milestones.evaluate(sessions: sessions, groups: groups, mode: mode, unlocked: unlockedMilestones).filter(\.earned)
     }
     private var cups: [WeeklyCup] {
         WeeklyLeague.cupHistory(sessions: sessions, groups: groups)

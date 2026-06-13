@@ -20,6 +20,7 @@ targets:
     dependencies:
       - target: HitRateWatch
         embed: true
+        platformFilters: [ios]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate

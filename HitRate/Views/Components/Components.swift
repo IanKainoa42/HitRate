@@ -100,6 +100,21 @@ struct BrandSignalDot: View {
     }
 }
 
+// MARK: - Milestone Icon
+struct MilestoneIcon: View {
+    var icon: String
+    
+    var body: some View {
+        if UIImage(named: icon) != nil {
+            Image(icon)
+                .renderingMode(.template)
+        } else {
+            Image(systemName: icon)
+        }
+    }
+}
+
+
 struct IconWordmark: View {
     var size: CGFloat = 17
     var rateFill: Color = Theme.well
