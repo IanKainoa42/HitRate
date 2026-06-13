@@ -6,6 +6,7 @@ struct HomeView: View {
     @Query private var sessions: [PracticeSession]
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
+    @Query private var unlockedMilestones: [UnlockedMilestone]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
@@ -149,7 +150,7 @@ struct HomeView: View {
             // Milestones are lifetime — deliberately not filtered by timeframe.
             ShareCardsSheet(stats: stats,
                             milestones: Milestones.evaluate(sessions: sessions,
-                                                            groups: groups, mode: mode),
+                                                            groups: groups, mode: mode, unlocked: unlockedMilestones),
                             teamName: shareTeamName,
                             orgName: identityLabel,
                             mode: mode)
@@ -179,6 +180,12 @@ struct HomeView: View {
                  ? "Track another squad with its own roster and stats."
                  : "Track another team or gym with its own skills and stats.")
         }
+        .onAppear { syncMilestones() }
+        .onChange(of: sessions) { _, _ in syncMilestones() }
+    }
+
+    private func syncMilestones() {
+        Milestones.sync(sessions: sessions, groups: groups, mode: mode, unlocked: unlockedMilestones, context: context)
     }
 
     /// Create a team and switch to it. Its roster starts empty — add skills/

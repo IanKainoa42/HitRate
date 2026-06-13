@@ -20,11 +20,12 @@ targets:
     dependencies:
       - target: HitRateWatch
         embed: true
+        platformFilters: [ios]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 8
+        CURRENT_PROJECT_VERSION: 10
         MARKETING_VERSION: "1.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
@@ -74,7 +75,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate.watchkitapp
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 8
+        CURRENT_PROJECT_VERSION: 10
         MARKETING_VERSION: "1.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA

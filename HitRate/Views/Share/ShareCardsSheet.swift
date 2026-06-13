@@ -216,7 +216,7 @@ struct ShareCardsSheet: View {
     private func glassButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 7) {
-                Image(systemName: icon)
+                MilestoneIcon(icon: icon)
                     .font(.system(size: 14, weight: .semibold))
                 Text(title)
                     .font(Theme.grotesk(14, .medium))

@@ -273,7 +273,7 @@ struct HoloCardView: View {
     private func milestoneFace(_ m: Milestone) -> some View {
         ZStack {
             VStack(spacing: 0) {
-                header(badge: Image(systemName: m.icon).font(.system(size: 13, weight: .bold)),
+                header(badge: MilestoneIcon(icon: m.icon).font(.system(size: 13, weight: .bold)),
                        color: rarity.tag.opacity(m.earned ? 1 : 0.5),
                        kicker: m.kicker, name: m.name)
 
@@ -294,9 +294,15 @@ struct HoloCardView: View {
                         .padding(9)
                         .frame(width: 116, height: 116)
                         .shadow(color: rarity.tag.opacity(m.earned ? 0.9 : 0.3), radius: 3.2)
-                    Image(systemName: m.earned ? m.icon : "lock.fill")
-                        .font(.system(size: 38, weight: .semibold))
-                        .foregroundStyle(m.earned ? .white : .white.opacity(0.45))
+                    Group {
+                        if m.earned {
+                            MilestoneIcon(icon: m.icon)
+                        } else {
+                            Image(systemName: "lock.fill")
+                        }
+                    }
+                    .font(.system(size: 38, weight: .semibold))
+                    .foregroundStyle(m.earned ? .white : .white.opacity(0.45))
                 }
                 .padding(.top, 2)
 

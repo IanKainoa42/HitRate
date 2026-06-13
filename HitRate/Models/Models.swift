@@ -273,3 +273,22 @@ extension Array where Element == StuntGroup {
         return scoped.sorted { $0.orderIndex < $1.orderIndex }
     }
 }
+
+// MARK: - Unlocked Milestones
+
+/// A collectible milestone variation earned by the user.
+/// Since the core milestone stats are calculated purely on the fly, this model
+/// simply saves the fact that a user unlocked a specific milestone, and which
+/// of the 4 visual variants they randomly received, so their collection is stable.
+@Model
+final class UnlockedMilestone {
+    var milestoneID: String
+    var variantIndex: Int
+    var unlockedAt: Date
+    
+    init(milestoneID: String, variantIndex: Int, unlockedAt: Date = .now) {
+        self.milestoneID = milestoneID
+        self.variantIndex = variantIndex
+        self.unlockedAt = unlockedAt
+    }
+}

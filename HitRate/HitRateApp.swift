@@ -7,10 +7,23 @@ struct HitRateApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Team.self, StuntGroup.self,
-                                           PracticeSession.self, Attempt.self)
+            let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self])
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            container = try ModelContainer(for: schema, configurations: [configuration])
         } catch {
-            fatalError("Failed to create model container: \(error)")
+            // Log the error for debugging
+            print("❌ Failed to create model container: \(error)")
+            print("Error details: \(error.localizedDescription)")
+            
+            // Attempt in-memory fallback for development
+            do {
+                let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self])
+                let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                container = try ModelContainer(for: schema, configurations: [configuration])
+                print("⚠️ Using in-memory store as fallback")
+            } catch {
+                fatalError("Failed to create model container even with in-memory fallback: \(error)")
+            }
         }
     }
 

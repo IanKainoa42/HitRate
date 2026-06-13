@@ -59,6 +59,12 @@ final class WatchSessionBridge: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState,
                  error: Error?) {
+        if let error = error {
+            print("❌ Watch session activation failed: \(error.localizedDescription)")
+        } else {
+            print("✅ Watch session activated with state: \(activationState.rawValue)")
+        }
+        
         DispatchQueue.main.async { [weak self] in
             guard let snapshot = self?.snapshotProvider?() else { return }
             self?.publishSnapshot(snapshot)

@@ -20,7 +20,17 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     /// app stays foregrounded/reachable while logging from the wrist.
     let workout = WatchWorkoutManager()
 
-    private var session: WCSession? { WCSession.isSupported() ? WCSession.default : nil }
+    private var session: WCSession? {
+        #if targetEnvironment(simulator)
+        // WatchConnectivity has XPC/IPC bugs on simulator (iOS 18/watchOS 11)
+        // that cause -[OS_dispatch_mach_msg _setContext:] crashes.
+        // Always return nil on simulator to avoid the crash.
+        print("⚠️ WatchConnectivity disabled on simulator (known XPC bug)")
+        return nil
+        #else
+        return WCSession.isSupported() ? WCSession.default : nil
+        #endif
+    }
 
     /// The skill the wrist currently has up (crown selection, clamped).
     var selectedGroup: WatchGroupSnapshot? {
@@ -31,17 +41,63 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
 
     override init() {
         super.init()
+        // Requesting HealthKit auth is safe in init (no WCSession run-loop
+        // dependency). Do NOT activate() here — WCSession's delegate must be
+        // set on the main thread once the run loop is ready, so activation is
+        // deferred to HitRateWatchApp's .onAppear (avoids the XPC/IPC crash).
         workout.requestAuthorization()
-        activate()
     }
 
     func activate() {
+        print("🔵 Attempting to activate WatchConnectivity...")
+        print("🔵 WCSession.isSupported: \(WCSession.isSupported())")
+        
         guard let session else {
-            statusText = "Watch sync unavailable"
+            print("❌ WCSession not supported on this device")
+            #if targetEnvironment(simulator)
+            // On simulator, load demo data so UI can be tested
+            print("⚠️ Loading demo data for simulator testing")
+            DispatchQueue.main.async { [weak self] in
+                self?.snapshot = .screenshotDemo
+                self?.statusText = "Simulator demo mode"
+            }
+            #endif
             return
         }
-        session.delegate = self
-        session.activate()
+        
+        print("🔵 Current activation state: \(session.activationState.rawValue)")
+        
+        #if targetEnvironment(simulator)
+        // Skip WatchConnectivity on simulator to avoid XPC crash
+        print("⚠️ Skipping WCSession activation on simulator (XPC issues)")
+        print("⚠️ Use physical device for actual Watch Connectivity testing")
+        DispatchQueue.main.async { [weak self] in
+            self?.snapshot = .screenshotDemo
+            self?.statusText = "Simulator: Use device for sync"
+        }
+        return
+        #endif
+        
+        // CRITICAL: WCSession.delegate must be set on main thread
+        // Use async after to ensure run loop is fully ready
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            
+            print("🔵 Setting delegate on main thread...")
+            
+            // Only set delegate if not already set (avoid re-activation issues)
+            if session.delegate == nil {
+                print("🔵 Delegate is nil, setting and activating...")
+                session.delegate = self
+                session.activate()
+            } else if session.activationState != .activated {
+                print("🔵 Delegate exists but not activated, attempting activation...")
+                // If delegate is set but not activated, try to activate
+                session.activate()
+            } else {
+                print("✅ Session already activated")
+            }
+        }
     }
 
     func requestSnapshot() {
@@ -95,6 +151,14 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState,
                  error: Error?) {
         DispatchQueue.main.async { [weak self] in
+            if let error = error {
+                self?.statusText = "Sync error: \(error.localizedDescription)"
+                print("❌ Watch activation failed: \(error)")
+                return
+            }
+            
+            print("✅ Watch activated with state: \(activationState.rawValue)")
+            
             if !session.receivedApplicationContext.isEmpty {
                 self?.receive(message: session.receivedApplicationContext)
             }

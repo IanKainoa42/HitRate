@@ -29,7 +29,7 @@ struct PuckView: View {
                         .font(Theme.grotesk(8))
                         .tracking(1.6)
                         .foregroundStyle(.white.opacity(0.5))
-                    Image(systemName: milestone.icon)
+                    MilestoneIcon(icon: milestone.icon)
                         .font(.system(size: 44, weight: .semibold))
                         .foregroundStyle(rarity.tag)
                         .shadow(color: rarity.tag.opacity(0.8), radius: 9)
