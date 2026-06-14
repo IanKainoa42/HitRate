@@ -139,6 +139,7 @@ platform :ios do
       skip_metadata: true,
       force: true,
       run_precheck_before_submit: false,  # precheck needs Apple ID auth, not API key
+      reject_if_possible: true,
       submit_for_review: true,
       automatic_release: true,  # release as soon as Apple approves
       submission_information: { export_compliance_uses_encryption: false }
