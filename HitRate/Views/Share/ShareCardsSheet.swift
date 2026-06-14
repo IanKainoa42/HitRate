@@ -17,6 +17,7 @@ struct ShareCardsSheet: View {
     @State private var toast = ""
     @State private var toastTask: Task<Void, Never>?
     @State private var photoSaver = PhotoSaver()
+    @State private var holdingCard: DeckCard?
 
     private var cards: [DeckCard] {
         var deck = CardSpec.deck(from: stats, teamName: teamName, mode: mode)
@@ -58,6 +59,23 @@ struct ShareCardsSheet: View {
                     .padding(.bottom, 128)
             }
             .allowsHitTesting(false)
+            
+            // Holding Mode Overlay
+            if let card = holdingCard {
+                ZStack {
+                    Color.black.opacity(0.85)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                holdingCard = nil
+                            }
+                        }
+                        
+                    InteractiveCardView(card: card, index: card.id, count: deck.count, orgName: orgName)
+                        .transition(AnyTransition.scale(scale: 0.8).combined(with: .opacity))
+                }
+                .zIndex(100)
+            }
         }
     }
 
@@ -109,6 +127,11 @@ struct ShareCardsSheet: View {
                             .id(card.id)
                             .scaleEffect(scale)
                             .frame(width: scaledWidth, height: 430 * scale)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    holdingCard = card
+                                }
+                            }
                     }
                 }
                 .scrollTargetLayout()

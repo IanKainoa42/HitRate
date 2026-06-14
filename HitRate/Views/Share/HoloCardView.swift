@@ -78,6 +78,7 @@ struct HoloCardView: View {
     let count: Int
     let orgName: String
     var isSnapshot = false   // static rendering for ImageRenderer
+    var interactiveTilt: CGSize? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -122,13 +123,21 @@ struct HoloCardView: View {
 
     private var foilEdge: some View {
         TimelineView(.animation(minimumInterval: 1 / 20, paused: !animated)) { tl in
-            let t = animated
-                ? tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 7) / 7
-                : 0.35
-            let phase = CGFloat(t) * 2 * .pi
-            let dx = cos(phase) * 0.5
-            let dy = sin(phase) * 0.5
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            let dx: CGFloat
+            let dy: CGFloat
+            if let tilt = interactiveTilt {
+                dx = tilt.width * 0.5
+                dy = tilt.height * 0.5
+            } else {
+                let t = animated
+                    ? tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 7) / 7
+                    : 0.35
+                let phase = CGFloat(t) * 2 * .pi
+                dx = cos(phase) * 0.5
+                dy = sin(phase) * 0.5
+            }
+            
+            return RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(LinearGradient(
                     colors: rarity.edgeColors,
                     startPoint: UnitPoint(x: 0.5 - dx, y: 0.5 - dy),
@@ -140,23 +149,32 @@ struct HoloCardView: View {
 
     private var foilSheen: some View {
         TimelineView(.animation(minimumInterval: 1 / 20, paused: !animated)) { tl in
-            let t = animated
-                ? tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6) / 6
-                : 0.4
-            let x = CGFloat(t) * 2 - 0.5 // sweeps across
-            Group {
+            let x: CGFloat
+            let y: CGFloat
+            if let tilt = interactiveTilt {
+                x = tilt.width * 0.8
+                y = tilt.height * 0.8
+            } else {
+                let t = animated
+                    ? tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6) / 6
+                    : 0.4
+                x = CGFloat(t) * 2 - 0.5 // sweeps across
+                y = CGFloat(t)
+            }
+            
+            return Group {
                 if rarity.foil == .holo {
                     LinearGradient(
                         colors: [.clear, Theme.electric.opacity(0.5), Color(hex: 0x9775FA).opacity(0.5),
                                  Color(hex: 0xFF4D6D).opacity(0.45), Theme.gold.opacity(0.5), .clear],
-                        startPoint: UnitPoint(x: x - 0.6, y: CGFloat(t) - 0.6),
-                        endPoint: UnitPoint(x: x + 0.6, y: CGFloat(t) + 0.6))
+                        startPoint: UnitPoint(x: x - 0.6, y: y - 0.6),
+                        endPoint: UnitPoint(x: x + 0.6, y: y + 0.6))
                 } else {
                     LinearGradient(
                         colors: [.clear, Theme.gold.opacity(0.55), Color(hex: 0xFFF3B0).opacity(0.6),
                                  Theme.gold.opacity(0.5), .clear],
-                        startPoint: UnitPoint(x: x - 0.6, y: CGFloat(t) - 0.6),
-                        endPoint: UnitPoint(x: x + 0.6, y: CGFloat(t) + 0.6))
+                        startPoint: UnitPoint(x: x - 0.6, y: y - 0.6),
+                        endPoint: UnitPoint(x: x + 0.6, y: y + 0.6))
                 }
             }
             .blendMode(.colorDodge)

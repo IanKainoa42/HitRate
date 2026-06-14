@@ -32,6 +32,7 @@
 		8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */; };
 		908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */; };
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
+		93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */; };
 		A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
 		B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */; };
@@ -92,6 +93,7 @@
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRate.entitlements; sourceTree = "<group>"; };
+		3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveCardView.swift; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -135,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				20184832604D05CBF0C04210 /* HoloCardView.swift */,
+				3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */,
 				4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */,
 				47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */,
 			);
@@ -434,6 +437,7 @@
 				CA745130292CAC719774B178 /* HitRateApp.swift in Sources */,
 				E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */,
 				32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */,
+				93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */,
 				273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */,
 				8472DF181A48BC7407E5698A /* Milestones.swift in Sources */,
 				D9E1104B0EB188559FA6F688 /* Models.swift in Sources */,
