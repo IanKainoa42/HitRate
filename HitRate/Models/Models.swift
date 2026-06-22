@@ -160,6 +160,11 @@ final class Team {
     var name: String
     var orderIndex: Int
     var createdAt: Date
+    /// What this folder calls its buckets — "athlete", "skill", "group",
+    /// "driver"… Blank (default) = fall back to the global `AppMode` noun, so
+    /// existing stores migrate lightweight. Stored singular + lowercase; the
+    /// `noun(for:)` helpers derive plural/title forms.
+    var itemNoun: String = ""
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
@@ -171,6 +176,35 @@ final class Team {
         self.orderIndex = orderIndex
         self.createdAt = createdAt
     }
+
+    // MARK: Bucket noun — per-folder override of AppMode's wording.
+    // Every view that labels buckets should read these (not `mode.noun`
+    // directly) so one folder can track "athletes" and another "skills".
+
+    private var customNoun: String? {
+        let t = itemNoun.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t.lowercased()
+    }
+
+    func noun(for mode: AppMode) -> String { customNoun ?? mode.noun }
+
+    func nounPlural(for mode: AppMode) -> String {
+        guard let n = customNoun else { return mode.nounPlural }
+        return n.hasSuffix("s") ? n : n + "s"
+    }
+
+    func nounTitle(for mode: AppMode) -> String { noun(for: mode).capitalized }
+    func nounPluralTitle(for mode: AppMode) -> String { nounPlural(for: mode).capitalized }
+}
+
+extension Optional where Wrapped == Team {
+    /// Bucket noun for an optional active team — folder override when present,
+    /// else the global AppMode noun. Lets views read one call regardless of
+    /// whether a team is resolved yet.
+    func noun(for mode: AppMode) -> String { self?.noun(for: mode) ?? mode.noun }
+    func nounPlural(for mode: AppMode) -> String { self?.nounPlural(for: mode) ?? mode.nounPlural }
+    func nounTitle(for mode: AppMode) -> String { self?.nounTitle(for: mode) ?? mode.nounTitle }
+    func nounPluralTitle(for mode: AppMode) -> String { self?.nounPluralTitle(for: mode) ?? mode.nounPluralTitle }
 }
 
 @Model

@@ -11,6 +11,11 @@ settings:
 configs:
   Debug: debug
   Release: release
+packages:
+  CheerRulesKit:
+    # Local path — single source of truth shared with CheerCenter. No GitHub
+    # round-trip during dev; the kit lives beside this repo.
+    path: ../CheerRulesKit
 targets:
   HitRate:
     type: application
@@ -21,6 +26,7 @@ targets:
       - target: HitRateWatch
         embed: true
         platformFilters: [ios]
+      - package: CheerRulesKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate

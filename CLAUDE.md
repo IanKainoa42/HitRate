@@ -26,6 +26,21 @@ the editor.
   xcrun simctl install booted <path-to-HitRate.app>   # from DerivedData Build/Products
   xcrun simctl launch booted com.ianrichardson.HitRate
   ```
+- **Two targets, one project.yml**: `HitRate` (iOS app) embeds `HitRateWatch`
+  (watchOS app); bump `CURRENT_PROJECT_VERSION` in BOTH target blocks together.
+  The watch target compiles `HitRate/WatchSync/WatchPayloads.swift` directly
+  into itself (shared wire format — keep that file dependency-free of iOS-only
+  imports). Both targets carry the HealthKit entitlement + Health usage strings.
+- **Catalyst is the verify lane for anything you can't trust on the iOS
+  simulator** (`SUPPORTS_MACCATALYST: YES`) — append
+  `-destination 'platform=macOS,variant=Mac Catalyst'`. WatchConnectivity and
+  workout sessions can't be exercised on the iOS simulator at all (see Gotchas).
+- **Shipping is fastlane, not Xcode export** (`fastlane/Fastfile`): `/usr/bin/rsync`
+  is openrsync (no `-E`), so Xcode's `-exportArchive` fails ("Copy failed"). The
+  lane archives normally then hand-assembles + re-signs the IPA. Build number
+  lives in `project.yml` (no `increment_build_number`); `/ship` bumps it and
+  re-runs `xcodegen generate`. ASC API key is a raw `.p8` via `key_filepath`
+  (Ruby 4 / OpenSSL 3 breaks `key_content`).
 - No test target, no linter config.
 
 ## Design source of truth
@@ -248,6 +263,29 @@ Key invariants:
   (74% / 171 reps today, 7 groups) via a seeded RNG — used to visually diff
   against handoff screenshots. Triggered from the empty-state Home button,
   which is shown in coach mode only (the dataset is coach-shaped).
+- `HitRate/WatchSync/*` + `HitRateWatch/*` — the Apple Watch companion. The
+  iPhone is the source of truth; the watch is a thin remote logger. `HitRateApp`
+  builds a `WatchRosterSnapshot` (active team's roster, per-group counts, the
+  pad's selected skill, `isPracticeLive`) and pushes it through
+  `WatchSessionBridge` (a `WCSession` singleton) on every roster/session change.
+  The watch (`WatchLogStore`) renders that snapshot, sends back `WatchLogRequest`
+  messages, and the bridge's `logHandler` writes the Attempt into SwiftData on
+  the phone. Wire format = `WatchPayloads.swift` (JSON `Codable`, the ONLY file
+  shared across both targets) — every field is optional-decodable so old
+  snapshots survive a schema bump. The wrist owns its OWN skill selection
+  (Digital Crown scrolls + tap-to-lock; can't intercept the crown, hence the
+  lock), seeded once from the phone. Launching the watch app has no public API:
+  `PracticeWatchLauncher` starts an `HKWorkoutSession` via
+  `HKHealthStore.startWatchApp(with:)` when practice begins — that's the only
+  sanctioned foreground path — and the watch's `WatchWorkoutManager` keeps its
+  own workout running (driven purely by `isPracticeLive`) so the app stays
+  reachable as the wrist drops. HealthKit is touched ONLY when an installed
+  paired watch exists (`isWatchAppAvailable`) so iPhone-only users never see a
+  Health prompt.
+- `Views/Share/InteractiveCardView.swift` — wraps `HoloCardView` in a live
+  `rotation3DEffect` drag (pitch/yaw + `interactiveTilt` feeding the foil) for
+  on-screen "holding" of a card; the static `isSnapshot: true` render path
+  (save/share) is unaffected and stays deterministic.
 
 ## Gotchas discovered
 
@@ -263,3 +301,9 @@ Key invariants:
 - `figure.cheerleading` SF Symbol doesn't exist; use `figure.gymnastics`.
 - Latest-session snapshot must skip attempt-less sessions or an ended empty
   session hides the tape card.
+- WatchConnectivity is force-disabled on the simulator (`WatchLogStore.session`
+  returns nil under `targetEnvironment(simulator)`) — `WCSession` has an XPC/IPC
+  bug on iOS 18 / watchOS 11 paired simulators that crashes in
+  `-[OS_dispatch_mach_msg _setContext:]`. Watch sync therefore can only be
+  verified on real paired hardware; the `--demo-roster` launch arg seeds a local
+  snapshot so the watch can still be screenshotted without a live pairing.

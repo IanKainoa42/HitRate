@@ -15,6 +15,7 @@
 		309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD1AA942B68F4E661CF6471 /* HomeView.swift */; };
 		380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */; };
+		3B4D46C1BBB313C31352BCA2 /* CheerRulesKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4E222ABED63D36E8E7A13432 /* CheerRulesKit */; };
 		491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79288C2661DD00CF6B1AF541 /* TrendCard.swift */; };
 		4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B06141B674607C1343BF33B /* TrophyRoomView.swift */; };
 		52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */; };
@@ -92,6 +93,7 @@
 		3443E05F3F665254D47A7E74 /* HitRateWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateWatchApp.swift; sourceTree = "<group>"; };
 		354E38DADE87EAEA70210445 /* HitRateApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitRateApp.swift; sourceTree = "<group>"; };
 		3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
+		35BF9F1654CE44D595A576C6 /* CheerRulesKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CheerRulesKit; path = ../CheerRulesKit; sourceTree = SOURCE_ROOT; };
 		3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRate.entitlements; sourceTree = "<group>"; };
 		3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveCardView.swift; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
@@ -131,6 +133,17 @@
 		FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsCard.swift; sourceTree = "<group>"; };
 		FFD34ACD23F8DA7A6168614F /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6F18E6ED78160307E4462536 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B4D46C1BBB313C31352BCA2 /* CheerRulesKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0DADB79C19E5F443BE08334D /* Share */ = {
@@ -188,8 +201,17 @@
 			children = (
 				9CBF43E65D81D52A8C010E7C /* HitRate */,
 				D61303D10F0D3692EF85FFBE /* HitRateWatch */,
+				4A7A28A205380C1E2B04A9DC /* Packages */,
 				F668D95A08DD886D33B73867 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		4A7A28A205380C1E2B04A9DC /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				35BF9F1654CE44D595A576C6 /* CheerRulesKit */,
+			);
+			name = Packages;
 			sourceTree = "<group>";
 		};
 		52BC2444AF9AB2D57B440DCC /* Onboarding */ = {
@@ -344,6 +366,7 @@
 			buildPhases = (
 				5ACCFDE164491C41AF0DEA12 /* Sources */,
 				E49910887B82B9A43446F6C5 /* Resources */,
+				6F18E6ED78160307E4462536 /* Frameworks */,
 				271217C077C36B39B07DC151 /* Embed Watch Content */,
 			);
 			buildRules = (
@@ -353,6 +376,7 @@
 			);
 			name = HitRate;
 			packageProductDependencies = (
+				4E222ABED63D36E8E7A13432 /* CheerRulesKit */,
 			);
 			productName = HitRate;
 			productReference = E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */;
@@ -386,6 +410,9 @@
 			);
 			mainGroup = 3EF647EFDCE1CAC10DBB845E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				90F9398CCF1E9057555866EF /* XCLocalSwiftPackageReference "../CheerRulesKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F668D95A08DD886D33B73867 /* Products */;
 			projectDirPath = "";
@@ -719,6 +746,20 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		90F9398CCF1E9057555866EF /* XCLocalSwiftPackageReference "../CheerRulesKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../CheerRulesKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4E222ABED63D36E8E7A13432 /* CheerRulesKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CheerRulesKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BC2F2365CD63E505D88A5A30 /* Project object */;
 }

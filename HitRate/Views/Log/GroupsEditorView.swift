@@ -61,6 +61,18 @@ struct GroupsEditorView: View {
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
 
+    // Bucket wording for the active folder (its `itemNoun` override, else the
+    // AppMode default). Views read these, never `mode.noun` directly.
+    private var noun: String { currentTeam.noun(for: mode) }
+    private var nounTitle: String { currentTeam.nounTitle(for: mode) }
+    private var nounPlural: String { currentTeam.nounPlural(for: mode) }
+    private var nounPluralTitle: String { currentTeam.nounPluralTitle(for: mode) }
+
+    /// Folder item-noun presets offered in the editor; "" = AppMode default.
+    private let nounPresets: [(label: String, value: String)] = [
+        ("Default", ""), ("Skills", "skill"), ("Groups", "group"), ("Athletes", "athlete"),
+    ]
+
     var body: some View {
         NavigationStack {
             List {
@@ -78,7 +90,7 @@ struct GroupsEditorView: View {
 
                 teamsSection
 
-                Section("\(mode.nounPluralTitle) · \(currentTeam?.name ?? "")") {
+                Section("\(nounPluralTitle) · \(currentTeam?.name ?? "")") {
                     ForEach(groups) { g in
                         HStack(spacing: 10) {
                             Text("\(g.number)")
@@ -142,13 +154,13 @@ struct GroupsEditorView: View {
 
                     Button {
                         let next = (groups.map(\.number).max() ?? 0) + 1
-                        let g = StuntGroup(name: "\(mode.nounTitle) \(next)",
+                        let g = StuntGroup(name: "\(nounTitle) \(next)",
                                            number: next, orderIndex: groups.count)
                         g.team = currentTeam
                         context.insert(g)
                         try? context.save()
                     } label: {
-                        Label("Add \(mode.noun)", systemImage: "plus")
+                        Label("Add \(noun)", systemImage: "plus")
                     }
                 }
                 .listRowBackground(glassRow)
@@ -242,7 +254,7 @@ struct GroupsEditorView: View {
                     set: { if !$0 { pendingDelete = nil } }),
                 presenting: pendingDelete
             ) { g in
-                Button("Delete \(mode.noun) & reps", role: .destructive) {
+                Button("Delete \(noun) & reps", role: .destructive) {
                     context.delete(g)
                     renumber()
                 }
@@ -260,7 +272,7 @@ struct GroupsEditorView: View {
                 Button("Delete team & data", role: .destructive) { removeTeam(t) }
                 Button("Cancel", role: .cancel) {}
             } message: { t in
-                Text("Its \(groupCount(t)) \(mode.nounPlural) and all their logged reps will be deleted. This can't be undone.")
+                Text("Its \(groupCount(t)) \(t.nounPlural(for: mode)) and all their logged reps will be deleted. This can't be undone.")
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
@@ -317,13 +329,32 @@ struct GroupsEditorView: View {
                             .foregroundStyle(t.id == currentTeam?.id ? Theme.accent : Theme.label3)
                     }
                     .buttonStyle(.plain)
-                    RenameField(prompt: "Team name", value: t.name) { new in
+                    RenameField(prompt: "Folder name", value: t.name) { new in
                         let trimmed = new.trimmingCharacters(in: .whitespaces)
                         guard !trimmed.isEmpty else { return }
                         t.name = trimmed
                         try? context.save()
                     }
                     Spacer()
+                    // What this folder calls its buckets — per-folder override.
+                    Menu {
+                        ForEach(nounPresets, id: \.value) { preset in
+                            Button {
+                                t.itemNoun = preset.value
+                                try? context.save()
+                            } label: {
+                                if t.itemNoun == preset.value {
+                                    Label(preset.label, systemImage: "checkmark")
+                                } else {
+                                    Text(preset.label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Text("Tracks: \(t.nounPluralTitle(for: mode))")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                     Text("\(groupCount(t))")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -344,12 +375,12 @@ struct GroupsEditorView: View {
             Button {
                 addTeam()
             } label: {
-                Label("Add team", systemImage: "plus")
+                Label("Add folder", systemImage: "plus")
             }
         } header: {
-            Text("Teams")
+            Text("Folders")
         } footer: {
-            Text("Each team keeps its own \(mode.nounPlural) and stats. Switch the active team with the circle here or from the Home header.")
+            Text("Each folder keeps its own roster and stats — call it a team, an athlete, a private lesson, whatever you track separately. Switch the active folder with the circle here or from the Home header.")
         }
         .listRowBackground(glassRow)
     }
@@ -359,7 +390,7 @@ struct GroupsEditorView: View {
     }
 
     private func addTeam() {
-        let t = Team(name: "Team \(teams.count + 1)", orderIndex: teams.count)
+        let t = Team(name: "Folder \(teams.count + 1)", orderIndex: teams.count)
         context.insert(t)
         try? context.save()
         currentTeamID = t.id.uuidString
