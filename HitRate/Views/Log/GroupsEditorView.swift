@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import CheerRulesKit
 
 /// A rename field that types into a LOCAL buffer and only commits the result
 /// on blur / return / dismiss — never per keystroke. The old direct binding
@@ -73,6 +74,12 @@ struct GroupsEditorView: View {
         ("Default", ""), ("Skills", "skill"), ("Groups", "group"), ("Athletes", "athlete"),
     ]
 
+    /// Drives the active folder's `tracksDrivers` flag (saves on change).
+    private var tracksDriversBinding: Binding<Bool> {
+        Binding(get: { currentTeam?.tracksDrivers ?? false },
+                set: { currentTeam?.tracksDrivers = $0; try? context.save() })
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -103,31 +110,29 @@ struct GroupsEditorView: View {
                                 g.name = new
                                 try? context.save()
                             }
-                            if mode == .athlete {
-                                // Stunt vs tumbling — picks the outcome wording
-                                // on the pad for this skill.
-                                Menu {
-                                    ForEach(SkillKind.allCases) { k in
-                                        Button {
-                                            g.kind = k
-                                            try? context.save()
-                                        } label: {
-                                            Label(k.label, systemImage: k.icon)
-                                        }
+                            // United category — carries the execution drivers
+                            // and (via category→kind) the outcome wording.
+                            Menu {
+                                ForEach(SkillCategory.allCases, id: \.self) { c in
+                                    Button {
+                                        g.category = c
+                                        try? context.save()
+                                    } label: {
+                                        Label(c.displayName, systemImage: c.icon)
                                     }
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: g.kind.icon)
-                                            .font(.system(size: 10, weight: .semibold))
-                                        Text(g.kind.label)
-                                            .font(.system(size: 12, weight: .semibold))
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 5)
-                                    .background(Theme.fill)
-                                    .clipShape(Capsule())
                                 }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: g.category.icon)
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text(g.category.displayName)
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(Theme.fill)
+                                .clipShape(Capsule())
                             }
                         }
                         // Custom swipe action, deliberately NOT role: .destructive:
@@ -202,6 +207,15 @@ struct GroupsEditorView: View {
                     }
                     .listRowBackground(glassRow)
                 }
+
+                Section {
+                    Toggle("Track execution drivers", isOn: tracksDriversBinding)
+                } header: {
+                    Text("Advanced · \(currentTeam?.name ?? "")")
+                } footer: {
+                    Text("Adds a dropdown on each logged rep to flag which United execution driver broke (Bases, Top Person, Landings, Synch…), by skill category. Tap-to-submit on the pad is unchanged. Per-folder.")
+                }
+                .listRowBackground(glassRow)
 
                 Section {
                     Toggle("Tap sounds", isOn: $soundsOn)

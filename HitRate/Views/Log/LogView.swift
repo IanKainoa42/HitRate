@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import CheerRulesKit
 
 /// The counter, presented full-screen from Home's practice pill for the
 /// duration of one session. Built for the floor: pick a group once, then
@@ -20,6 +21,10 @@ struct LogView: View {
 
     /// Practice logs into the active team's roster only.
     private var groups: [StuntGroup] { allGroups.inTeam(teams.current(id: currentTeamID)) }
+
+    /// Advanced opt-in (per folder): show the per-rep execution-driver dropdown
+    /// in the recent log. Never affects the tap-to-submit pad.
+    private var tracksDrivers: Bool { teams.current(id: currentTeamID)?.tracksDrivers ?? false }
 
     // Persisted (not @State) so the watch can mirror the pulled-up skill via
     // RootView's snapshot — and the pad remembers it between practices.
@@ -645,7 +650,19 @@ struct LogView: View {
             Text(a.outcome.label(a.group?.kind ?? .stunt))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.label2)
+            // Tagged drivers read inline so the coach sees them without opening
+            // the menu.
+            if tracksDrivers, !a.driverIDs.isEmpty {
+                Text(driverSummary(a))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.label3)
+                    .lineLimit(1)
+            }
             Spacer()
+            if tracksDrivers {
+                Menu { driverMenuItems(a) } label: { driverTagLabel(a) }
+                    .buttonStyle(.plain)
+            }
             if !inWave {
                 Text(a.timestamp.tapeTime)
                     .font(Theme.barlow(13, .semibold))
@@ -653,6 +670,71 @@ struct LogView: View {
             }
         }
         .padding(.vertical, 7)
+    }
+
+    // MARK: Execution-driver tagging (advanced, off the tap path)
+
+    /// Menu body shared by the pad row dropdown and the grid chip's long-press
+    /// context menu: toggle each of the skill category's execution drivers
+    /// (multi-select), with a Clear at the bottom once any are set.
+    @ViewBuilder
+    private func driverMenuItems(_ a: Attempt) -> some View {
+        let drivers = (a.group?.category ?? .stunts).executionDrivers
+        ForEach(drivers) { d in
+            Button {
+                toggleDriver(a, d.key)
+            } label: {
+                if a.driverIDs.contains(d.key) {
+                    Label(d.name, systemImage: "checkmark")
+                } else {
+                    Text(d.name)
+                }
+            }
+        }
+        if !a.driverIDs.isEmpty {
+            Divider()
+            Button(role: .destructive) {
+                a.driverIDs = []
+                try? context.save()
+                hapticTrigger += 1
+            } label: {
+                Label("Clear drivers", systemImage: "xmark.circle")
+            }
+        }
+    }
+
+    /// Compact dropdown affordance: a slider glyph, or a tag + count when set.
+    private func driverTagLabel(_ a: Attempt) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: a.driverIDs.isEmpty ? "slider.horizontal.3" : "tag.fill")
+                .font(.system(size: 12, weight: .semibold))
+            if !a.driverIDs.isEmpty {
+                Text("\(a.driverIDs.count)")
+                    .font(.system(size: 11, weight: .bold))
+            }
+        }
+        .foregroundStyle(a.driverIDs.isEmpty ? Theme.label3 : Theme.accent)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Theme.iconTile))
+        .contentShape(Rectangle())
+    }
+
+    private func toggleDriver(_ a: Attempt, _ key: String) {
+        if let i = a.driverIDs.firstIndex(of: key) {
+            a.driverIDs.remove(at: i)
+        } else {
+            a.driverIDs.append(key)
+        }
+        try? context.save()
+        hapticTrigger += 1
+    }
+
+    /// Short names of a rep's tagged drivers, in the category's canonical order.
+    private func driverSummary(_ a: Attempt) -> String {
+        let drivers = (a.group?.category ?? .stunts).executionDrivers
+        return drivers.filter { a.driverIDs.contains($0.key) }
+            .map(\.name).joined(separator: ", ")
     }
 
     /// A committed wave/routine: hairline-bordered container with a batch-summary
@@ -791,6 +873,14 @@ struct LogView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Theme.well.shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
         )
+        // Grid layout has no per-row dropdown — long-press a chip to tag drivers
+        // (an advanced gesture that never competes with tap-to-log).
+        .overlay(alignment: .topTrailing) {
+            if tracksDrivers, !a.driverIDs.isEmpty {
+                Circle().fill(Theme.accent).frame(width: 6, height: 6).padding(2)
+            }
+        }
+        .contextMenu { if tracksDrivers { driverMenuItems(a) } }
     }
 
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {

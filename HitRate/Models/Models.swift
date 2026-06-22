@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftData
 import SwiftUI
+import CheerRulesKit
 
 // MARK: - App mode (athlete-first vs coach)
 
@@ -34,6 +35,30 @@ enum SkillKind: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String { self == .stunt ? "Stunt" : "Tumbling" }
     var icon: String { self == .stunt ? "person.3.fill" : "figure.gymnastics" }
+}
+
+// MARK: - Skill category (United Scoring System)
+
+/// `SkillCategory` (CheerRulesKit) is the United score-sheet classification a
+/// skill belongs to — it carries the execution drivers. The legacy `SkillKind`
+/// (stunt/tumbling) stays the *outcome-wording* axis; a category maps onto it so
+/// every existing `Outcome.label(_:)`/`OutcomeNames` read keeps working.
+extension SkillCategory {
+    var hitRateKind: SkillKind {
+        switch self {
+        case .standingTumbling, .runningTumbling: return .tumbling
+        default: return .stunt
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .stunts, .pyramid: return "person.3.fill"
+        case .tosses: return "arrow.up.circle.fill"
+        case .jumps: return "figure.gymnastics"
+        case .standingTumbling, .runningTumbling: return "figure.gymnastics"
+        }
+    }
 }
 
 // MARK: - Outcome (the core domain enum)
@@ -165,6 +190,10 @@ final class Team {
     /// existing stores migrate lightweight. Stored singular + lowercase; the
     /// `noun(for:)` helpers derive plural/title forms.
     var itemNoun: String = ""
+    /// Advanced opt-in: when on, the practice log lets you flag which United
+    /// execution driver(s) broke on a rep — via a dropdown that never touches
+    /// the tap-to-submit flow. Off by default (existing behavior unchanged).
+    var tracksDrivers: Bool = false
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
@@ -216,9 +245,14 @@ final class StuntGroup {
     var number: Int        // badge number shown in chips/cards
     var orderIndex: Int    // display order
     var createdAt: Date
-    /// Stunt vs tumbling — default keeps existing stores migrating lightweight
-    /// (every pre-kind bucket was a stunt).
+    /// Stunt vs tumbling — the OUTCOME-WORDING axis (kept in sync when the
+    /// United category is set). Default keeps pre-kind stores migrating
+    /// lightweight (every pre-kind bucket was a stunt).
     var kindRaw: String = SkillKind.stunt.rawValue
+    /// United Scoring System category (carries the execution drivers). Blank
+    /// (default) = derive from the legacy `kindRaw`, so existing tumbling skills
+    /// keep their kind through migration instead of all collapsing to stunts.
+    var categoryRaw: String = ""
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -242,6 +276,19 @@ final class StuntGroup {
     var kind: SkillKind {
         get { SkillKind(rawValue: kindRaw) ?? .stunt }
         set { kindRaw = newValue.rawValue }
+    }
+
+    /// United category. Reading derives from the legacy kind when unset; setting
+    /// also syncs `kindRaw` so outcome wording follows the category.
+    var category: SkillCategory {
+        get {
+            if let c = SkillCategory(rawValue: categoryRaw) { return c }
+            return kind == .tumbling ? .standingTumbling : .stunts
+        }
+        set {
+            categoryRaw = newValue.rawValue
+            kindRaw = newValue.hitRateKind.rawValue
+        }
     }
 
     /// Group identity color — formation rainbow, cycled by number.
@@ -276,6 +323,11 @@ final class Attempt {
     /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
     /// container in the practice log. Optional → additive lightweight migration.
     var waveID: UUID?
+    /// United execution-driver keys flagged on this rep (e.g.
+    /// "standingTumbling.landings"). Empty = clean / untagged. Multi-select —
+    /// a rep can break on Body Control AND Landings. Additive lightweight
+    /// migration (defaults empty). Resolve to display via `ExecutionDriver.byKey`.
+    var driverIDs: [String] = []
 
     init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
