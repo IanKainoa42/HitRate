@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import CheerRulesKit
 
 /// The counter, presented full-screen from Home's practice pill for the
 /// duration of one session. Built for the floor: pick a group once, then
@@ -22,9 +21,10 @@ struct LogView: View {
     /// Practice logs into the active team's roster only.
     private var groups: [StuntGroup] { allGroups.inTeam(teams.current(id: currentTeamID)) }
 
-    /// Advanced opt-in (per folder): show the per-rep execution-driver dropdown
-    /// in the recent log. Never affects the tap-to-submit pad.
-    private var tracksDrivers: Bool { teams.current(id: currentTeamID)?.tracksDrivers ?? false }
+    /// The active folder's user-created outcomes (tap buttons below the 4).
+    private var customOutcomes: [CustomOutcome] {
+        (teams.current(id: currentTeamID)?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
 
     // Persisted (not @State) so the watch can mirror the pulled-up skill via
     // RootView's snapshot — and the pad remembers it between practices.
@@ -72,8 +72,11 @@ struct LogView: View {
     private var layoutBinding: Binding<String> {
         Binding(get: { useGrid ? "Grid" : "Pad" },
                 set: { newValue in
+                    // Leaving the grid with staged-but-unsubmitted reps: commit
+                    // them rather than silently dropping (they were taps the user
+                    // meant to keep — the old behavior lost them on switch).
+                    if newValue == "Pad", stagedReps > 0 { commitWave() }
                     practiceLayoutRaw = (newValue == "Grid") ? "grid" : "pad"
-                    if newValue == "Pad" { staged = [:] }   // leaving the grid drops pending stages
                 })
     }
 
@@ -266,6 +269,10 @@ struct LogView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+
+                if !customOutcomes.isEmpty {
+                    customOutcomePad(group: group)
+                }
             } else {
                 Text("Add a \(mode.noun) first (\(mode.nounPluralTitle), top right).")
                     .font(.system(size: 14))
@@ -650,19 +657,7 @@ struct LogView: View {
             Text(a.outcome.label(a.group?.kind ?? .stunt))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.label2)
-            // Tagged drivers read inline so the coach sees them without opening
-            // the menu.
-            if tracksDrivers, !a.driverIDs.isEmpty {
-                Text(driverSummary(a))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.label3)
-                    .lineLimit(1)
-            }
             Spacer()
-            if tracksDrivers {
-                Menu { driverMenuItems(a) } label: { driverTagLabel(a) }
-                    .buttonStyle(.plain)
-            }
             if !inWave {
                 Text(a.timestamp.tapeTime)
                     .font(Theme.barlow(13, .semibold))
@@ -670,71 +665,6 @@ struct LogView: View {
             }
         }
         .padding(.vertical, 7)
-    }
-
-    // MARK: Execution-driver tagging (advanced, off the tap path)
-
-    /// Menu body shared by the pad row dropdown and the grid chip's long-press
-    /// context menu: toggle each of the skill category's execution drivers
-    /// (multi-select), with a Clear at the bottom once any are set.
-    @ViewBuilder
-    private func driverMenuItems(_ a: Attempt) -> some View {
-        let drivers = (a.group?.category ?? .stunts).executionDrivers
-        ForEach(drivers) { d in
-            Button {
-                toggleDriver(a, d.key)
-            } label: {
-                if a.driverIDs.contains(d.key) {
-                    Label(d.name, systemImage: "checkmark")
-                } else {
-                    Text(d.name)
-                }
-            }
-        }
-        if !a.driverIDs.isEmpty {
-            Divider()
-            Button(role: .destructive) {
-                a.driverIDs = []
-                try? context.save()
-                hapticTrigger += 1
-            } label: {
-                Label("Clear drivers", systemImage: "xmark.circle")
-            }
-        }
-    }
-
-    /// Compact dropdown affordance: a slider glyph, or a tag + count when set.
-    private func driverTagLabel(_ a: Attempt) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: a.driverIDs.isEmpty ? "slider.horizontal.3" : "tag.fill")
-                .font(.system(size: 12, weight: .semibold))
-            if !a.driverIDs.isEmpty {
-                Text("\(a.driverIDs.count)")
-                    .font(.system(size: 11, weight: .bold))
-            }
-        }
-        .foregroundStyle(a.driverIDs.isEmpty ? Theme.label3 : Theme.accent)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(Theme.iconTile))
-        .contentShape(Rectangle())
-    }
-
-    private func toggleDriver(_ a: Attempt, _ key: String) {
-        if let i = a.driverIDs.firstIndex(of: key) {
-            a.driverIDs.remove(at: i)
-        } else {
-            a.driverIDs.append(key)
-        }
-        try? context.save()
-        hapticTrigger += 1
-    }
-
-    /// Short names of a rep's tagged drivers, in the category's canonical order.
-    private func driverSummary(_ a: Attempt) -> String {
-        let drivers = (a.group?.category ?? .stunts).executionDrivers
-        return drivers.filter { a.driverIDs.contains($0.key) }
-            .map(\.name).joined(separator: ", ")
     }
 
     /// A committed wave/routine: hairline-bordered container with a batch-summary
@@ -873,14 +803,90 @@ struct LogView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Theme.well.shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
         )
-        // Grid layout has no per-row dropdown — long-press a chip to tag drivers
-        // (an advanced gesture that never competes with tap-to-log).
-        .overlay(alignment: .topTrailing) {
-            if tracksDrivers, !a.driverIDs.isEmpty {
-                Circle().fill(Theme.accent).frame(width: 6, height: 6).padding(2)
+    }
+
+    // MARK: Custom-outcome pad (user-created, tallied separately from hit-rate)
+
+    /// A second group of tap buttons under the locked 4 — the folder's own
+    /// outcomes. Tap = +1, long-press = −1 (gesture view, not a Button: a
+    /// Button fires on release after a hold and would re-increment a decrement,
+    /// same reason the wave cells use gestures). No dropdowns, nothing closes.
+    @ViewBuilder
+    private func customOutcomePad(group: StuntGroup) -> some View {
+        VStack(spacing: 6) {
+            Text("ISSUES")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.8)
+                .foregroundStyle(Theme.label2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())],
+                      spacing: 10) {
+                ForEach(customOutcomes) { o in
+                    let c = customCount(o, group: group)
+                    // ~Half the height of the locked outcome wells (92 → 44) and
+                    // a flat row of color dot + name + count, so issues read as a
+                    // clearly secondary tier, not another outcome.
+                    HStack(spacing: 7) {
+                        Circle().fill(o.color).frame(width: 8, height: 8)
+                        Text(o.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: 4)
+                        Text("\(c)")
+                            .font(Theme.barlow(18, .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(c == 0 ? Theme.label3 : Theme.label)
+                            .contentTransition(.numericText(value: Double(c)))
+                            .animation(.spring(duration: 0.3), value: c)
+                    }
+                    .padding(.horizontal, 11)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(Theme.well
+                                .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(o.color.opacity(0.35), lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { addCustom(o, group) }
+                    .onLongPressGesture(minimumDuration: 0.4) { removeCustom(o, group) }
+                    .accessibilityLabel("Log \(o.name)")
+                    .accessibilityValue("\(c) logged for \(group.name)")
+                    .accessibilityHint("Tap to add one, hold to remove one")
+                }
             }
         }
-        .contextMenu { if tracksDrivers { driverMenuItems(a) } }
+        .padding(.horizontal, 16)
+    }
+
+    /// This session's tally count of a custom outcome on one group.
+    private func customCount(_ o: CustomOutcome, group: StuntGroup) -> Int {
+        session.customTallies.filter { $0.outcome?.id == o.id && $0.group === group }.count
+    }
+
+    private func addCustom(_ o: CustomOutcome, _ group: StuntGroup) {
+        context.insert(CustomTally(outcome: o, group: group, session: session))
+        try? context.save()
+        selectedGroupIDRaw = group.id.uuidString
+        hapticTrigger += 1
+    }
+
+    /// Remove the most recent tally of this outcome+group (long-press undo).
+    private func removeCustom(_ o: CustomOutcome, _ group: StuntGroup) {
+        let mine = session.customTallies
+            .filter { $0.outcome?.id == o.id && $0.group === group }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard let last = mine.last else { return }
+        context.delete(last)
+        try? context.save()
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
     }
 
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {

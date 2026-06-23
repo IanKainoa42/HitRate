@@ -51,12 +51,16 @@ extension SkillCategory {
         }
     }
 
+    /// A distinct SF Symbol per category (all verified to exist — note
+    /// figure.cheerleading does NOT, per the project gotchas).
     var icon: String {
         switch self {
-        case .stunts, .pyramid: return "person.3.fill"
+        case .stunts: return "person.3.fill"
+        case .pyramid: return "triangle.fill"
         case .tosses: return "arrow.up.circle.fill"
-        case .jumps: return "figure.gymnastics"
-        case .standingTumbling, .runningTumbling: return "figure.gymnastics"
+        case .jumps: return "figure.jumprope"
+        case .standingTumbling: return "figure.gymnastics"
+        case .runningTumbling: return "figure.run"
         }
     }
 }
@@ -190,14 +194,14 @@ final class Team {
     /// existing stores migrate lightweight. Stored singular + lowercase; the
     /// `noun(for:)` helpers derive plural/title forms.
     var itemNoun: String = ""
-    /// Advanced opt-in: when on, the practice log lets you flag which United
-    /// execution driver(s) broke on a rep — via a dropdown that never touches
-    /// the tap-to-submit flow. Off by default (existing behavior unchanged).
-    var tracksDrivers: Bool = false
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
     var groups: [StuntGroup] = []
+    /// User-created extra outcomes this folder tracks (alongside the locked 4).
+    /// Deleting the folder removes them (and each cascades its tallies).
+    @Relationship(deleteRule: .cascade, inverse: \CustomOutcome.team)
+    var customOutcomes: [CustomOutcome] = []
 
     init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
@@ -261,6 +265,8 @@ final class StuntGroup {
     /// orphaned reps (which used to leak into deltas/trend but not the rate).
     @Relationship(deleteRule: .cascade, inverse: \Attempt.group)
     var attempts: [Attempt] = []
+    @Relationship(deleteRule: .cascade, inverse: \CustomTally.group)
+    var customTallies: [CustomTally] = []
 
     init(name: String, number: Int, orderIndex: Int, kind: SkillKind = .stunt,
          id: UUID = UUID(),
@@ -301,6 +307,8 @@ final class PracticeSession {
     var endedAt: Date?
     @Relationship(deleteRule: .cascade, inverse: \Attempt.session)
     var attempts: [Attempt] = []
+    @Relationship(deleteRule: .cascade, inverse: \CustomTally.session)
+    var customTallies: [CustomTally] = []
 
     init(startedAt: Date = .now) {
         self.startedAt = startedAt
@@ -323,11 +331,6 @@ final class Attempt {
     /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
     /// container in the practice log. Optional → additive lightweight migration.
     var waveID: UUID?
-    /// United execution-driver keys flagged on this rep (e.g.
-    /// "standingTumbling.landings"). Empty = clean / untagged. Multi-select —
-    /// a rep can break on Body Control AND Landings. Additive lightweight
-    /// migration (defaults empty). Resolve to display via `ExecutionDriver.byKey`.
-    var driverIDs: [String] = []
 
     init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
@@ -338,6 +341,54 @@ final class Attempt {
     }
 
     var outcome: Outcome { Outcome(rawValue: outcomeRaw) ?? .hit }
+}
+
+// MARK: - Custom outcomes (user-created, per folder)
+
+/// An extra outcome the user creates to tally alongside the locked 4 (e.g.
+/// "Caught", "Dropped"). Deliberately a SEPARATE model from `Attempt` so it
+/// never enters the hit-rate / cards / tournament math — those stay confined to
+/// the four severity slots. Scoped to a folder (`Team`).
+@Model
+final class CustomOutcome {
+    var id: UUID = UUID()
+    var name: String
+    var colorIndex: Int    // into Theme.groupRainbow
+    var orderIndex: Int
+    var createdAt: Date
+    var team: Team?
+    @Relationship(deleteRule: .cascade, inverse: \CustomTally.outcome)
+    var tallies: [CustomTally] = []
+
+    init(name: String, colorIndex: Int, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.colorIndex = colorIndex
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+    }
+
+    var color: Color { Theme.groupColor(colorIndex % Theme.groupRainbow.count) }
+}
+
+/// One logged tap of a custom outcome — the parallel of `Attempt` for the
+/// user's own counters. Tied to the outcome, the group it was logged on, and
+/// the live session.
+@Model
+final class CustomTally {
+    var id: UUID = UUID()
+    var timestamp: Date
+    var outcome: CustomOutcome?
+    var group: StuntGroup?
+    var session: PracticeSession?
+
+    init(outcome: CustomOutcome?, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, id: UUID = UUID()) {
+        self.id = id
+        self.outcome = outcome
+        self.group = group
+        self.session = session
+        self.timestamp = timestamp
+    }
 }
 
 // MARK: - Team scoping helpers

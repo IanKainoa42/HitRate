@@ -19,19 +19,31 @@ private struct RenameField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField(prompt, text: $draft)
-            .focused($focused)
-            .submitLabel(.done)
-            .onAppear {
-                guard !loaded else { return }
-                draft = value
-                loaded = true
+        HStack(spacing: 6) {
+            TextField(prompt, text: $draft)
+                .focused($focused)
+                .submitLabel(.done)
+                .onAppear {
+                    guard !loaded else { return }
+                    draft = value
+                    loaded = true
+                }
+                .onChange(of: focused) { _, nowFocused in
+                    if !nowFocused { commit(draft) }   // tapped away
+                }
+                .onSubmit { commit(draft) }
+                .onDisappear { commit(draft) }         // sheet dismissed via Done
+            // Pencil signals the word is editable (the plain field read as a
+            // fixed label before). Hidden while editing.
+            if !focused {
+                Image(systemName: "pencil")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.label3)
             }
-            .onChange(of: focused) { _, nowFocused in
-                if !nowFocused { commit(draft) }   // tapped away
-            }
-            .onSubmit { commit(draft) }
-            .onDisappear { commit(draft) }         // sheet dismissed via Done
+        }
+        // Tapping anywhere on the row — pencil or padding — starts editing.
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
     }
 }
 
@@ -62,23 +74,17 @@ struct GroupsEditorView: View {
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
 
+    /// The active folder's user-created outcomes, in display order.
+    private var customOutcomes: [CustomOutcome] {
+        (currentTeam?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
     // Bucket wording for the active folder (its `itemNoun` override, else the
     // AppMode default). Views read these, never `mode.noun` directly.
     private var noun: String { currentTeam.noun(for: mode) }
     private var nounTitle: String { currentTeam.nounTitle(for: mode) }
     private var nounPlural: String { currentTeam.nounPlural(for: mode) }
     private var nounPluralTitle: String { currentTeam.nounPluralTitle(for: mode) }
-
-    /// Folder item-noun presets offered in the editor; "" = AppMode default.
-    private let nounPresets: [(label: String, value: String)] = [
-        ("Default", ""), ("Skills", "skill"), ("Groups", "group"), ("Athletes", "athlete"),
-    ]
-
-    /// Drives the active folder's `tracksDrivers` flag (saves on change).
-    private var tracksDriversBinding: Binding<Bool> {
-        Binding(get: { currentTeam?.tracksDrivers ?? false },
-                set: { currentTeam?.tracksDrivers = $0; try? context.save() })
-    }
 
     var body: some View {
         NavigationStack {
@@ -208,14 +214,7 @@ struct GroupsEditorView: View {
                     .listRowBackground(glassRow)
                 }
 
-                Section {
-                    Toggle("Track execution drivers", isOn: tracksDriversBinding)
-                } header: {
-                    Text("Advanced · \(currentTeam?.name ?? "")")
-                } footer: {
-                    Text("Adds a dropdown on each logged rep to flag which United execution driver broke (Bases, Top Person, Landings, Synch…), by skill category. Tap-to-submit on the pad is unchanged. Per-folder.")
-                }
-                .listRowBackground(glassRow)
+                customOutcomesSection
 
                 Section {
                     Toggle("Tap sounds", isOn: $soundsOn)
@@ -328,6 +327,80 @@ struct GroupsEditorView: View {
         }
     }
 
+    // MARK: Custom outcomes (per folder)
+
+    @ViewBuilder
+    private var customOutcomesSection: some View {
+        Section {
+            ForEach(customOutcomes) { o in
+                HStack(spacing: 10) {
+                    // Single-pick color menu (closes after one — fine for a
+                    // one-shot choice; the hated close-after-each was multi-select).
+                    Menu {
+                        ForEach(0..<Theme.groupRainbow.count, id: \.self) { i in
+                            Button {
+                                o.colorIndex = i
+                                try? context.save()
+                            } label: {
+                                Label("Color \(i + 1)",
+                                      systemImage: o.colorIndex == i ? "checkmark.circle.fill" : "circle.fill")
+                            }
+                        }
+                    } label: {
+                        Circle().fill(o.color).frame(width: 18, height: 18)
+                            .overlay(Circle().stroke(.white.opacity(0.15), lineWidth: 1))
+                    }
+                    RenameField(prompt: "Name", value: o.name) { new in
+                        let t = new.trimmingCharacters(in: .whitespaces)
+                        guard !t.isEmpty else { return }
+                        o.name = t
+                        try? context.save()
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button("Delete") { deleteCustomOutcome(o) }.tint(.red)
+                }
+            }
+            .onDelete { idx in if let i = idx.first { deleteCustomOutcome(customOutcomes[i]) } }
+            .onMove { from, to in
+                var arr = customOutcomes
+                arr.move(fromOffsets: from, toOffset: to)
+                for (i, o) in arr.enumerated() { o.orderIndex = i }
+                try? context.save()
+            }
+
+            Button {
+                addCustomOutcome()
+            } label: {
+                Label("Add issue", systemImage: "plus")
+            }
+        } header: {
+            Text("Issues · \(currentTeam?.name ?? "")")
+        } footer: {
+            Text("Issues this folder tracks — anything that comes up that you want to count (e.g. timing off, wrong count, dropped). They appear as their own tap buttons in practice and tally separately, so they never change your hit-rate.")
+        }
+        .listRowBackground(glassRow)
+    }
+
+    private func addCustomOutcome() {
+        let outs = customOutcomes
+        let next = (outs.map(\.orderIndex).max() ?? -1) + 1
+        let co = CustomOutcome(name: "Issue \(outs.count + 1)",
+                               colorIndex: outs.count % Theme.groupRainbow.count,
+                               orderIndex: next)
+        co.team = currentTeam
+        context.insert(co)
+        try? context.save()
+    }
+
+    private func deleteCustomOutcome(_ o: CustomOutcome) {
+        withAnimation {
+            context.delete(o)   // cascades its tallies
+            for (i, x) in customOutcomes.enumerated() { x.orderIndex = i }
+            try? context.save()
+        }
+    }
+
     // MARK: Teams
 
     @ViewBuilder
@@ -349,25 +422,19 @@ struct GroupsEditorView: View {
                         t.name = trimmed
                         try? context.save()
                     }
-                    Spacer()
-                    // What this folder calls its buckets — per-folder override.
-                    Menu {
-                        ForEach(nounPresets, id: \.value) { preset in
-                            Button {
-                                t.itemNoun = preset.value
-                                try? context.save()
-                            } label: {
-                                if t.itemNoun == preset.value {
-                                    Label(preset.label, systemImage: "checkmark")
-                                } else {
-                                    Text(preset.label)
-                                }
-                            }
+                    Spacer(minLength: 6)
+                    // What this folder calls its buckets — free text (skill,
+                    // group, section, athlete… whatever). Blank = app default.
+                    HStack(spacing: 3) {
+                        Text("tracks")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.label3)
+                        RenameField(prompt: mode.noun, value: t.itemNoun) { new in
+                            t.itemNoun = new.trimmingCharacters(in: .whitespaces).lowercased()
+                            try? context.save()
                         }
-                    } label: {
-                        Text("Tracks: \(t.nounPluralTitle(for: mode))")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 72)
                     }
                     Text("\(groupCount(t))")
                         .font(.system(size: 12, weight: .semibold))
@@ -379,6 +446,10 @@ struct GroupsEditorView: View {
                         Button("Delete") { requestTeamDelete(t) }.tint(.red)
                     }
                 }
+                // The only folder can't be deleted (reps need a home). Disable
+                // the edit-mode minus too, or it animates the row away and then
+                // pops back when the guard blocks the delete.
+                .deleteDisabled(teams.count <= 1)
             }
             .onDelete { idx in   // edit-mode minus button path
                 guard let i = idx.first else { return }

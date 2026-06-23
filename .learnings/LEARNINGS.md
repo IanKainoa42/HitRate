@@ -221,3 +221,31 @@
 - **Category:** knowledge_gap
 - **What happened:** `upload_app_privacy_details_to_app_store` has no api_key option and ignores `Spaceship::ConnectAPI.token` — it requires an Apple ID web session. Headless run died "Unauthorized Access"; with FASTLANE_USER + FASTLANE_PASSWORD (1Password "Apple Developer Portal", vault SecretAgent) it prompts for a 6-digit 2FA code on stdin. First code expired (each login attempt invalidates prior codes); piping the freshest code worked: `printf 'CODE\n' | fastlane ship_privacy`.
 - **Rule:** For App Privacy updates, expect an interactive 2FA round-trip with Ian. Age rating + screenshots + metadata all go through `ship_listing` (deliver + API key, no 2FA). Watch screenshots: capture on an Ultra sim with `--demo-roster` (WCSession between sims is unreliable; `simctl pair_activate` switches the active watch but sync still may not arrive), then `sips -z 502 410` to the ASC-accepted size.
+
+## 2026-06-22 — Stale-build install trap (`find | head -1`)
+
+- **Category:** correction
+- **What happened:** Installed HitRate via `APP=$(find ~/Library/.../DerivedData -path "*Debug-iphonesimulator/HitRate.app" | head -1)`. Multiple DerivedData dirs exist (worktrees + Xcode rekeys), so `head -1` grabbed a STALE product (Jun 13) while xcodebuild was compiling into a DIFFERENT dir (`ehzk`). Every install/launch ran old code; user saw none of the new features ("no option to choose") for several turns.
+- **Rule:** Never `find | head -1` for the app product. Get the real path from `xcodebuild -showBuildSettings | grep BUILT_PRODUCTS_DIR`, or build with explicit `-derivedDataPath ./build` and install from there. Also: `simctl launch` on an already-running app may just foreground the old instance — `simctl terminate` before launch to force a reload. Verify deploy with `stat -f '%Sm' "$APP"` (mtime must be today).
+
+## 2026-06-22 — SwiftUI .onDelete pop-back; outcome model direction
+
+- **Category:** correction / best_practice
+- **What happened:** Deleting the last folder "popped back" — List `.onDelete` animates the row away BEFORE the handler runs; the handler's `guard count > 1` then blocked the delete, so the row reappeared. Fix: `.deleteDisabled(teams.count <= 1)` on the row so the affordance never shows for the un-deletable case (don't tease a delete that can't complete). Same class as the documented swipe-snap-back.
+- **Rule:** Any conditionally-blocked List delete must gate the affordance (`.deleteDisabled`) — never block inside the handler after the row already animated.
+- **Outcome-model feedback (Ian):** Outcomes are fundamentally 4 color-coded severity slots (green/yellow/orange/red). Wants suggested-but-editable names, leaning "always show a suggestion, let user rename." Workshop open: one set vs per-kind vs per-category suggestions. Keep driver layer advanced/opt-in so simple stays simple.
+
+## 2026-06-22 — Custom outcomes: inline buttons, NOT dropdowns (Ian)
+
+- **Category:** correction / best_practice
+- **What happened:** Built United execution-driver tagging via a SwiftUI Menu dropdown. Ian: "too obscure," and HATES that a Menu closes after each pick so multi-select means reopening it every time. Cut it.
+- **Rule:** For HitRate logging, outcomes are TAP BUTTONS on the pad (tap +1, long-press −1, gesture view not Button), never a dropdown/Menu. "Create my own outcomes" = user-created CustomOutcome per FOLDER (Team), shown as a second button group under the locked 4. Tallied via a SEPARATE model (CustomTally) so the sacred hit-rate/cards/tournament math (the 4 severity slots) is never polluted. Keep base 4 locked + renameable.
+
+- 2026-06-22 follow-up: user-facing name for the custom-tally feature is **"Issues"** (model stays `CustomOutcome`/`CustomTally`). Editor section "Issues", pad group "ISSUES", "Add issue". Framing: things that come up to track, separate from hit/bobble/building-fall logic.
+
+## 2026-06-22 — Logging refinements (Ian)
+
+- **Category:** correction / best_practice
+- Issues buttons must be ~half the size of the locked-4 wells (flat dot·name·count row, h≈44 vs 92) so they read as a secondary tier.
+- **Bug:** switching Grid→Pad cleared staged wave reps (`staged = [:]`). Fix: auto-commit staged reps on layout switch (`if stagedReps > 0 { commitWave() }`) — assume the user meant to keep their taps; never silently drop logged-intent.
+- Bucket noun is FREE TEXT per folder (skill / group / section / athlete / anything), not a fixed preset list — `Team.itemNoun` via a RenameField. Everything bucket-labeled (Add button, weekly "X OF THE WEEK", entrant subtitles) must route through the folder noun, never hardcode "group" or `mode.nounTitle`.

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// "WEEKLY GAME" — the built-in rotating competition. Each week one of three
 /// games is live (RATE CUP / GRIND CUP / STREAK CUP); the card crowns the
@@ -15,10 +16,16 @@ struct WeeklyTournamentCard: View {
     @State private var view = "Week"
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    @AppStorage("currentTeamID") private var currentTeamID = ""
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
-    /// "SKILL OF THE WEEK" / "GROUP OF THE WEEK".
-    private var crownLabel: String { "\(mode.nounTitle.uppercased()) OF THE WEEK" }
+    /// The active folder's word for a bucket (skill / group / section / …),
+    /// falling back to the AppMode default.
+    private var nounTitle: String { teams.current(id: currentTeamID).nounTitle(for: mode) }
+
+    /// "SKILL OF THE WEEK" / "GROUP OF THE WEEK" / "SECTION OF THE WEEK"…
+    private var crownLabel: String { "\(nounTitle.uppercased()) OF THE WEEK" }
 
     private var showingWeek: Bool { weekOnly || view == "Week" }
 
@@ -109,7 +116,7 @@ struct WeeklyTournamentCard: View {
                     .foregroundStyle(Theme.label)
                     .lineLimit(1)
                 Text(s.isGhost ? "Your average week, plus a little luck"
-                     : "\(mode.nounTitle) \(s.number) · \(s.total) rep\(s.total == 1 ? "" : "s")")
+                     : "\(nounTitle) \(s.number) · \(s.total) rep\(s.total == 1 ? "" : "s")")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.label3)
             }
