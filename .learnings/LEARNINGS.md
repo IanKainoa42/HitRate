@@ -249,3 +249,14 @@
 - Issues buttons must be ~half the size of the locked-4 wells (flat dot·name·count row, h≈44 vs 92) so they read as a secondary tier.
 - **Bug:** switching Grid→Pad cleared staged wave reps (`staged = [:]`). Fix: auto-commit staged reps on layout switch (`if stagedReps > 0 { commitWave() }`) — assume the user meant to keep their taps; never silently drop logged-intent.
 - Bucket noun is FREE TEXT per folder (skill / group / section / athlete / anything), not a fixed preset list — `Team.itemNoun` via a RenameField. Everything bucket-labeled (Add button, weekly "X OF THE WEEK", entrant subtitles) must route through the folder noun, never hardcode "group" or `mode.nounTitle`.
+
+## 2026-06-24 — Diagnose iOS data loss from the on-device SwiftData store
+
+- **Category:** best_practice
+- **What happened:** User reported a HitRate folder dropping 3 skills → 1 + lost reps. Rather than guess, pulled the live store off the device and read it.
+- **Rule:** To diagnose SwiftData data loss on a real device:
+  1. List the container: `xcrun devicectl device info files --device <UDID> --domain-type appDataContainer --domain-identifier <bundleid> --username mobile`
+  2. Copy the store: `xcrun devicectl device copy from --device <UDID> --domain-type appDataContainer --domain-identifier <bundleid> --user mobile --source "Library/Application Support/default.store" --destination <path>` (also pull `-shm` and `-wal`).
+  3. Read with `sqlite3`: SwiftData tables are `Z<ENTITY>` (ZTEAM, ZSTUNTGROUP, ZATTEMPT). Relationships are integer FKs to `Z_PK`. Timestamps are Core Data epoch: `datetime(ZTIMESTAMP+978307200,'unixepoch','localtime')`.
+  4. **Persistent history pinpoints deletes:** `ACHANGE` (ZCHANGETYPE 0=insert/1=update/2=delete, ZENTITY, ZENTITYPK, ZTRANSACTIONID) JOIN `ATRANSACTION` (ZTIMESTAMP, ZAUTHOR) gives the exact time each row was deleted. PK gaps in a table = prior deletions.
+- **HitRate root cause found this way:** skill delete cascade-deletes its reps; `sweepOrphanedAttempts` hard-deleted reps on launch (traced a 1738-rep wipe to it). Fix = soft-delete/Trash + stop auto-deleting on launch.
