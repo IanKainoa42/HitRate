@@ -1,5 +1,46 @@
 import SwiftUI
 import SwiftData
+import CheerRulesKit
+
+/// The four first-run focus areas. Each maps to a CheerRulesKit `SkillCategory`
+/// — which carries that skill's execution drivers (the issues you tag a rep
+/// against) — and seeds a set of suggested skill names. Pyramid folds into
+/// Stunts and tumbling is one area (standing/running share identical drivers),
+/// so the picker stays four wide.
+enum OnboardingFocus: String, CaseIterable, Identifiable {
+    case stunts, tumbling, jumps, tosses
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .stunts: "Stunts"
+        case .tumbling: "Tumbling"
+        case .jumps: "Jumps"
+        case .tosses: "Tosses"
+        }
+    }
+
+    var category: SkillCategory {
+        switch self {
+        case .stunts: .stunts
+        case .tumbling: .standingTumbling
+        case .jumps: .jumps
+        case .tosses: .tosses
+        }
+    }
+
+    var icon: String { category.icon }
+
+    var suggestions: [String] {
+        switch self {
+        case .stunts: ["Prep", "Extension", "Full up lib", "Released inversion"]
+        case .tumbling: ["Roundoff", "Back walkover", "Back handspring", "Roundoff double HS"]
+        case .jumps: ["Pencil jump", "Toe touch", "Left hurdler", "Right hurdler", "Pike", "Double toe touch"]
+        case .tosses: ["Straight ride", "Full twist", "Kick full basket", "Double basket", "Kick double basket"]
+        }
+    }
+}
 
 /// First launch: choose who's counting (athlete vs coach), name the identity,
 /// and create the first skills/groups. Nothing is pre-seeded — every bucket
@@ -19,11 +60,8 @@ struct OnboardingView: View {
 
     @State private var mode: AppMode?
     @State private var draft = ""
-    @State private var draftKind: SkillKind = .stunt
-    @State private var pending: [(name: String, kind: SkillKind)] = []   // buckets created on finish
-
-    private let stuntSuggestions = ["Lib", "Stretch", "Full up", "Rewind", "Toss hands"]
-    private let tumblingSuggestions = ["Back handspring", "Tuck", "Layout", "Full"]
+    @State private var focus: OnboardingFocus = .stunts
+    @State private var pending: [(name: String, focus: OnboardingFocus)] = []   // skills created on finish
 
     /// Names already on the current roster — on an intro replay the chips
     /// shouldn't offer buckets the user already has.
@@ -140,11 +178,11 @@ struct OnboardingView: View {
                 .padding(.top, 2)
 
             Text(mode == .athlete ? "Make it yours" : "Set up your floor")
-                .font(Theme.grotesk(26))
+                .font(Theme.grotesk(22))
                 .foregroundStyle(.white)
             Text(mode == .athlete
-                 ? "Your name goes on your cards. Add the skills you're counting — or add them later."
-                 : "Your program goes on the cards. Add your stunt groups — or add them later.")
+                 ? "Your name goes on your cards."
+                 : "Your program goes on the cards.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.6))
 
@@ -157,11 +195,17 @@ struct OnboardingView: View {
                         glassField("Team (e.g. Senior Coed)", text: $teamName)
                     }
 
-                    Text(mode == .athlete ? "YOUR SKILLS" : "YOUR GROUPS")
-                        .font(Theme.grotesk(10))
-                        .tracking(1.8)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.top, 6)
+                    // The headline ask — big and bold, not a faint caption.
+                    Text("What skills do you want to track?")
+                        .font(Theme.grotesk(22))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                    Text("Pick a focus, then tap the skills you do. You can add more anytime.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+
+                    focusPicker
 
                     ForEach(Array(pending.enumerated()), id: \.offset) { i, item in
                         HStack(spacing: 10) {
@@ -174,20 +218,18 @@ struct OnboardingView: View {
                             Text(item.name)
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
-                            if mode == .athlete {
-                                HStack(spacing: 4) {
-                                    Image(systemName: item.kind.icon)
-                                        .font(.system(size: 8, weight: .semibold))
-                                    Text(item.kind.label.uppercased())
-                                }
-                                .font(Theme.grotesk(8))
-                                .tracking(1.2)
-                                .foregroundStyle(.white.opacity(0.45))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(.white.opacity(0.07))
-                                .clipShape(Capsule())
+                            HStack(spacing: 4) {
+                                Image(systemName: item.focus.icon)
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text(item.focus.label.uppercased())
                             }
+                            .font(Theme.grotesk(8))
+                            .tracking(1.2)
+                            .foregroundStyle(.white.opacity(0.45))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(.white.opacity(0.07))
+                            .clipShape(Capsule())
                             Spacer()
                             Button {
                                 pending.remove(at: i)
@@ -208,7 +250,7 @@ struct OnboardingView: View {
 
                     HStack(spacing: 10) {
                         TextField("", text: $draft,
-                                  prompt: Text(mode == .athlete ? "Skill name" : "Group \(pending.count + 1)")
+                                  prompt: Text("Add your own \(focus.label.lowercased()) skill")
                                     .foregroundStyle(.white.opacity(0.35)))
                             .font(.system(size: 15))
                             .foregroundStyle(.white)
@@ -232,50 +274,13 @@ struct OnboardingView: View {
                         .buttonStyle(.plain)
                     }
 
-                    if mode == .athlete {
-                        // Manual adds need a kind — stunt vs tumbling picks the
-                        // outcome wording on the pad.
-                        HStack(spacing: 8) {
-                            ForEach(SkillKind.allCases) { k in
-                                let on = draftKind == k
-                                Button {
-                                    draftKind = k
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: k.icon)
-                                            .font(.system(size: 10, weight: .semibold))
-                                        Text(k.label)
-                                            .font(.system(size: 12, weight: .semibold))
-                                    }
-                                    .foregroundStyle(on ? Theme.navy : .white.opacity(0.7))
-                                    .padding(.horizontal, 11)
-                                    .padding(.vertical, 6)
-                                    .background(on ? .white : .white.opacity(0.06))
-                                    .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(.white.opacity(on ? 0 : 0.14), lineWidth: 1))
-                                    .contentShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            Spacer()
-                        }
-
-                        // Starter ideas — tapping one still *creates* it; nothing is pre-made.
-                        suggestionHeader("STUNTS")
-                        FlowChips(options: available(stuntSuggestions)) { name in
-                            pending.append((name, .stunt))
-                        }
-                        suggestionHeader("TUMBLING")
-                        FlowChips(options: available(tumblingSuggestions)) { name in
-                            pending.append((name, .tumbling))
-                        }
-                    } else {
-                        // Coach starter ideas
-                        let groupSuggestions = ["Group 1", "Group 2", "Group 3", "Group 4", "Group 5"]
-                        suggestionHeader("STARTER GROUPS")
-                        FlowChips(options: available(groupSuggestions)) { name in
-                            pending.append((name, .stunt))
-                        }
+                    // Suggested skills for the chosen focus. Tapping one still
+                    // *creates* it, tagged with that focus's category (so its
+                    // execution drivers are right from the first rep); nothing is
+                    // pre-made. The field above adds your own.
+                    suggestionHeader("\(focus.label.uppercased()) — SUGGESTED")
+                    FlowChips(options: available(focus.suggestions)) { name in
+                        pending.append((name, focus))
                     }
                 }
                 .padding(.bottom, 12)
@@ -327,12 +332,39 @@ struct OnboardingView: View {
             .padding(.top, 2)
     }
 
+    /// The four focus areas — each selects which suggested skills show AND which
+    /// execution-driver set a created skill carries.
+    private var focusPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(OnboardingFocus.allCases) { f in
+                let on = focus == f
+                Button { focus = f } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: f.icon)
+                            .font(.system(size: 14, weight: .semibold))
+                        Text(f.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(on ? Theme.navy : .white.opacity(0.7))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(on ? .white : .white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(.white.opacity(on ? 0 : 0.14), lineWidth: 1))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private func addPending() {
         let name = draft.trimmingCharacters(in: .whitespaces)
-        let fallback = mode == .coach ? "Group \(pending.count + 1)" : ""
-        let final = name.isEmpty ? fallback : name
-        guard !final.isEmpty else { return }
-        pending.append((final, mode == .athlete ? draftKind : .stunt))
+        guard !name.isEmpty else { return }
+        pending.append((name, focus))
         draft = ""
     }
 
@@ -353,8 +385,11 @@ struct OnboardingView: View {
         let base = allGroups.filter { $0.team?.id == team.id }.count
         for (i, item) in pending.enumerated() {
             let g = StuntGroup(name: item.name, number: base + i + 1,
-                               orderIndex: base + i, kind: item.kind)
+                               orderIndex: base + i)
             g.team = team
+            // Tag the skill's United category — this both sets the outcome kind
+            // and carries the execution drivers (the issues you tag a rep with).
+            g.category = item.focus.category
             context.insert(g)
         }
         try? context.save()

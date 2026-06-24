@@ -107,6 +107,57 @@ A created skill's category sets its `hitRateKind` (`.tumbling` for tumbling,
 - Build number bumped in `project.yml` for both targets, then `xcodegen
   generate`; ship via fastlane `ship_upload`.
 
+## Addendum 2026-06-24 — device test findings + expanded scope
+
+On-device test of the rebuilt 1.1 surfaced a **data-loss class of bug** plus a
+gap in the outcome model. Scope expanded (user: "fold it in now"). The build
+becomes a proper multi-stage cycle, NOT a same-day ship.
+
+### Forensic finding (data loss — confirmed via on-device store)
+
+Pulled `default.store` off ianPad and read SwiftData's persistent history:
+- Store is healthy (3 folders, 16 skills, 17 reps) — NOT a global wipe or
+  in-memory fallback.
+- Lucy's missing skill = `StuntGroup` PK 25, **deleted 2026-06-23 17:59:11**;
+  the same transaction cascade-deleted its 37 logged reps.
+- A separate transaction at 17:55:48 deleted **1,738 attempts** at once.
+- Root cause is a class of **destructive delete paths**: skill delete cascades
+  its reps; `sweepOrphanedAttempts` hard-deletes orphaned reps on launch with no
+  prompt; staged practice reps drop if the session ends before Submit.
+- Deleted rows are unrecoverable (history stores only row IDs, not data).
+
+### Stage A — Data-integrity gate (build + device-verify FIRST)
+
+1. **Soft-delete / Trash.** Add `deletedAt: Date?` to `StuntGroup` and `Team`.
+   Deleting sets `deletedAt` instead of removing; the row and its reps are kept.
+   Every roster query filters `deletedAt == nil`. A Trash section (in Data
+   Management) lists soft-deleted skills/folders with Restore and an explicit
+   "Delete permanently." No auto-purge in v1 — nothing is hard-deleted without
+   an explicit permanent-delete tap.
+2. **No launch-time hard delete.** `sweepOrphanedAttempts` stops deleting;
+   orphaned attempts are re-homed (or left), never destroyed on launch.
+3. **Confirm before skill delete** when the skill has reps, showing the count.
+4. **Auto-commit staged reps on End** — ending a practice commits staged reps
+   instead of dropping them; plus a larger/clearer Submit affordance.
+
+### Stage B — Per-category outcomes + grid
+
+Today `SkillCategory.hitRateKind` collapses jumps/tosses into the *stunt*
+outcome words, and the grid renders ONE outcome-header row keyed to a single
+kind — so jumps/tosses have no outcomes of their own and the grid can't show
+per-skill outcomes. Stage B gives each category its own taggable
+outcome/issue set (surfacing the CheerRulesKit execution drivers) WITHOUT
+disturbing the load-bearing 4 severity slots / hit-rate spine, and reworks the
+grid to show each skill's own outcomes. Detailed design TBD before building
+(its own design pass — touches the Outcome/OutcomeNames/grid fragile areas).
+
+### Stage C — Navigation
+
+- A "Skills" button replacing the small header dropdown.
+- Opening the editor while already inside a folder must NOT show the
+  folder-picker ("Choose your folder") — you're already in it; switching folders
+  happens by exiting to the folder-list home.
+
 ## Testing
 
 No test target exists (project mechanics note). Verification is the on-device

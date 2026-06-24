@@ -41,6 +41,7 @@
 		BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD34ACD23F8DA7A6168614F /* Components.swift */; };
 		BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */; };
 		C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724ED0A599E2826857191AD3 /* DataManagementView.swift */; };
+		C3D91D1EFFBD17AD2D9D0882 /* FolderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404429588572142C218018D5 /* FolderListView.swift */; };
 		C6CE9FFACF20F129D966110D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 682FC96676B2F3C23E0A2C50 /* Assets.xcassets */; };
 		CA745130292CAC719774B178 /* HitRateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354E38DADE87EAEA70210445 /* HitRateApp.swift */; };
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
@@ -97,6 +98,7 @@
 		3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRate.entitlements; sourceTree = "<group>"; };
 		3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveCardView.swift; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
+		404429588572142C218018D5 /* FolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderListView.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
@@ -172,6 +174,7 @@
 		2536EE1F284E212EB3F82F36 /* Home */ = {
 			isa = PBXGroup;
 			children = (
+				404429588572142C218018D5 /* FolderListView.swift */,
 				FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */,
 				BCD1AA942B68F4E661CF6471 /* HomeView.swift */,
 				3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */,
@@ -459,6 +462,7 @@
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
 				FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */,
+				C3D91D1EFFBD17AD2D9D0882 /* FolderListView.swift in Sources */,
 				52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */,
 				FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */,
 				CA745130292CAC719774B178 /* HitRateApp.swift in Sources */,

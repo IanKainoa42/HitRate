@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    /// Return to the folder-list home. Nil when Home is shown standalone.
+    var onExit: (() -> Void)? = nil
+
     @Environment(\.modelContext) private var context
     @Query private var sessions: [PracticeSession]
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
@@ -273,7 +276,7 @@ struct HomeView: View {
     private var teamSwitcher: some View {
         Menu {
             Picker("Team", selection: $currentTeamID) {
-                ForEach(teams) { t in
+                ForEach(teams.active) { t in
                     Text(t.name).tag(t.id.uuidString)
                 }
             }
@@ -296,6 +299,19 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
+            // Back to the folder list (when Home was opened from it).
+            if let onExit {
+                Button(action: onExit) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.label2)
+                        .frame(width: 34, height: 34)
+                        .background(iconButtonBackground)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 // Wordmark mirrors the app icon: solid HIT, outlined RATE,
                 // single green signal dot.

@@ -139,6 +139,9 @@ struct LogView: View {
                 }
                 Spacer()
                 Button {
+                    // Ending must never silently drop staged reps — the Submit
+                    // button is easy to miss. Commit any staged batch first.
+                    if stagedReps > 0 { commitWave() }
                     // A session with reps ends here; an empty one stays live
                     // and Home deletes it on dismiss (mutating-then-rendering
                     // a deleted model mid-animation crashes).

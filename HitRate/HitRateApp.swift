@@ -51,17 +51,34 @@ struct RootView: View {
     // so the wrist mirrors whatever the phone has up.
     @AppStorage("selectedGroupID") private var padSelectedGroupID = ""
 
+    /// Which folder's dashboard is open. Nil → the folder-list home (the launch
+    /// root). Deliberately @State, not persisted: every cold launch lands on the
+    /// folder list, per the "open straight to folders" design.
+    @State private var openFolderID: String?
+
     var body: some View {
         Group {
-            // No tab bar — practice is occasional, the dashboard is the app.
-            // The counter lives in a full-screen cover off Home's practice pill.
+            // No tab bar — the folder list is home, a folder's dashboard is one
+            // tap in, and the counter lives in a cover off the dashboard's pill.
             if didOnboard {
-                HomeView()
+                if let id = openFolderID, teams.contains(where: { $0.id.uuidString == id }) {
+                    HomeView(onExit: { openFolderID = nil })
+                } else {
+                    FolderListView(onOpen: { team in
+                        currentTeamID = team.id.uuidString
+                        openFolderID = team.id.uuidString
+                    })
+                }
             } else {
                 OnboardingView()
             }
         }
         .tint(Theme.accent)
+        // Finishing onboarding drops the user straight into the folder they just
+        // built (its dashboard), not back out to the list.
+        .onChange(of: didOnboard) { _, now in
+            if now { openFolderID = currentTeamID }
+        }
         .onAppear {
             CardCatalogRenderer.runIfRequested()
             dedupeSyncIDs()
@@ -200,7 +217,7 @@ struct RootView: View {
 
         if !orphanGroups.isEmpty {
             let home: Team
-            if let first = teams.first {
+            if let first = teams.active.first {
                 home = first
             } else {
                 let name = teamName.isEmpty ? "My Team" : teamName
@@ -211,8 +228,8 @@ struct RootView: View {
             dirty = true
         }
 
-        // Pin the active team if it's unset or points at a deleted team.
-        if teams.current(id: currentTeamID) == nil, let first = teams.first {
+        // Pin the active team if it's unset or points at a trashed/deleted team.
+        if teams.current(id: currentTeamID) == nil, let first = teams.active.first {
             currentTeamID = first.id.uuidString
         } else if currentTeamID.isEmpty, let home = orphanGroups.first?.team {
             currentTeamID = home.id.uuidString
@@ -221,17 +238,14 @@ struct RootView: View {
         if dirty { try? context.save() }
     }
 
-    /// Group deletes now cascade their attempts, but installs from before the
-    /// cascade may hold orphaned attempts (group → nil) that distort the trend
-    /// and tape while being invisible in the rate. Deleting the group meant
-    /// deleting its reps — finish the job once.
-    private func sweepOrphanedAttempts() {
-        let orphans = (try? context.fetch(
-            FetchDescriptor<Attempt>(predicate: #Predicate { $0.group == nil }))) ?? []
-        guard !orphans.isEmpty else { return }
-        for a in orphans { context.delete(a) }
-        try? context.save()
-    }
+    /// NEVER auto-delete reps on launch. (This used to hard-delete every
+    /// group-less attempt, which silently destroyed data — a 1,738-rep wipe was
+    /// traced to it.) Orphaned attempts are already invisible to stats (those
+    /// filter by group membership), so leaving them is harmless; nothing is
+    /// destroyed without an explicit user "Delete permanently" from the Trash.
+    /// With soft-delete, skills are no longer hard-deleted, so new orphans don't
+    /// arise either. Kept as a documented no-op so the call site stays obvious.
+    private func sweepOrphanedAttempts() { /* intentionally does nothing */ }
 
     /// A session left running from a previous day ends at its last rep —
     /// otherwise reps logged "today" land in a session dated days ago and

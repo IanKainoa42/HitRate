@@ -12,10 +12,13 @@ import CheerRulesKit
 enum AppMode: String {
     case athlete, coach
 
-    var noun: String { self == .athlete ? "skill" : "group" }
-    var nounPlural: String { self == .athlete ? "skills" : "groups" }
-    var nounTitle: String { self == .athlete ? "Skill" : "Group" }
-    var nounPluralTitle: String { self == .athlete ? "Skills" : "Groups" }
+    // Buckets are "skills" universally now (athlete AND coach — a coach just
+    // makes a skill per stunt group). The mode still differs on identity and
+    // whose name rides the cards, but never on the bucket word.
+    var noun: String { "skill" }
+    var nounPlural: String { "skills" }
+    var nounTitle: String { "Skill" }
+    var nounPluralTitle: String { "Skills" }
 
     /// For non-view code (CSV export). Views should observe @AppStorage("appMode").
     static var current: AppMode {
@@ -194,6 +197,10 @@ final class Team {
     /// existing stores migrate lightweight. Stored singular + lowercase; the
     /// `noun(for:)` helpers derive plural/title forms.
     var itemNoun: String = ""
+    /// Soft-delete tombstone. Non-nil = in the Trash: hidden from every roster/
+    /// stat but its skills and reps are KEPT and restorable. Nothing is hard-
+    /// deleted without an explicit "Delete permanently" from the Trash.
+    var deletedAt: Date? = nil
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
@@ -214,10 +221,12 @@ final class Team {
     // Every view that labels buckets should read these (not `mode.noun`
     // directly) so one folder can track "athletes" and another "skills".
 
-    private var customNoun: String? {
-        let t = itemNoun.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? nil : t.lowercased()
-    }
+    // The per-folder noun override was retired (it produced nonsense like an
+    // athlete folder's "Add athlete"). Buckets are "skill" everywhere now; the
+    // stored `itemNoun` is ignored for wording and kept only so old stores
+    // migrate lightweight. Always nil → every `noun(for:)` falls back to the
+    // (now universal) AppMode word.
+    private var customNoun: String? { nil }
 
     func noun(for mode: AppMode) -> String { customNoun ?? mode.noun }
 
@@ -257,6 +266,9 @@ final class StuntGroup {
     /// (default) = derive from the legacy `kindRaw`, so existing tumbling skills
     /// keep their kind through migration instead of all collapsing to stunts.
     var categoryRaw: String = ""
+    /// Soft-delete tombstone — see `Team.deletedAt`. Non-nil = trashed: hidden
+    /// from rosters/stats but the skill and its reps are kept and restorable.
+    var deletedAt: Date? = nil
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -394,19 +406,31 @@ final class CustomTally {
 // MARK: - Team scoping helpers
 
 extension Array where Element == Team {
+    /// Folders not in the Trash, in order.
+    var active: [Team] { filter { $0.deletedAt == nil } }
+    /// Folders currently in the Trash, most-recently-deleted first.
+    var trashed: [Team] { filter { $0.deletedAt != nil }.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) } }
+
     /// The active team for a stored `currentTeamID` (uuidString), falling back
-    /// to the first team. Nil only when there are no teams at all.
+    /// to the first ACTIVE team. Never resolves to a trashed folder.
     func current(id: String) -> Team? {
-        first { $0.id.uuidString == id } ?? first
+        let live = active
+        return live.first { $0.id.uuidString == id } ?? live.first
     }
 }
 
 extension Array where Element == StuntGroup {
-    /// The buckets belonging to one team, in display order. With no team yet
-    /// (pre-migration), every bucket shows — RootView assigns them to a default
-    /// team momentarily.
+    /// Skills not in the Trash.
+    var active: [StuntGroup] { filter { $0.deletedAt == nil } }
+    /// Skills in the Trash, most-recently-deleted first.
+    var trashed: [StuntGroup] { filter { $0.deletedAt != nil }.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) } }
+
+    /// The (non-trashed) buckets belonging to one team, in display order. With
+    /// no team yet (pre-migration), every active bucket shows — RootView assigns
+    /// them to a default team momentarily. Trashed skills never appear.
     func inTeam(_ team: Team?) -> [StuntGroup] {
-        let scoped = team.map { t in filter { $0.team?.id == t.id } } ?? self
+        let live = active
+        let scoped = team.map { t in live.filter { $0.team?.id == t.id } } ?? live
         return scoped.sorted { $0.orderIndex < $1.orderIndex }
     }
 }

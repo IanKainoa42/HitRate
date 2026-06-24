@@ -267,13 +267,13 @@ struct GroupsEditorView: View {
                     set: { if !$0 { pendingDelete = nil } }),
                 presenting: pendingDelete
             ) { g in
-                Button("Delete \(noun) & reps", role: .destructive) {
-                    context.delete(g)
+                Button("Move to Trash", role: .destructive) {
+                    withAnimation { softDelete(g) }
                     renumber()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { g in
-                Text("Its \(g.attempts.count) logged reps will be deleted too. This can't be undone.")
+                Text("This \(noun) and its \(g.attempts.count) logged reps move to the Trash. Restore them anytime from Data Management.")
             }
             .alert(
                 "Delete \(pendingTeamDelete?.name ?? "")?",
@@ -282,10 +282,10 @@ struct GroupsEditorView: View {
                     set: { if !$0 { pendingTeamDelete = nil } }),
                 presenting: pendingTeamDelete
             ) { t in
-                Button("Delete team & data", role: .destructive) { removeTeam(t) }
+                Button("Move to Trash", role: .destructive) { withAnimation { removeTeam(t) } }
                 Button("Cancel", role: .cancel) {}
             } message: { t in
-                Text("Its \(groupCount(t)) \(t.nounPlural(for: mode)) and all their logged reps will be deleted. This can't be undone.")
+                Text("This folder, its \(groupCount(t)) \(t.nounPlural(for: mode)), and all their reps move to the Trash. Restore anytime from Data Management.")
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
@@ -319,12 +319,18 @@ struct GroupsEditorView: View {
     private func requestDelete(_ g: StuntGroup) {
         if g.attempts.isEmpty {
             withAnimation {
-                context.delete(g)
+                softDelete(g)
                 renumber()
             }
         } else {
-            pendingDelete = g
+            pendingDelete = g   // has reps — confirm before trashing
         }
+    }
+
+    /// Soft-delete: the skill + its reps move to the Trash, kept and restorable.
+    private func softDelete(_ g: StuntGroup) {
+        g.deletedAt = .now
+        try? context.save()
     }
 
     // MARK: Custom outcomes (per folder)
@@ -406,7 +412,7 @@ struct GroupsEditorView: View {
     @ViewBuilder
     private var teamsSection: some View {
         Section {
-            ForEach(teams) { t in
+            ForEach(teams.active) { t in
                 HStack(spacing: 10) {
                     Button {
                         currentTeamID = t.id.uuidString
@@ -423,37 +429,24 @@ struct GroupsEditorView: View {
                         try? context.save()
                     }
                     Spacer(minLength: 6)
-                    // What this folder calls its buckets — free text (skill,
-                    // group, section, athlete… whatever). Blank = app default.
-                    HStack(spacing: 3) {
-                        Text("tracks")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.label3)
-                        RenameField(prompt: mode.noun, value: t.itemNoun) { new in
-                            t.itemNoun = new.trimmingCharacters(in: .whitespaces).lowercased()
-                            try? context.save()
-                        }
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 72)
-                    }
                     Text("\(groupCount(t))")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
                 // Same no-snap-back treatment as the skills rows — see there.
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    if teams.count > 1 {
+                    if teams.active.count > 1 {
                         Button("Delete") { requestTeamDelete(t) }.tint(.red)
                     }
                 }
                 // The only folder can't be deleted (reps need a home). Disable
                 // the edit-mode minus too, or it animates the row away and then
                 // pops back when the guard blocks the delete.
-                .deleteDisabled(teams.count <= 1)
+                .deleteDisabled(teams.active.count <= 1)
             }
             .onDelete { idx in   // edit-mode minus button path
                 guard let i = idx.first else { return }
-                requestTeamDelete(teams[i])
+                requestTeamDelete(teams.active[i])
             }
             .onMove(perform: moveTeams)
 
@@ -471,30 +464,32 @@ struct GroupsEditorView: View {
     }
 
     private func groupCount(_ t: Team) -> Int {
-        allGroups.filter { $0.team?.id == t.id }.count
+        allGroups.filter { $0.team?.id == t.id && $0.deletedAt == nil }.count
     }
 
     private func addTeam() {
-        let t = Team(name: "Folder \(teams.count + 1)", orderIndex: teams.count)
+        let t = Team(name: "Folder \(teams.active.count + 1)", orderIndex: teams.count)
         context.insert(t)
         try? context.save()
         currentTeamID = t.id.uuidString
     }
 
     private func requestTeamDelete(_ t: Team) {
-        // Always keep at least one team — there's nowhere to put reps otherwise.
-        guard teams.count > 1 else { return }
-        if allGroups.contains(where: { $0.team?.id == t.id && !$0.attempts.isEmpty }) {
-            pendingTeamDelete = t   // has logged reps — confirm the cascade
+        // Always keep at least one active folder — reps need a live home.
+        guard teams.active.count > 1 else { return }
+        if allGroups.contains(where: { $0.team?.id == t.id && $0.deletedAt == nil && !$0.attempts.isEmpty }) {
+            pendingTeamDelete = t   // has logged reps — confirm before trashing
         } else {
             withAnimation { removeTeam(t) }
         }
     }
 
+    /// Soft-delete: the folder (and its skills + reps) move to the Trash, kept
+    /// and restorable. Nothing is hard-deleted here.
     private func removeTeam(_ t: Team) {
         let wasCurrent = t.id == currentTeam?.id
-        let remaining = teams.filter { $0.id != t.id }.sorted { $0.orderIndex < $1.orderIndex }
-        context.delete(t)
+        t.deletedAt = .now
+        let remaining = teams.active.filter { $0.id != t.id }.sorted { $0.orderIndex < $1.orderIndex }
         for (i, team) in remaining.enumerated() { team.orderIndex = i }
         try? context.save()
         if wasCurrent, let first = remaining.first {

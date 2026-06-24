@@ -14,6 +14,7 @@ import SwiftData
 struct DataManagementView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
+    @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var sessions: [PracticeSession]
     @Query private var attempts: [Attempt]
 
@@ -29,10 +30,14 @@ struct DataManagementView: View {
     private var hasReps: Bool { !attempts.isEmpty }
     private var hasAnything: Bool { !groups.isEmpty || !attempts.isEmpty || !sessions.isEmpty }
 
+    private var trashedTeams: [Team] { teams.trashed }
+    private var trashedGroups: [StuntGroup] { groups.trashed }
+    private var hasTrash: Bool { !trashedTeams.isEmpty || !trashedGroups.isEmpty }
+
     var body: some View {
         List {
             Section {
-                summaryRow(mode.nounPluralTitle, groups.count)
+                summaryRow(mode.nounPluralTitle, groups.active.count)
                 summaryRow("Reps", attempts.count)
                 summaryRow("Sessions", sessions.count)
             } header: {
@@ -71,6 +76,28 @@ struct DataManagementView: View {
                 Text("Runs the first-launch setup again. Nothing is deleted — your \(mode.nounPlural) and reps stay, and anything you add joins your current team.")
             }
             .listRowBackground(glassRow)
+
+            if hasTrash {
+                Section {
+                    ForEach(trashedTeams) { t in
+                        trashRow(name: t.name,
+                                 detail: "Folder · \(allActiveSkills(t)) \(mode.nounPlural)",
+                                 restore: { restore(team: t) },
+                                 purge: { purge(team: t) })
+                    }
+                    ForEach(trashedGroups) { g in
+                        trashRow(name: g.name,
+                                 detail: "\(mode.nounTitle) · \(g.attempts.count) reps",
+                                 restore: { restore(group: g) },
+                                 purge: { purge(group: g) })
+                    }
+                } header: {
+                    Text("Trash")
+                } footer: {
+                    Text("Swipe right to Restore (brings it back with its reps), or left to Delete permanently — that one can't be undone.")
+                }
+                .listRowBackground(glassRow)
+            }
 
             Section {
                 Button(role: .destructive) {
@@ -125,6 +152,41 @@ struct DataManagementView: View {
             Text("Your \(groups.count) \(mode.nounPlural), \(attempts.count) reps, and \(sessions.count) sessions will be permanently deleted.")
         }
     }
+
+    private func allActiveSkills(_ t: Team) -> Int {
+        groups.filter { $0.team?.id == t.id && $0.deletedAt == nil }.count
+    }
+
+    private func trashRow(name: String, detail: String,
+                          restore: @escaping () -> Void,
+                          purge: @escaping () -> Void) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 15, weight: .medium))
+                Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Restore") { withAnimation { restore() } }
+                .font(.system(size: 13, weight: .semibold))
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.accent)
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button("Restore") { withAnimation { restore() } }.tint(Theme.accent)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button("Delete permanently", role: .destructive) { withAnimation { purge() } }
+        }
+    }
+
+    // MARK: Trash actions
+
+    private func restore(team t: Team) { t.deletedAt = nil; try? context.save() }
+    private func restore(group g: StuntGroup) { g.deletedAt = nil; try? context.save() }
+
+    /// The only hard delete that touches reps — explicit, from the Trash.
+    private func purge(team t: Team) { context.delete(t); try? context.save() }
+    private func purge(group g: StuntGroup) { context.delete(g); try? context.save() }
 
     private func summaryRow(_ label: String, _ count: Int) -> some View {
         HStack {
