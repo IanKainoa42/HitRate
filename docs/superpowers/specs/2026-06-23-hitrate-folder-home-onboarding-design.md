@@ -151,6 +151,44 @@ disturbing the load-bearing 4 severity slots / hit-rate spine, and reworks the
 grid to show each skill's own outcomes. Detailed design TBD before building
 (its own design pass — touches the Outcome/OutcomeNames/grid fragile areas).
 
+### Stage B — design (locked 2026-06-24)
+
+**Model: Hit + swappable issues.** The 4 severity slots stay (rawValue-indexed
+spine intact). Slot 0 is always the clean outcome → hit rate / cards /
+tournament keep working. Slots 1–3 are per-skill swappable issue words, seeded
+from the skill's `SkillCategory` (drivers for jumps/tosses; established severity
+words for stunts/tumbling).
+
+Category default outcome words (slot 0 = clean):
+
+| Category | 0 | 1 | 2 | 3 |
+|---|---|---|---|---|
+| stunts / pyramid | Hit | Bobble | Building fall | Major fall |
+| standing/running tumbling | Stuck | Stepped out | Touched down | Major fall |
+| jumps | Hit | Legs | Arms | Sync |
+| tosses | Hit | Top | Bases | Height |
+
+Implementation:
+- `SkillCategory.defaultOutcomeWords: [String]` (4) — new source of truth for
+  defaults, replaces the kind-only `defaultLabel`. Existing stunt/tumbling words
+  preserved.
+- **Per-skill override:** `StuntGroup.outcomeOverridesRaw` (newline-joined 4;
+  blank slot = category default). Additive field → lightweight migration.
+- Resolution: `Outcome.label(for: StuntGroup)` / `short(for:)` =
+  skill override ?? category default. The PAD, GRID, and a skill's own tape use
+  per-skill words; aggregate legends/cards stay on the category/kind default
+  (mixed rosters can't share one custom set).
+- `OutcomeNames.shared` stays for the stunt/tumbling per-kind custom renames
+  (back-compat) and remains @Observable so renames re-render.
+- **Editor:** per-skill outcome editor — edit slots 1–3 (and slot 0 word),
+  seeded from category, quick-pick from the category's drivers.
+- **Grid rework:** each skill row renders its OWN outcome labels, lifting the
+  single-kind `gridAvailable` restriction (a tumbling row shows tumbling words,
+  a jump row shows jump words). Per-row mini-labels instead of one shared header.
+
+Fragile-area care: slot order + rawValue indexing unchanged; `OutcomeNames`
+reads stay observable; no `Rarity.of(rate:)`.
+
 ### Stage C — Navigation
 
 - A "Skills" button replacing the small header dropdown.

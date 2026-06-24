@@ -67,6 +67,7 @@ struct GroupsEditorView: View {
     // Swipe-deleted group/team awaiting confirmation (only when it has reps).
     @State private var pendingDelete: StuntGroup?
     @State private var pendingTeamDelete: Team?
+    @State private var editingOutcomesFor: StuntGroup?
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -140,6 +141,15 @@ struct GroupsEditorView: View {
                                 .background(Theme.fill)
                                 .clipShape(Capsule())
                             }
+                            // Per-skill outcome swap (the good→bad scale).
+                            Button {
+                                editingOutcomesFor = g
+                            } label: {
+                                Image(systemName: "slider.horizontal.below.square.filled.and.square")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Theme.accent)
+                            }
+                            .buttonStyle(.plain)
                         }
                         // Custom swipe action, deliberately NOT role: .destructive:
                         // a destructive swipe makes iOS animate the row away
@@ -296,6 +306,9 @@ struct GroupsEditorView: View {
                     }
                     .fontWeight(.semibold)
                 }
+            }
+            .sheet(item: $editingOutcomesFor) { g in
+                SkillOutcomesEditor(group: g)
             }
         }
     }
@@ -502,5 +515,115 @@ struct GroupsEditorView: View {
         arr.move(fromOffsets: from, toOffset: to)
         for (i, t) in arr.enumerated() { t.orderIndex = i }
         try? context.save()
+    }
+}
+
+/// Per-skill outcome editor — swap the four tap targets along the good→bad
+/// scale. Slot 0 is the clean hit (the hit-rate spine, kept). Slots 1–3 are the
+/// issues, seeded from the skill's category drivers and freely renamed. Binds a
+/// local @State buffer (not the @Model directly) so typing never fights the
+/// cursor; the model saves through `setOutcomeWord`.
+struct SkillOutcomesEditor: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    let group: StuntGroup
+
+    @State private var words: [String] = ["", "", "", ""]
+
+    private var drivers: [String] { group.category.executionDrivers.map(\.name) }
+
+    private func severityWord(_ o: Outcome) -> String {
+        switch o {
+        case .hit: "GOOD"
+        case .bobble: "MINOR"
+        case .buildingFall: "MAJOR"
+        case .majorFall: "BAD"
+        }
+    }
+
+    private func binding(_ i: Int) -> Binding<String> {
+        Binding(get: { words[i] }, set: { new in
+            words[i] = new
+            // Storing the category default as-is keeps the slot "linked" so a
+            // later category change still updates it.
+            let def = group.category.defaultOutcomeWords[i]
+            group.setOutcomeWord(new.trimmingCharacters(in: .whitespaces) == def ? "" : new, slot: i)
+            try? context.save()
+        })
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(Outcome.allCases) { o in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 10) {
+                                Circle().fill(o.color).frame(width: 12, height: 12)
+                                TextField(group.category.defaultOutcomeWords[o.rawValue],
+                                          text: binding(o.rawValue))
+                                    .foregroundStyle(Theme.label)
+                                    .tint(Theme.accent)
+                                Spacer()
+                                Text(severityWord(o))
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(Theme.label3)
+                            }
+                            // Quick-pick the category's drivers for the issue
+                            // slots (slot 0 is always the clean hit).
+                            if o.rawValue > 0, !drivers.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(drivers, id: \.self) { d in
+                                            Button {
+                                                binding(o.rawValue).wrappedValue = d
+                                            } label: {
+                                                Text(d)
+                                                    .font(.system(size: 12, weight: .medium))
+                                                    .foregroundStyle(Theme.label2)
+                                                    .padding(.horizontal, 9)
+                                                    .padding(.vertical, 4)
+                                                    .background(Theme.fill)
+                                                    .clipShape(Capsule())
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } header: {
+                    Text("Good → bad")
+                } footer: {
+                    Text("Slot 0 is the clean hit — it counts toward your hit rate. Tap a driver chip to use it, or type your own. Severity order and colors stay fixed.")
+                }
+                .listRowBackground(Theme.well)
+
+                Section {
+                    Button(role: .destructive) {
+                        group.outcomeOverridesRaw = ""
+                        try? context.save()
+                        words = group.outcomeWords
+                    } label: {
+                        Label("Reset to \(group.category.displayName) defaults",
+                              systemImage: "arrow.counterclockwise")
+                    }
+                }
+                .listRowBackground(Theme.well)
+            }
+            .scrollContentBackground(.hidden)
+            .background(FloorBackdrop().ignoresSafeArea())
+            .navigationTitle(group.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { try? context.save(); dismiss() }.fontWeight(.semibold)
+                }
+            }
+            .onAppear { words = group.outcomeWords }
+        }
     }
 }

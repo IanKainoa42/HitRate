@@ -54,6 +54,34 @@ extension SkillCategory {
         }
     }
 
+    /// The default 4 outcome words for a skill in this category (slot 0 = the
+    /// clean hit — the hit-rate spine; slots 1–3 = the issues). Stunts/pyramid
+    /// and the tumblings keep the established severity words; jumps/tosses use
+    /// their execution drivers. Per-skill swaps (`StuntGroup.outcomeWords`)
+    /// override these.
+    var defaultOutcomeWords: [String] {
+        switch self {
+        case .stunts, .pyramid:
+            return ["Hit", "Bobble", "Building fall", "Major fall"]
+        case .standingTumbling, .runningTumbling:
+            return ["Stuck", "Stepped out", "Touched down", "Major fall"]
+        case .jumps:
+            return ["Hit", "Legs", "Arms", "Sync"]
+        case .tosses:
+            return ["Hit", "Top", "Bases", "Height"]
+        }
+    }
+
+    /// True for the categories whose default words ARE the legacy stunt/tumbling
+    /// kind words — only those honor the per-kind `OutcomeNames` custom renames.
+    /// Jumps/tosses have their own words and never borrow stunt renames.
+    var usesKindWords: Bool {
+        switch self {
+        case .stunts, .pyramid, .standingTumbling, .runningTumbling: return true
+        case .jumps, .tosses: return false
+        }
+    }
+
     /// A distinct SF Symbol per category (all verified to exist — note
     /// figure.cheerleading does NOT, per the project gotchas).
     var icon: String {
@@ -123,12 +151,24 @@ enum Outcome: Int, Codable, CaseIterable, Identifiable {
         }
         // Derive: initials for multi-word names ("Touch down" → TD),
         // first 3 letters otherwise ("Drop" → DRO).
-        let words = custom.split(separator: " ")
+        return Self.deriveShort(custom)
+    }
+
+    /// Short code for an arbitrary word: initials for multi-word ("Touch down"
+    /// → TD), first three letters otherwise ("Drop" → DRO).
+    static func deriveShort(_ word: String) -> String {
+        let words = word.split(separator: " ")
         if words.count >= 2 {
             return words.prefix(3).compactMap { $0.first.map(String.init) }.joined().uppercased()
         }
-        return String(custom.prefix(3)).uppercased()
+        return String(word.prefix(3)).uppercased()
     }
+
+    /// Per-skill label/short — the PAD, GRID, and a skill's own tape read these
+    /// so each skill shows ITS own outcome words (a jump row shows jump words, a
+    /// tumbling row tumbling words). Aggregate legends/cards keep `label(_:kind)`.
+    func label(for group: StuntGroup) -> String { group.outcomeWords[rawValue] }
+    func short(for group: StuntGroup) -> String { Self.deriveShort(group.outcomeWords[rawValue]) }
 
     var isHit: Bool { self == .hit }
 
@@ -269,6 +309,11 @@ final class StuntGroup {
     /// Soft-delete tombstone — see `Team.deletedAt`. Non-nil = trashed: hidden
     /// from rosters/stats but the skill and its reps are kept and restorable.
     var deletedAt: Date? = nil
+    /// Per-skill outcome-word swaps along the good→bad scale. Newline-joined,
+    /// one entry per severity slot (0 = clean/good … 3 = worst/bad); a blank
+    /// entry falls back to the category default. Additive field → lightweight
+    /// migration; blank = every slot uses `category.defaultOutcomeWords`.
+    var outcomeOverridesRaw: String = ""
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -307,6 +352,41 @@ final class StuntGroup {
             categoryRaw = newValue.rawValue
             kindRaw = newValue.hitRateKind.rawValue
         }
+    }
+
+    // MARK: Per-skill outcome words (the good→bad scale)
+
+    /// This skill's four outcome words, slot 0 (good/clean) → slot 3 (bad).
+    /// A per-skill swap wins; a blank slot falls back to the category default
+    /// (which itself honors the per-kind `OutcomeNames` rename for the
+    /// stunt/tumbling families).
+    var outcomeWords: [String] {
+        let overrides = outcomeOverridesRaw.isEmpty ? [] : outcomeOverridesRaw.components(separatedBy: "\n")
+        let defaults = category.defaultOutcomeWords
+        return (0..<4).map { i in
+            let o = i < overrides.count ? overrides[i].trimmingCharacters(in: .whitespaces) : ""
+            if !o.isEmpty { return o }
+            if category.usesKindWords {
+                let custom = OutcomeNames.shared.custom(kind)[i]
+                if !custom.isEmpty { return custom }
+            }
+            return defaults[i]
+        }
+    }
+
+    /// The raw per-skill override for a slot (empty = using the default).
+    func outcomeOverride(_ slot: Int) -> String {
+        let parts = outcomeOverridesRaw.isEmpty ? [] : outcomeOverridesRaw.components(separatedBy: "\n")
+        return slot < parts.count ? parts[slot] : ""
+    }
+
+    /// Set (or clear, with "") a per-skill outcome word at one severity slot.
+    func setOutcomeWord(_ word: String, slot: Int) {
+        var parts = (0..<4).map { outcomeOverride($0) }
+        guard slot >= 0, slot < 4 else { return }
+        parts[slot] = word.trimmingCharacters(in: .whitespaces)
+        // Collapse to "" when nothing is overridden, so the row stays on defaults.
+        outcomeOverridesRaw = parts.contains { !$0.isEmpty } ? parts.joined(separator: "\n") : ""
     }
 
     /// Group identity color — formation rainbow, cycled by number.

@@ -124,8 +124,8 @@ struct RootView: View {
                                counts: countsFor(group: group, in: session?.attempts ?? []),
                                outcomes: Outcome.allCases.map { outcome in
                 WatchOutcomeSnapshot(rawValue: outcome.rawValue,
-                                     label: outcome.label(group.kind),
-                                     shortLabel: outcome.short(group.kind))
+                                     label: outcome.label(for: group),
+                                     shortLabel: outcome.short(for: group))
             })
         },
                                    selectedGroupID: watchGroups.first {

@@ -55,9 +55,9 @@ struct LogView: View {
     /// offered when every group shares a kind (coach is always all-stunt; a
     /// single-kind athlete also qualifies). Mixed-kind athletes stay on the
     /// per-skill pad, which labels each skill in its own kind's words.
-    private var gridAvailable: Bool {
-        !groups.isEmpty && Set(groups.map(\.kind)).count == 1
-    }
+    /// Every cell now names its own skill's outcome, so the grid no longer needs
+    /// a single shared kind — any roster (mixed categories included) can use it.
+    private var gridAvailable: Bool { !groups.isEmpty }
     private var gridKind: SkillKind { groups.first?.kind ?? .stunt }
     /// Coach defaults to the matrix; athlete to the pad. Either flips via the
     /// Grid⇄Pad toggle (persisted in `practiceLayout`).
@@ -246,7 +246,7 @@ struct LogView: View {
                                     .foregroundStyle(Theme.label)
                                     .contentTransition(.numericText(value: Double(groupCounts[o.rawValue])))
                                     .animation(.spring(duration: 0.3), value: groupCounts[o.rawValue])
-                                Text(o.label(group.kind).uppercased())
+                                Text(o.label(for: group).uppercased())
                                     .font(.system(size: 11, weight: .bold))
                                     .tracking(0.8)
                                     .foregroundStyle(o.color)
@@ -267,7 +267,7 @@ struct LogView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Log \(o.label(group.kind))")
+                        .accessibilityLabel("Log \(o.label(for: group))")
                         .accessibilityValue("\(groupCounts[o.rawValue]) logged for \(group.name)")
                     }
                 }
@@ -349,20 +349,18 @@ struct LogView: View {
                 .foregroundStyle(Theme.label3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Column headers — one kind (see gridAvailable), via OutcomeNames.
+            // The grid now mixes categories, so a single word header can't name
+            // every row's outcomes — each cell labels its OWN skill instead.
+            // The header just shows the good→bad severity scale (slot colors).
             HStack(spacing: 6) {
-                Color.clear.frame(width: gridNameColumnWidth, height: 1)
+                Text("GOOD → BAD")
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.label3)
+                    .frame(width: gridNameColumnWidth, alignment: .leading)
                 ForEach(Outcome.allCases) { o in
-                    VStack(spacing: 3) {
-                        Circle().fill(o.color).frame(width: 7, height: 7)
-                        Text(o.short(gridKind))
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(0.3)
-                            .foregroundStyle(Theme.label2)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(maxWidth: .infinity)
+                    Circle().fill(o.color).frame(width: 8, height: 8)
+                        .frame(maxWidth: .infinity)
                 }
             }
 
@@ -397,7 +395,7 @@ struct LogView: View {
                                 let v = c[o.rawValue]
                                 let stagedN = waveActive
                                     ? (staged[g.persistentModelID]?[o.rawValue] ?? 0) : 0
-                                let cell = gridCellLabel(v, outcome: o, stagedN: stagedN)
+                                let cell = gridCellLabel(v, outcome: o, stagedN: stagedN, group: g)
                                 Group {
                                     if waveActive {
                                         // NOT a Button: a Button fires its action on
@@ -418,7 +416,7 @@ struct LogView: View {
                                         .buttonStyle(.plain)
                                     }
                                 }
-                                .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(o.label(gridKind)) for \(g.name)")
+                                .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(o.label(for: g)) for \(g.name)")
                                 .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
                                 .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
                             }
@@ -441,13 +439,22 @@ struct LogView: View {
     /// One engraved matrix cell: the session count in chalk, and — while
     /// staging — a "+n" pip in the outcome color showing this cell's pending
     /// reps. Shared by both the tap-to-log Button and the wave gesture view.
-    private func gridCellLabel(_ v: Int, outcome o: Outcome, stagedN: Int) -> some View {
-        Text("\(v)")
-            .font(Theme.barlow(20, .extrabold))
-            .monospacedDigit()
-            .foregroundStyle(stagedN > 0 ? o.color : (v == 0 ? Theme.label3 : Theme.label))
-            .contentTransition(.numericText(value: Double(v)))
-            .animation(.spring(duration: 0.3), value: v)
+    private func gridCellLabel(_ v: Int, outcome o: Outcome, stagedN: Int, group: StuntGroup) -> some View {
+        VStack(spacing: 1) {
+            Text("\(v)")
+                .font(Theme.barlow(20, .extrabold))
+                .monospacedDigit()
+                .foregroundStyle(stagedN > 0 ? o.color : (v == 0 ? Theme.label3 : Theme.label))
+                .contentTransition(.numericText(value: Double(v)))
+                .animation(.spring(duration: 0.3), value: v)
+            // Each cell names THIS skill's outcome for that slot — so a jump row
+            // shows jump words, a tumbling row tumbling words (mixed grids work).
+            Text(o.short(for: group))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(o.color.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
             .background(
@@ -657,7 +664,7 @@ struct LogView: View {
             Circle().fill(a.outcome.color).frame(width: 8, height: 8)
             Text(a.group?.name ?? "—")
                 .font(.system(size: 13, weight: .semibold))
-            Text(a.outcome.label(a.group?.kind ?? .stunt))
+            Text(a.group.map { a.outcome.label(for: $0) } ?? a.outcome.label(.stunt))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.label2)
             Spacer()
@@ -794,7 +801,7 @@ struct LogView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.label)
                 .lineLimit(1)
-            Text(a.outcome.short(a.group?.kind ?? .stunt))
+            Text(a.group.map { a.outcome.short(for: $0) } ?? a.outcome.short(.stunt))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
