@@ -174,7 +174,7 @@ enum StatsEngine {
             let counts = outcomeCounts(in: current, group: g, within: currentInterval)
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
-            let rate = total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : 0
+            let rate = weightedRate(counts)
 
             let prevCounts = outcomeCounts(in: previous, group: g, within: previousInterval)
             let prevTotal = prevCounts.reduce(0, +)
@@ -182,8 +182,7 @@ enum StatsEngine {
             var delta: Int?
             if total > 0, prevTotal > 0 {
                 // For .all, compare against the first session (season start) — "growth since Sept".
-                let prevRate = Int((Double(prevCounts[Outcome.hit.rawValue]) / Double(prevTotal) * 100).rounded())
-                delta = rate - prevRate
+                delta = rate - weightedRate(prevCounts)
             }
 
             groupStats.append(GroupStat(
@@ -199,7 +198,7 @@ enum StatsEngine {
         for s in groupStats { for i in 0..<4 { overall[i] += s.counts[i] } }
         let total = overall.reduce(0, +)
         let hits = overall[Outcome.hit.rawValue]
-        let rate = total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : 0
+        let rate = weightedRate(overall)
 
         // prevOverall is rolled up from per-group counts (not raw session
         // attempts) so the floor delta and the per-group deltas agree — raw
@@ -208,8 +207,7 @@ enum StatsEngine {
         let prevTotal = prevOverall.reduce(0, +)
         var delta: Int?
         if total > 0, prevTotal > 0 {
-            let prevRate = Int((Double(prevOverall[Outcome.hit.rawValue]) / Double(prevTotal) * 100).rounded())
-            delta = rate - prevRate
+            delta = rate - weightedRate(prevOverall)
         }
 
         return FloorStats(
@@ -229,16 +227,16 @@ enum StatsEngine {
                                     timeframe: Timeframe, now: Date) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
-            var hits = 0, total = 0
+            var creditSum = 0, total = 0
             for s in sessions {
                 for a in s.attempts
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     if let interval, !interval.contains(a.timestamp) { continue }
                     total += 1
-                    if a.outcome.isHit { hits += 1 }
+                    creditSum += a.creditValue   // weighted: partial credit for decent/rough
                 }
             }
-            return total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : nil
+            return total > 0 ? Int((Double(creditSum) / Double(total)).rounded()) : nil
         }
 
         switch timeframe {
@@ -281,7 +279,8 @@ enum StatsEngine {
         }
         guard let last = sorted.last(where: { !inKind($0).isEmpty }) else { return nil }
         let attempts = inKind(last)
-        let outcomes = attempts.map(\.outcome)
+        // Tape colors/rough-patch run off the credit tier, not the raw slot.
+        let outcomes = attempts.map(\.tierOutcome)
         return SessionSnapshot(
             outcomes: outcomes,
             start: attempts.first!.timestamp,
@@ -304,16 +303,28 @@ enum StatsEngine {
         return best >= minMisses ? bestStart..<(bestStart + window) : nil
     }
 
+    /// A skill's reps bucketed into the 4 credit TIERS (hit/decent/rough/miss),
+    /// regardless of how many distinct outcomes it has — so aggregates stay
+    /// 4-wide and crash-safe while logging carries any number of outcomes.
     private static func outcomeCounts(in sessions: [PracticeSession], group: StuntGroup,
                                       within interval: DateInterval? = nil) -> [Int] {
         var counts = [0, 0, 0, 0]
         for s in sessions {
             for a in s.attempts where a.group === group {
                 if let interval, !interval.contains(a.timestamp) { continue }
-                guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
-                counts[outcome.rawValue] += 1
+                counts[a.tierOutcome.rawValue] += 1
             }
         }
         return counts
+    }
+
+    /// Weighted hit rate (0–100) from a 4-tier count array: credit ladder is
+    /// hit 100 · decent 67 · rough 33 · miss 0, so a "decent" rep earns partial.
+    static func weightedRate(_ tierCounts: [Int]) -> Int {
+        let total = tierCounts.reduce(0, +)
+        guard total > 0 else { return 0 }
+        let credits = [100, 67, 33, 0]
+        let sum = zip(tierCounts, credits).reduce(0) { $0 + $1.0 * $1.1 }
+        return Int((Double(sum) / Double(total)).rounded())
     }
 }

@@ -186,43 +186,18 @@ struct GroupsEditorView: View {
                 }
                 .listRowBackground(glassRow)
 
+                // Outcomes are now per-skill (label + color + credit), edited via
+                // the slider icon on each skill row → SkillOutcomesEditor. The old
+                // global per-kind rename sections were retired with that change.
+
                 Section {
-                    ForEach(Outcome.allCases) { o in
-                        HStack(spacing: 10) {
-                            Circle().fill(o.color).frame(width: 12, height: 12)
-                            RenameField(prompt: o.defaultLabel(.stunt),
-                                        value: outcomeNames.stunt[o.rawValue]) { new in
-                                outcomeNames.stunt[o.rawValue] = new
-                            }
-                        }
-                    }
+                    Text("Each skill sets its own outcomes — tap the outcome icon on a skill above to rename them, recolor them, set their weight, or add more (e.g. a blue \"Balk\").")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.label2)
                 } header: {
-                    Text(mode == .athlete ? "Stunt outcomes" : "Outcomes")
-                } footer: {
-                    if mode == .coach {
-                        Text("Rename outcomes to match how your gym calls them. Leave blank for the standard name. Severity order and colors stay fixed.")
-                    }
+                    Text("Outcomes")
                 }
                 .listRowBackground(glassRow)
-
-                if mode == .athlete {
-                    Section {
-                        ForEach(Outcome.allCases) { o in
-                            HStack(spacing: 10) {
-                                Circle().fill(o.color).frame(width: 12, height: 12)
-                                RenameField(prompt: o.defaultLabel(.tumbling),
-                                            value: outcomeNames.tumbling[o.rawValue]) { new in
-                                    outcomeNames.tumbling[o.rawValue] = new
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Tumbling outcomes")
-                    } footer: {
-                        Text("Rename outcomes to match how your gym calls them. Leave blank for the standard name. Severity order and colors stay fixed across both.")
-                    }
-                    .listRowBackground(glassRow)
-                }
 
                 customOutcomesSection
 
@@ -518,97 +493,111 @@ struct GroupsEditorView: View {
     }
 }
 
-/// Per-skill outcome editor — swap the four tap targets along the good→bad
-/// scale. Slot 0 is the clean hit (the hit-rate spine, kept). Slots 1–3 are the
-/// issues, seeded from the skill's category drivers and freely renamed. Binds a
-/// local @State buffer (not the @Model directly) so typing never fights the
-/// cursor; the model saves through `setOutcomeWord`.
+/// Per-skill outcome editor — the flexible outcome list. Each outcome is a
+/// label + a palette color + a credit weight (Hit 100 / Decent 67 / Rough 33 /
+/// Miss 0). Color is independent of credit (a blue "Balk" can still be a miss);
+/// the weighted hit rate is the average credit, and any 100% outcome is "a hit".
+/// Edits a local @State buffer (not the @Model) so typing never fights the
+/// cursor; saves through `setOutcomeDefs`. Add + edit are always safe; a trailing
+/// outcome with no logged reps can be removed (keeps existing reps' slots valid).
 struct SkillOutcomesEditor: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     let group: StuntGroup
 
-    @State private var words: [String] = ["", "", "", ""]
+    @State private var defs: [OutcomeDef] = []
 
-    private var drivers: [String] { group.category.executionDrivers.map(\.name) }
-
-    private func severityWord(_ o: Outcome) -> String {
-        switch o {
-        case .hit: "GOOD"
-        case .bobble: "MINOR"
-        case .buildingFall: "MAJOR"
-        case .majorFall: "BAD"
-        }
+    private func commit() {
+        group.setOutcomeDefs(defs)
+        try? context.save()
     }
 
-    private func binding(_ i: Int) -> Binding<String> {
-        Binding(get: { words[i] }, set: { new in
-            words[i] = new
-            // Storing the category default as-is keeps the slot "linked" so a
-            // later category change still updates it.
-            let def = group.category.defaultOutcomeWords[i]
-            group.setOutcomeWord(new.trimmingCharacters(in: .whitespaces) == def ? "" : new, slot: i)
-            try? context.save()
-        })
+    private func repsAt(_ slot: Int) -> Int {
+        group.attempts.filter { $0.outcomeRaw == slot }.count
+    }
+    /// Only the trailing outcome with no reps can be removed — deleting an inner
+    /// slot would re-map every higher rep's history.
+    private func canDelete(_ i: Int) -> Bool {
+        i == defs.count - 1 && defs.count > 1 && repsAt(i) == 0
+    }
+
+    private func labelBinding(_ i: Int) -> Binding<String> {
+        Binding(get: { i < defs.count ? defs[i].label : "" },
+                set: { defs[i].label = $0; commit() })
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(Outcome.allCases) { o in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 10) {
-                                Circle().fill(o.color).frame(width: 12, height: 12)
-                                TextField(group.category.defaultOutcomeWords[o.rawValue],
-                                          text: binding(o.rawValue))
-                                    .foregroundStyle(Theme.label)
-                                    .tint(Theme.accent)
-                                Spacer()
-                                Text(severityWord(o))
-                                    .font(.system(size: 9, weight: .bold))
-                                    .tracking(0.8)
-                                    .foregroundStyle(Theme.label3)
-                            }
-                            // Quick-pick the category's drivers for the issue
-                            // slots (slot 0 is always the clean hit).
-                            if o.rawValue > 0, !drivers.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(drivers, id: \.self) { d in
-                                            Button {
-                                                binding(o.rawValue).wrappedValue = d
-                                            } label: {
-                                                Text(d)
-                                                    .font(.system(size: 12, weight: .medium))
-                                                    .foregroundStyle(Theme.label2)
-                                                    .padding(.horizontal, 9)
-                                                    .padding(.vertical, 4)
-                                                    .background(Theme.fill)
-                                                    .clipShape(Capsule())
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
+                    ForEach(defs.indices, id: \.self) { i in
+                        HStack(spacing: 10) {
+                            // Color — free palette, independent of credit.
+                            Menu {
+                                ForEach(OutcomeColor.allCases) { c in
+                                    Button { defs[i].colorRaw = c.rawValue; commit() } label: {
+                                        Label(c.rawValue.capitalized, systemImage: "circle.fill")
                                     }
                                 }
+                            } label: {
+                                Circle().fill(defs[i].color).frame(width: 16, height: 16)
+                                    .overlay(Circle().stroke(.white.opacity(0.15), lineWidth: 1))
+                            }
+
+                            TextField("Outcome", text: labelBinding(i))
+                                .foregroundStyle(Theme.label)
+                                .tint(Theme.accent)
+
+                            Spacer(minLength: 6)
+
+                            // Credit — the weight that drives the hit rate.
+                            Menu {
+                                ForEach(OutcomeCredit.allCases) { cr in
+                                    Button { defs[i].credit = cr.rawValue; commit() } label: {
+                                        Text(cr.label)
+                                    }
+                                }
+                            } label: {
+                                Text("\(defs[i].credit)%")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(defs[i].color)
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(Theme.fill)
+                                    .clipShape(Capsule())
                             }
                         }
-                        .padding(.vertical, 2)
+                        .swipeActions(edge: .trailing) {
+                            if canDelete(i) {
+                                Button("Delete", role: .destructive) {
+                                    defs.remove(at: i); commit()
+                                }.tint(.red)
+                            }
+                        }
+                    }
+
+                    if defs.count < 6 {
+                        Button {
+                            defs.append(OutcomeDef("New outcome", .gray, .decent))
+                            commit()
+                        } label: {
+                            Label("Add outcome", systemImage: "plus")
+                        }
                     }
                 } header: {
-                    Text("Good → bad")
+                    Text("Outcomes · good → bad")
                 } footer: {
-                    Text("Slot 0 is the clean hit — it counts toward your hit rate. Tap a driver chip to use it, or type your own. Severity order and colors stay fixed.")
+                    Text("Color is yours (e.g. a blue \"Balk\"). Credit is the weight: a Hit is 100%, a Miss 0% — your hit rate is the weighted average, and any 100% outcome counts as a hit. Only a trailing outcome with no reps can be removed.")
                 }
                 .listRowBackground(Theme.well)
 
                 Section {
                     Button(role: .destructive) {
-                        group.outcomeOverridesRaw = ""
+                        defs = group.category.defaultOutcomeDefs
+                        group.outcomeDefsRaw = ""
                         try? context.save()
-                        words = group.outcomeWords
                     } label: {
-                        Label("Reset to \(group.category.displayName) defaults",
+                        Label("Reset to \(group.category.displayName) preset",
                               systemImage: "arrow.counterclockwise")
                     }
                 }
@@ -620,10 +609,10 @@ struct SkillOutcomesEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { try? context.save(); dismiss() }.fontWeight(.semibold)
+                    Button("Done") { commit(); dismiss() }.fontWeight(.semibold)
                 }
             }
-            .onAppear { words = group.outcomeWords }
+            .onAppear { defs = group.outcomeDefs }
         }
     }
 }

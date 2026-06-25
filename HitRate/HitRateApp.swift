@@ -170,8 +170,7 @@ struct RootView: View {
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
         var counts = [0, 0, 0, 0]
         for attempt in attempts where attempt.group === group {
-            guard let outcome = Outcome(rawValue: attempt.outcomeRaw) else { continue }
-            counts[outcome.rawValue] += 1
+            counts[attempt.tierOutcome.rawValue] += 1   // tier-bucketed → crash-safe for N outcomes
         }
         return counts
     }

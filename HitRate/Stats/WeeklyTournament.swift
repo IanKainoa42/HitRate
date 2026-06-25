@@ -493,7 +493,7 @@ enum WeeklyLeague {
             .sorted { $0.timestamp < $1.timestamp }
         var best = 0, run = 0
         for a in attempts {
-            if a.outcome.isHit {
+            if a.isHitRep {
                 run += 1
                 best = max(best, run)
             } else {
@@ -507,8 +507,7 @@ enum WeeklyLeague {
         var counts = [0, 0, 0, 0]
         for s in sessions {
             for a in s.attempts where a.group === group {
-                guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
-                counts[outcome.rawValue] += 1
+                counts[a.tierOutcome.rawValue] += 1   // tier-bucketed → crash-safe
             }
         }
         return counts

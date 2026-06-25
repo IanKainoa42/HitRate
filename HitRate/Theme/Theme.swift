@@ -28,6 +28,11 @@ enum Theme {
     static let bobble = Color(hex: 0xE8C94B)
     static let buildingFall = Color(hex: 0xFF9A3D)
     static let majorFall = Color(hex: 0xFF6B57)
+    // Extra outcome-palette colors (user-assignable, independent of credit —
+    // e.g. tumbling "Balk" is blue but counts as a miss).
+    static let outcomeBlue = Color(hex: 0x4F9BE8)
+    static let outcomePurple = Color(hex: 0xA98BD4)
+    static let outcomeGray = Color(hex: 0x8D8B86)
 
     // Brand register ("court at night")
     static let navy = Color(hex: 0x0A0F1E)

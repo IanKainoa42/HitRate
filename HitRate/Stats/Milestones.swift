@@ -52,13 +52,13 @@ enum Milestones {
                 .sorted { $0.timestamp < $1.timestamp }
             let total = attempts.count
             let falls = attempts.filter {
-                $0.outcome == .buildingFall || $0.outcome == .majorFall
+                $0.tierOutcome == .buildingFall || $0.tierOutcome == .majorFall
             }.count
 
             var bestHitRun = 0, bestMissRun = 0
             var hitRun = 0, missRun = 0
             for a in attempts {
-                if a.outcome.isHit {
+                if a.isHitRep {
                     hitRun += 1; missRun = 0
                 } else {
                     missRun += 1; hitRun = 0
@@ -77,9 +77,9 @@ enum Milestones {
                 let reps = s.attempts.filter(inTeam)
                 let n = reps.count
                 guard n > 0 else { return nil }
-                let hits = reps.filter(\.outcome.isHit).count
+                let hits = reps.filter(\.isHitRep).count
                 let f = reps.filter {
-                    $0.outcome == .buildingFall || $0.outcome == .majorFall
+                    $0.tierOutcome == .buildingFall || $0.tierOutcome == .majorFall
                 }.count
                 return SessionShape(reps: n,
                                     rate: Int((Double(hits) / Double(n) * 100).rounded()),
@@ -223,7 +223,7 @@ let reps10Id = "reps10\(suffix)"
             let mastery: [(group: StuntGroup, reps: Int, rate: Int, progress: Double)] = masteryGroups.compactMap { g in
                 let n = g.attempts.count
                 guard n > 0 else { return nil }
-                let hits = g.attempts.filter(\.outcome.isHit).count
+                let hits = g.attempts.filter(\.isHitRep).count
                 let rate = Int((Double(hits) / Double(n) * 100).rounded())
                 let p = min(1, Double(n) / 50) * min(1, Double(rate) / 90)
                 return (g, n, rate, p)

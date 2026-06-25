@@ -113,8 +113,10 @@ struct LogView: View {
 
     private var activeView: some View {
         let attempts = session.sortedAttempts
-        let hits = attempts.filter { $0.outcome.isHit }.count
-        let rate = attempts.isEmpty ? nil : Int((Double(hits) / Double(attempts.count) * 100).rounded())
+        let hits = attempts.filter { $0.isHitRep }.count
+        // Weighted hit rate: credit averages directly to a percentage (0–100).
+        let rate = attempts.isEmpty ? nil
+            : Int((Double(attempts.reduce(0) { $0 + $1.creditValue }) / Double(attempts.count)).rounded())
 
         return VStack(spacing: 9) {
             // Session header (well)
@@ -226,49 +228,49 @@ struct LogView: View {
                 .padding(.horizontal, 16)
             }
 
-            // Outcome pad
+            // Outcome pad — the skill's own flexible outcome list (2–6).
             if let group = activeGroup {
+                let defs = group.outcomeDefs
                 let groupCounts = countsFor(group: group, in: attempts)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())],
                           spacing: 10) {
-                    ForEach(Outcome.allCases) { o in
+                    ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
+                        let v = slot < groupCounts.count ? groupCounts[slot] : 0
                         Button {
-                            context.insert(Attempt(outcome: o, group: group, session: session))
+                            context.insert(Attempt(slot: slot, group: group, session: session))
                             try? context.save()
                             selectedGroupIDRaw = group.id.uuidString
                             hapticTrigger += 1
-                            Sounds.shared.play(.outcome(o))
+                            Sounds.shared.play(.outcome(def.soundOutcome))
                         } label: {
                             VStack(spacing: 3) {
-                                Text("\(groupCounts[o.rawValue])")
+                                Text("\(v)")
                                     .font(Theme.barlow(34, .extrabold))
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.label)
-                                    .contentTransition(.numericText(value: Double(groupCounts[o.rawValue])))
-                                    .animation(.spring(duration: 0.3), value: groupCounts[o.rawValue])
-                                Text(o.label(for: group).uppercased())
+                                    .contentTransition(.numericText(value: Double(v)))
+                                    .animation(.spring(duration: 0.3), value: v)
+                                Text(def.label.uppercased())
                                     .font(.system(size: 11, weight: .bold))
                                     .tracking(0.8)
-                                    .foregroundStyle(o.color)
+                                    .foregroundStyle(def.color)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.7)   // "STEPPED OUT" must fit the pad button
+                                    .minimumScaleFactor(0.7)
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 92)
-                            // Engraved well — the outcome color lives in the
-                            // machined bottom edge + label, one material.
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .fill(Theme.well
                                         .shadow(.inner(color: .black.opacity(0.6), radius: 4, y: 2))
-                                        .shadow(.inner(color: o.color.opacity(0.9), radius: 1, y: -2)))
+                                        .shadow(.inner(color: def.color.opacity(0.9), radius: 1, y: -2)))
                                     .shadow(color: .white.opacity(0.05), radius: 0, y: 1)
                             )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Log \(o.label(for: group))")
-                        .accessibilityValue("\(groupCounts[o.rawValue]) logged for \(group.name)")
+                        .accessibilityLabel("Log \(def.label)")
+                        .accessibilityValue("\(v) logged for \(group.name)")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -349,23 +351,17 @@ struct LogView: View {
                 .foregroundStyle(Theme.label3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // The grid now mixes categories, so a single word header can't name
-            // every row's outcomes — each cell labels its OWN skill instead.
-            // The header just shows the good→bad severity scale (slot colors).
-            HStack(spacing: 6) {
-                Text("GOOD → BAD")
-                    .font(.system(size: 8, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundStyle(Theme.label3)
-                    .frame(width: gridNameColumnWidth, alignment: .leading)
-                ForEach(Outcome.allCases) { o in
-                    Circle().fill(o.color).frame(width: 8, height: 8)
-                        .frame(maxWidth: .infinity)
-                }
-            }
+            // Each row shows its OWN skill's outcomes (count varies per skill),
+            // so there's no shared column header — just the good→bad direction.
+            Text("← good   ·   bad →")
+                .font(.system(size: 8, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.label3)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
             let gridRows = VStack(spacing: groups.count > 8 ? 4 : 6) {
                 ForEach(groups) { g in
+                        let defs = g.outcomeDefs
                         let c = countsFor(group: g, in: attempts)
                         let streakN = hotStreak(group: g, in: attempts)
                         HStack(spacing: 6) {
@@ -391,32 +387,31 @@ struct LogView: View {
                             .frame(width: gridNameColumnWidth, alignment: .leading)
                             .frame(maxHeight: .infinity)
 
-                            ForEach(Outcome.allCases) { o in
-                                let v = c[o.rawValue]
-                                let stagedN = waveActive
-                                    ? (staged[g.persistentModelID]?[o.rawValue] ?? 0) : 0
-                                let cell = gridCellLabel(v, outcome: o, stagedN: stagedN, group: g)
+                            ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
+                                let v = slot < c.count ? c[slot] : 0
+                                let stagedN = waveActive ? stagedCount(g, slot) : 0
+                                let cell = gridCellLabel(v, def: def, stagedN: stagedN)
                                 Group {
                                     if waveActive {
                                         // NOT a Button: a Button fires its action on
                                         // release even after a hold, so a long-press
                                         // decrement would be re-incremented on lift.
                                         cell
-                                            .onTapGesture { stage(g, o) }
-                                            .onLongPressGesture(minimumDuration: 0.4) { unstage(g, o) }
+                                            .onTapGesture { stage(g, slot) }
+                                            .onLongPressGesture(minimumDuration: 0.4) { unstage(g, slot) }
                                     } else {
                                         Button {
-                                            context.insert(Attempt(outcome: o, group: g, session: session))
+                                            context.insert(Attempt(slot: slot, group: g, session: session))
                                             try? context.save()
                                             hapticTrigger += 1
-                                            Sounds.shared.play(.outcome(o))
+                                            Sounds.shared.play(.outcome(def.soundOutcome))
                                         } label: {
                                             cell
                                         }
                                         .buttonStyle(.plain)
                                     }
                                 }
-                                .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(o.label(for: g)) for \(g.name)")
+                                .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(def.label) for \(g.name)")
                                 .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
                                 .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
                             }
@@ -439,19 +434,19 @@ struct LogView: View {
     /// One engraved matrix cell: the session count in chalk, and — while
     /// staging — a "+n" pip in the outcome color showing this cell's pending
     /// reps. Shared by both the tap-to-log Button and the wave gesture view.
-    private func gridCellLabel(_ v: Int, outcome o: Outcome, stagedN: Int, group: StuntGroup) -> some View {
+    private func gridCellLabel(_ v: Int, def: OutcomeDef, stagedN: Int) -> some View {
         VStack(spacing: 1) {
             Text("\(v)")
                 .font(Theme.barlow(20, .extrabold))
                 .monospacedDigit()
-                .foregroundStyle(stagedN > 0 ? o.color : (v == 0 ? Theme.label3 : Theme.label))
+                .foregroundStyle(stagedN > 0 ? def.color : (v == 0 ? Theme.label3 : Theme.label))
                 .contentTransition(.numericText(value: Double(v)))
                 .animation(.spring(duration: 0.3), value: v)
-            // Each cell names THIS skill's outcome for that slot — so a jump row
-            // shows jump words, a tumbling row tumbling words (mixed grids work).
-            Text(o.short(for: group))
+            // Each cell names THIS skill's own outcome — mixed rosters and
+            // variable outcome counts both read correctly.
+            Text(def.short)
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(o.color.opacity(0.9))
+                .foregroundStyle(def.color.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
@@ -461,12 +456,12 @@ struct LogView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Theme.well
                         .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
-                        .shadow(.inner(color: o.color.opacity(0.85), radius: 1, y: -2)))
+                        .shadow(.inner(color: def.color.opacity(0.85), radius: 1, y: -2)))
             )
             // Staged cell stays lit until the wave commits.
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(o.color, lineWidth: stagedN > 0 ? 2.5 : 0)
+                    .stroke(def.color, lineWidth: stagedN > 0 ? 2.5 : 0)
             )
             .overlay(alignment: .topTrailing) {
                 if stagedN > 0 {
@@ -476,7 +471,7 @@ struct LogView: View {
                         .foregroundStyle(Theme.well)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
-                        .background(Capsule().fill(o.color))
+                        .background(Capsule().fill(def.color))
                         .padding(3)
                 }
             }
@@ -563,18 +558,26 @@ struct LogView: View {
     /// Tap a cell in wave mode: stage one more rep of that outcome for that
     /// group. No cap and no auto-commit — a group can carry several outcomes
     /// in one pass, so only the user knows when the batch is done (Submit).
-    private func stage(_ g: StuntGroup, _ o: Outcome) {
-        var c = staged[g.persistentModelID] ?? [0, 0, 0, 0]
-        c[o.rawValue] += 1
+    private func stagedCount(_ g: StuntGroup, _ slot: Int) -> Int {
+        guard let arr = staged[g.persistentModelID], slot >= 0, slot < arr.count else { return 0 }
+        return arr[slot]
+    }
+
+    private func stage(_ g: StuntGroup, _ slot: Int) {
+        let n = g.outcomeDefs.count
+        var c = staged[g.persistentModelID] ?? Array(repeating: 0, count: n)
+        if c.count < n { c += Array(repeating: 0, count: n - c.count) }
+        guard slot >= 0, slot < c.count else { return }
+        c[slot] += 1
         staged[g.persistentModelID] = c
         hapticTrigger += 1
-        Sounds.shared.play(.outcome(o))
+        Sounds.shared.play(.outcome(g.outcomeDef(at: slot)?.soundOutcome ?? .hit))
     }
 
     /// Hold a cell in wave mode: take one staged rep of that outcome back off.
-    private func unstage(_ g: StuntGroup, _ o: Outcome) {
-        guard var c = staged[g.persistentModelID], c[o.rawValue] > 0 else { return }
-        c[o.rawValue] -= 1
+    private func unstage(_ g: StuntGroup, _ slot: Int) {
+        guard var c = staged[g.persistentModelID], slot >= 0, slot < c.count, c[slot] > 0 else { return }
+        c[slot] -= 1
         staged[g.persistentModelID] = c.reduce(0, +) == 0 ? nil : c
         hapticTrigger += 1
         Sounds.shared.play(.undo)
@@ -587,10 +590,9 @@ struct LogView: View {
         var committed: [Attempt] = []
         for g in groups {
             guard let c = staged[g.persistentModelID] else { continue }
-            for (oi, n) in c.enumerated() where n > 0 {
-                guard let o = Outcome(rawValue: oi) else { continue }
+            for (slot, n) in c.enumerated() where n > 0 {
                 for _ in 0..<n {
-                    let a = Attempt(outcome: o, group: g, session: session, waveID: waveID)
+                    let a = Attempt(slot: slot, group: g, session: session, waveID: waveID)
                     context.insert(a)
                     committed.append(a)
                 }
@@ -661,10 +663,10 @@ struct LogView: View {
     @ViewBuilder
     private func recentRow(_ a: Attempt, inWave: Bool = false) -> some View {
         HStack(spacing: 10) {
-            Circle().fill(a.outcome.color).frame(width: 8, height: 8)
+            Circle().fill(a.outcomeDef?.color ?? Theme.label3).frame(width: 8, height: 8)
             Text(a.group?.name ?? "—")
                 .font(.system(size: 13, weight: .semibold))
-            Text(a.group.map { a.outcome.label(for: $0) } ?? a.outcome.label(.stunt))
+            Text(a.outcomeDef?.label ?? "—")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.label2)
             Spacer()
@@ -681,7 +683,7 @@ struct LogView: View {
     /// header (noun · reps · hit%) and its reps stacked inside.
     @ViewBuilder
     private func waveContainer(_ reps: [Attempt]) -> some View {
-        let hits = reps.filter { $0.outcome.isHit }.count
+        let hits = reps.filter { $0.isHitRep }.count
         let pct = reps.isEmpty ? 0 : Int((Double(hits) / Double(reps.count) * 100).rounded())
         VStack(spacing: 1) {
             HStack {
@@ -796,12 +798,12 @@ struct LogView: View {
     /// Engraved chip: outcome dot + group name + outcome short word.
     private func repChip(_ a: Attempt) -> some View {
         HStack(spacing: 5) {
-            Circle().fill(a.outcome.color).frame(width: 7, height: 7)
+            Circle().fill(a.outcomeDef?.color ?? Theme.label3).frame(width: 7, height: 7)
             Text(a.group?.name ?? "—")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.label)
                 .lineLimit(1)
-            Text(a.group.map { a.outcome.short(for: $0) } ?? a.outcome.short(.stunt))
+            Text(a.outcomeDef?.short ?? "—")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
@@ -899,25 +901,25 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
+    /// Per-slot session counts for a skill, sized to its outcome list.
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
-        var counts = [0, 0, 0, 0]
+        var counts = Array(repeating: 0, count: group.outcomeDefs.count)
         for a in attempts where a.group === group {
-            guard let outcome = Outcome(rawValue: a.outcomeRaw) else { continue }
-            counts[outcome.rawValue] += 1
+            let slot = a.outcomeRaw
+            if slot >= 0 && slot < counts.count { counts[slot] += 1 }
         }
         return counts
     }
 
     // MARK: Hot streak (heating up / on fire)
 
-    /// Trailing run of clean hits for one group in this session — fuel for the
-    /// streak indicator. A bobble or fall breaks it (a bobble is NOT a hit,
-    /// same rule as everywhere else). 2 = heating up, 3+ = on fire.
+    /// Trailing run of clean hits (100%-credit outcomes) for one group in this
+    /// session. Any non-hit outcome breaks it. 2 = heating up, 3+ = on fire.
     private func hotStreak(group: StuntGroup, in attempts: [Attempt]) -> Int {
         var run = 0
         for a in attempts.reversed() {
             guard a.group === group else { continue }
-            guard a.outcome == .hit else { break }
+            guard a.isHitRep else { break }
             run += 1
         }
         return run

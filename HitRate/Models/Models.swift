@@ -96,6 +96,116 @@ extension SkillCategory {
     }
 }
 
+// MARK: - Flexible outcomes (label + color + credit)
+
+/// The fixed credit ladder that drives the weighted hit rate. Color is chosen
+/// SEPARATELY (see `OutcomeColor`) so e.g. a blue "Balk" still counts as a miss.
+enum OutcomeCredit: Int, CaseIterable, Codable, Identifiable {
+    case hit = 100, decent = 67, rough = 33, miss = 0
+    var id: Int { rawValue }
+    var label: String {
+        switch self {
+        case .hit: "Hit · 100%"
+        case .decent: "Decent · 67%"
+        case .rough: "Rough · 33%"
+        case .miss: "Miss · 0%"
+        }
+    }
+    var defaultColor: OutcomeColor {
+        switch self {
+        case .hit: .green
+        case .decent: .yellow
+        case .rough: .orange
+        case .miss: .red
+        }
+    }
+    /// Aggregate-histogram bucket (0 = hit … 3 = miss). Aligns with the legacy
+    /// `Outcome.rawValue` order so existing tier-indexed stats keep working while
+    /// individual skills carry any number of outcomes.
+    var tierIndex: Int {
+        switch self {
+        case .hit: 0
+        case .decent: 1
+        case .rough: 2
+        case .miss: 3
+        }
+    }
+}
+
+/// The outcome color palette — assignable independently of credit.
+enum OutcomeColor: String, CaseIterable, Codable, Identifiable {
+    case green, yellow, orange, red, blue, purple, gray
+    var id: String { rawValue }
+    var color: Color {
+        switch self {
+        case .green: Theme.hit
+        case .yellow: Theme.bobble
+        case .orange: Theme.buildingFall
+        case .red: Theme.majorFall
+        case .blue: Theme.outcomeBlue
+        case .purple: Theme.outcomePurple
+        case .gray: Theme.outcomeGray
+        }
+    }
+}
+
+/// One tap target on a skill's pad: a user word, a palette color, and a credit
+/// weight. Stored as a small Codable list on the skill (NOT a @Model — that
+/// avoids a relationship migration; `Attempt.outcomeRaw` keeps indexing by
+/// slot into this list, so existing reps stay valid).
+struct OutcomeDef: Codable, Hashable, Identifiable {
+    var label: String
+    var colorRaw: String
+    var credit: Int           // 0 / 33 / 67 / 100
+
+    var id: String { "\(label)|\(colorRaw)|\(credit)" }
+    var color: Color { (OutcomeColor(rawValue: colorRaw) ?? .gray).color }
+    var creditTier: OutcomeCredit { OutcomeCredit(rawValue: credit) ?? .miss }
+    /// A "hit" for streaks / the green accent / hit milestones.
+    var isHit: Bool { credit >= 100 }
+    var short: String { Outcome.deriveShort(label) }
+    /// Maps the credit tier onto a legacy `Outcome` purely to pick a tap sound.
+    var soundOutcome: Outcome {
+        switch creditTier {
+        case .hit: .hit
+        case .decent: .bobble
+        case .rough: .buildingFall
+        case .miss: .majorFall
+        }
+    }
+
+    init(_ label: String, _ color: OutcomeColor, _ credit: OutcomeCredit) {
+        self.label = label; self.colorRaw = color.rawValue; self.credit = credit.rawValue
+    }
+    init(label: String, colorRaw: String, credit: Int) {
+        self.label = label; self.colorRaw = colorRaw; self.credit = credit
+    }
+}
+
+extension SkillCategory {
+    /// The default flexible outcome set for a new skill in this category. The
+    /// first four slots stay aligned with the legacy severity order so existing
+    /// reps (which index by slot via `Attempt.outcomeRaw`) keep their meaning;
+    /// any extra outcome (e.g. tumbling "Balk") is APPENDED after them.
+    var defaultOutcomeDefs: [OutcomeDef] {
+        switch self {
+        case .stunts, .pyramid:
+            return [.init("Hit", .green, .hit), .init("Bobble", .yellow, .decent),
+                    .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss)]
+        case .standingTumbling, .runningTumbling:
+            return [.init("Stuck", .green, .hit), .init("Stepped out", .yellow, .decent),
+                    .init("Touched down", .orange, .rough), .init("Major fall", .red, .miss),
+                    .init("Balk", .blue, .miss)]
+        case .jumps:
+            return [.init("Hit", .green, .hit), .init("Low", .yellow, .decent),
+                    .init("Bent", .orange, .rough), .init("Missed", .red, .miss)]
+        case .tosses:
+            return [.init("Caught", .green, .hit), .init("Bobble", .yellow, .decent),
+                    .init("Low", .orange, .rough), .init("Dropped", .red, .miss)]
+        }
+    }
+}
+
 // MARK: - Outcome (the core domain enum)
 
 enum Outcome: Int, Codable, CaseIterable, Identifiable {
@@ -314,6 +424,10 @@ final class StuntGroup {
     /// entry falls back to the category default. Additive field → lightweight
     /// migration; blank = every slot uses `category.defaultOutcomeWords`.
     var outcomeOverridesRaw: String = ""
+    /// The skill's flexible outcome list (label + color + credit), JSON-encoded.
+    /// Blank = use `category.defaultOutcomeDefs`. `Attempt.outcomeRaw` indexes
+    /// into the resolved list, so the first four slots must stay legacy-aligned.
+    var outcomeDefsRaw: String = ""
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -352,6 +466,38 @@ final class StuntGroup {
             categoryRaw = newValue.rawValue
             kindRaw = newValue.hitRateKind.rawValue
         }
+    }
+
+    // MARK: Flexible outcome list (label + color + credit)
+
+    /// The skill's outcome tap targets, resolved: decoded per-skill list, else
+    /// the category preset. Always at least the preset (never empty).
+    var outcomeDefs: [OutcomeDef] {
+        if !outcomeDefsRaw.isEmpty,
+           let data = outcomeDefsRaw.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([OutcomeDef].self, from: data),
+           !decoded.isEmpty {
+            return decoded
+        }
+        return category.defaultOutcomeDefs
+    }
+
+    /// Persist a new outcome list (pass the category preset's contents to "reset"
+    /// by clearing back to defaults).
+    func setOutcomeDefs(_ defs: [OutcomeDef]) {
+        if defs == category.defaultOutcomeDefs {
+            outcomeDefsRaw = ""   // stay linked to the preset
+        } else if let data = try? JSONEncoder().encode(defs),
+                  let s = String(data: data, encoding: .utf8) {
+            outcomeDefsRaw = s
+        }
+    }
+
+    /// The outcome at a slot index (an `Attempt.outcomeRaw`), or nil if the list
+    /// shrank below it (a deleted outcome — the rep is then uncredited).
+    func outcomeDef(at slot: Int) -> OutcomeDef? {
+        let defs = outcomeDefs
+        return slot >= 0 && slot < defs.count ? defs[slot] : nil
     }
 
     // MARK: Per-skill outcome words (the good→bad scale)
@@ -432,7 +578,32 @@ final class Attempt {
         self.waveID = waveID
     }
 
+    /// Log a rep by its outcome SLOT index into the skill's flexible list — the
+    /// path used now that a skill can have any number of outcomes.
+    init(slot: Int, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
+        self.outcomeRaw = slot
+        self.group = group
+        self.session = session
+        self.timestamp = timestamp
+        self.waveID = waveID
+    }
+
     var outcome: Outcome { Outcome(rawValue: outcomeRaw) ?? .hit }
+
+    /// The flexible outcome this rep logged, resolved against its skill's current
+    /// list by slot index. Nil if that outcome was later deleted from the skill.
+    var outcomeDef: OutcomeDef? { group?.outcomeDef(at: outcomeRaw) }
+    /// Credit toward the weighted hit rate (0…100); a deleted outcome → 0.
+    var creditValue: Int { outcomeDef?.credit ?? 0 }
+    /// A clean hit — drives streaks, the green accent, and hit milestones.
+    var isHitRep: Bool { outcomeDef?.isHit ?? false }
+    /// The legacy severity `Outcome` this rep maps to by credit TIER (hit/decent/
+    /// rough/miss → hit/bobble/buildingFall/majorFall). Used only by aggregate
+    /// stats/visuals (tape color, tier histograms) so they stay 4-bucket and
+    /// crash-safe regardless of how many outcomes the skill defines.
+    var tierOutcome: Outcome {
+        Outcome(rawValue: outcomeDef?.creditTier.tierIndex ?? OutcomeCredit.miss.tierIndex) ?? .majorFall
+    }
 }
 
 // MARK: - Custom outcomes (user-created, per folder)
