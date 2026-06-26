@@ -22,6 +22,8 @@ struct FolderListView: View {
 
     @State private var addOpen = false
     @State private var newName = ""
+    @State private var renaming: Team?
+    @State private var renameText = ""
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -58,6 +60,27 @@ struct FolderListView: View {
         } message: {
             Text("Each folder keeps its own skills and stats — a team, an athlete, a private lesson, whatever you track separately.")
         }
+        .alert("Rename folder", isPresented: Binding(
+            get: { renaming != nil },
+            set: { if !$0 { renaming = nil } })) {
+            TextField("Folder name", text: $renameText)
+            Button("Save") {
+                let t = renameText.trimmingCharacters(in: .whitespaces)
+                if let f = renaming, !t.isEmpty { f.name = t; try? context.save() }
+                renaming = nil
+            }
+            Button("Cancel", role: .cancel) { renaming = nil }
+        }
+    }
+
+    /// Move a folder (and its skills + reps) to the Trash — kept and restorable
+    /// from Data Management. Always keep at least one active folder.
+    private func trashFolder(_ t: Team) {
+        guard teams.active.count > 1 else { return }
+        let wasCurrent = t.id.uuidString == currentTeamID
+        t.deletedAt = .now
+        try? context.save()
+        if wasCurrent, let first = teams.active.first { currentTeamID = first.id.uuidString }
     }
 
     // MARK: Header
@@ -124,6 +147,17 @@ struct FolderListView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                renameText = t.name
+                renaming = t
+            } label: { Label("Rename", systemImage: "pencil") }
+            if teams.active.count > 1 {
+                Button(role: .destructive) {
+                    withAnimation { trashFolder(t) }
+                } label: { Label("Move to Trash", systemImage: "trash") }
+            }
+        }
     }
 
     // MARK: New folder

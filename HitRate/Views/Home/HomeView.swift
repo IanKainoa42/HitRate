@@ -279,20 +279,24 @@ struct HomeView: View {
     private var skillsButton: some View {
         Button { editorOpen = true } label: {
             HStack(spacing: 5) {
-                Text(teamLabel.uppercased())
+                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
+                    .foregroundStyle(Theme.accent)
+                Text("SKILLS")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.label)
+                Text("· \(teamLabel)")
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(Theme.label2)
                     .lineLimit(1)
-                Text("SKILLS")
-                    .font(.system(size: 9, weight: .heavy))
-                    .tracking(1.5)
-                    .foregroundStyle(Theme.accent)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(Theme.label3)
             }
-            .contentShape(Rectangle())
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(
+                Capsule().fill(Theme.iconTile)
+                    .overlay(Capsule().stroke(Theme.iconTileEdge.opacity(0.85), lineWidth: 1)))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }

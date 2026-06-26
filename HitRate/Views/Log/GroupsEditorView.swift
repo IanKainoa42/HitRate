@@ -28,11 +28,15 @@ private struct RenameField: View {
                     draft = value
                     loaded = true
                 }
+                // Only commit on a REAL change — committing an unchanged value
+                // still triggers a SwiftData write → @Query refresh → row
+                // re-render → onDisappear fires again → infinite animation loop
+                // (the "spazz" when entering Edit mode). Guarding breaks it.
                 .onChange(of: focused) { _, nowFocused in
-                    if !nowFocused { commit(draft) }   // tapped away
+                    if !nowFocused, draft != value { commit(draft) }   // tapped away
                 }
-                .onSubmit { commit(draft) }
-                .onDisappear { commit(draft) }         // sheet dismissed via Done
+                .onSubmit { if draft != value { commit(draft) } }
+                .onDisappear { if loaded, draft != value { commit(draft) } }
             // Pencil signals the word is editable (the plain field read as a
             // fixed label before). Hidden while editing.
             if !focused {
@@ -199,10 +203,8 @@ struct GroupsEditorView: View {
 
                 customOutcomesSection
 
-                // Folder management lives at the bottom — the editor opens on
-                // the CURRENT folder's skills, not a folder chooser (you're
-                // already inside one; switch folders from the home screen).
-                teamsSection
+                // Folder management lives on the folder-list home page now —
+                // the editor is purely this folder's skills + settings.
 
                 Section {
                     Toggle("Tap sounds", isOn: $soundsOn)
