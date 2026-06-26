@@ -102,8 +102,6 @@ struct GroupsEditorView: View {
                     .listRowBackground(glassRow)
                 }
 
-                teamsSection
-
                 Section("\(nounPluralTitle) · \(currentTeam?.name ?? "")") {
                     ForEach(groups) { g in
                         HStack(spacing: 10) {
@@ -200,6 +198,11 @@ struct GroupsEditorView: View {
                 .listRowBackground(glassRow)
 
                 customOutcomesSection
+
+                // Folder management lives at the bottom — the editor opens on
+                // the CURRENT folder's skills, not a folder chooser (you're
+                // already inside one; switch folders from the home screen).
+                teamsSection
 
                 Section {
                     Toggle("Tap sounds", isOn: $soundsOn)
@@ -446,7 +449,7 @@ struct GroupsEditorView: View {
         } header: {
             Text("Folders")
         } footer: {
-            Text("Each folder keeps its own roster and stats — call it a team, an athlete, a private lesson, whatever you track separately. Switch the active folder with the circle here or from the Home header.")
+            Text("Each folder keeps its own roster and stats — call it a team, an athlete, a private lesson, whatever you track separately. Switch folders from the home screen (the back arrow), or tap a circle here.")
         }
         .listRowBackground(glassRow)
     }

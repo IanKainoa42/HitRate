@@ -273,28 +273,28 @@ struct HomeView: View {
                          : "\(teamLabel) · \(identityLabel)"
     }
 
-    private var teamSwitcher: some View {
-        Menu {
-            Picker("Team", selection: $currentTeamID) {
-                ForEach(teams.active) { t in
-                    Text(t.name).tag(t.id.uuidString)
-                }
-            }
-            Divider()
-            Button { addTeamOpen = true } label: { Label("New team", systemImage: "plus") }
-        } label: {
-            HStack(spacing: 4) {
-                Text(sublineText.uppercased())
+    /// Replaces the old folder dropdown: a clear "Skills" button that opens this
+    /// folder's roster/editor. Switching folders happens by exiting to the
+    /// folder-list home (the back chevron), not from a header menu.
+    private var skillsButton: some View {
+        Button { editorOpen = true } label: {
+            HStack(spacing: 5) {
+                Text(teamLabel.uppercased())
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(Theme.label2)
                     .lineLimit(1)
-                Image(systemName: "chevron.down")
+                Text("SKILLS")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.accent)
+                Image(systemName: "chevron.right")
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(Theme.label3)
             }
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -317,7 +317,7 @@ struct HomeView: View {
                 // single green signal dot.
                 IconWordmark(size: 17, rateFill: Theme.well, dotSize: 8)
 
-                teamSwitcher
+                skillsButton
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -338,20 +338,6 @@ struct HomeView: View {
                 trophyOpen = true
             } label: {
                 Image(systemName: "trophy")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.label2)
-                    .frame(width: 34, height: 34)
-                    .background(iconButtonBackground)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            // Skills/groups editor — with the Log tab gone, this is the only
-            // path to roster + settings outside a live practice.
-            Button {
-                editorOpen = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.label2)
                     .frame(width: 34, height: 34)
