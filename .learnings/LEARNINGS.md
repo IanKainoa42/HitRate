@@ -260,3 +260,9 @@
   3. Read with `sqlite3`: SwiftData tables are `Z<ENTITY>` (ZTEAM, ZSTUNTGROUP, ZATTEMPT). Relationships are integer FKs to `Z_PK`. Timestamps are Core Data epoch: `datetime(ZTIMESTAMP+978307200,'unixepoch','localtime')`.
   4. **Persistent history pinpoints deletes:** `ACHANGE` (ZCHANGETYPE 0=insert/1=update/2=delete, ZENTITY, ZENTITYPK, ZTRANSACTIONID) JOIN `ATRANSACTION` (ZTIMESTAMP, ZAUTHOR) gives the exact time each row was deleted. PK gaps in a table = prior deletions.
 - **HitRate root cause found this way:** skill delete cascade-deletes its reps; `sweepOrphanedAttempts` hard-deleted reps on launch (traced a 1738-rep wipe to it). Fix = soft-delete/Trash + stop auto-deleting on launch.
+
+## 2026-06-26 — RenameField commit-on-disappear caused infinite re-render in Edit mode
+
+- **Category:** correction
+- **What happened:** Tapping the editor's Edit button "spazzed out hardcore" — an animation loop. Cause: the custom `RenameField` committed its draft on `.onChange(of: focused)`, `.onSubmit`, AND `.onDisappear` *unconditionally*. Committing an unchanged value still does `model.x = same; try? context.save()`, which publishes a @Query change → row re-render → `onDisappear` fires again → save → loop. EditButton toggling row layout triggered the first disappear.
+- **Rule:** A commit-on-blur/disappear field MUST guard `draft != value` before committing. Never write to a @Model (even the same value) from a lifecycle callback that re-fires on re-render. Same class of bug as binding a TextField directly through @Observable/@Model.
