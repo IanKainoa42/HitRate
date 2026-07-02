@@ -65,6 +65,21 @@ platform :ios do
     # 2. Hand-assemble + re-sign the IPA (documented openrsync workaround).
     sh("cp -R #{"#{archive}/Products/Applications/#{scheme}.app".shellescape} #{payload.shellescape}/")
 
+    # 2b. Beta-host guard (ITMS-90111): App Store review intake rejects binaries
+    # whose BuildMachineOSBuild is a prerelease macOS seed (build id ends in a
+    # lowercase letter). Stamp a released build number BEFORE signing so the
+    # signature covers it. No-op on a released host.
+    host_build = `sw_vers -buildVersion`.strip
+    if host_build =~ /[a-z]\z/
+      released = ENV["SHIP_RELEASED_OS_BUILD"] || "25F80" # macOS 26.5.1
+      UI.important("Beta macOS host #{host_build} — stamping BuildMachineOSBuild=#{released}")
+      ["#{app}/Info.plist", "#{app}/Watch/#{scheme}.app/Info.plist"].each do |plist|
+        next unless File.exist?(plist)
+        sh("/usr/libexec/PlistBuddy -c 'Set :BuildMachineOSBuild #{released}' #{plist.shellescape} || " \
+           "/usr/libexec/PlistBuddy -c 'Add :BuildMachineOSBuild string #{released}' #{plist.shellescape}")
+      end
+    end
+
     # 2a. Nested watch app must be re-signed FIRST (inner before outer) with
     # its own App Store profile, or ASC rejects the dev-signed watchkitapp.
     watch_app = "#{app}/Watch/#{scheme}.app"

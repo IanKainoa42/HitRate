@@ -1,3 +1,7 @@
-• Custom outcomes — add your own per-folder outcomes to track the specific issues that matter for each skill, alongside the standard four.
-• Tag what drove each rep so you can see what's actually moving your numbers.
-• Rename the outcome bucket label per folder to match how you talk about your skills.
+A big 1.1 redesign, built from real practice-floor feedback:
+
+• New folder home — open the app to your folders, tap one to dive into its dashboard.
+• Flexible outcomes — define 2–6 custom outcomes per skill with your own labels, colors, and credit weights. Hit rate is now a weighted average, so partial reps count for what they're worth.
+• Skills button — jump between skills right from the dashboard.
+• Redesigned onboarding — pick your focus areas and get suggested skills to track from the first launch.
+• Trash with restore — deleted folders and skills go to Trash instead of vanishing, and your rep history stays safe.
