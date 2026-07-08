@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import os
 
 /// The counter, presented full-screen from Home's practice pill for the
 /// duration of one session. Built for the floor: pick a group once, then
@@ -8,6 +9,9 @@ import SwiftData
 /// (an empty session is swept by Home on dismiss instead of being kept).
 struct LogView: View {
     let session: PracticeSession
+    var isClinic: Bool = false
+    var goalRate: Int = 80
+    var onArchive: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -18,8 +22,12 @@ struct LogView: View {
     @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage("practiceLayout") private var practiceLayoutRaw = ""   // "" auto, "grid", "pad"
 
+    @State private var showSummary = false
+
     /// Practice logs into the active team's roster only.
     private var groups: [StuntGroup] { allGroups.inTeam(teams.current(id: currentTeamID)) }
+
+    private var currentTeam: Team? { teams.current(id: currentTeamID) }
 
     /// The active folder's user-created outcomes (tap buttons below the 4).
     private var customOutcomes: [CustomOutcome] {
@@ -95,9 +103,25 @@ struct LogView: View {
         NavigationStack {
             activeView
                 .background(FloorBackdrop().ignoresSafeArea())
-                .navigationTitle("Practice")
+                .navigationTitle(isClinic ? "" : "Practice")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack(spacing: 8) {
+                            Text(isClinic ? "Clinic:" : "Practice")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(Theme.label)
+                            if isClinic, let team = currentTeam {
+                                RenameField(prompt: "Camp Name", value: team.name) { new in
+                                    team.name = new
+                                    try? context.save()
+                                }
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                                .frame(maxWidth: 150)
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(mode.nounPluralTitle) { showGroupsEditor = true }
                     }
@@ -105,6 +129,21 @@ struct LogView: View {
                 .sheet(isPresented: $showGroupsEditor) {
                     GroupsEditorView()
                 }
+                .fullScreenCover(isPresented: $showSummary, onDismiss: {
+                    if isClinic {
+                        dismiss()
+                    }
+                }) {
+                    QuickClinicSummaryView(session: session, groups: groups, goalRate: goalRate) {
+                        onArchive?()
+                    } onDiscard: {
+                        // Handled cleanly by onDismiss when showSummary closes
+                    }
+                }
+        }
+        .onAppear {
+            let logger = Logger(subsystem: "com.ianrichardson.HitRate", category: "Clinic")
+            logger.notice("🔵 LogView onAppear - isClinic: \(isClinic), groups: \(groups.count), allGroups: \(allGroups.count), teams: \(teams.count)")
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
     }
@@ -124,7 +163,7 @@ struct LogView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         IconWordmark(size: 11, rateFill: Theme.well, dotSize: 5)
-                        Text("PRACTICE")
+                        Text(isClinic ? "CLINIC" : "PRACTICE")
                             .font(.system(size: 9, weight: .bold))
                             .tracking(1.5)
                             .foregroundStyle(Theme.label3)
@@ -139,6 +178,28 @@ struct LogView: View {
                         .tracking(1.5)
                         .foregroundStyle(Theme.label2)
                 }
+                
+                if isClinic, attempts.count > 0, let rate = rate {
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(Theme.fill)
+                                Capsule()
+                                    .fill(rate >= goalRate ? Theme.hit : Theme.buildingFall)
+                                    .frame(width: geo.size.width * CGFloat(min(1.0, Double(rate) / Double(max(1, goalRate)))))
+                            }
+                        }
+                        .frame(height: 6)
+                        
+                        Text("\(rate)% / \(goalRate)% GOAL")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.label2)
+                    }
+                    .frame(width: 100)
+                }
+                
                 Spacer()
                 Button {
                     // Ending must never silently drop staged reps — the Submit
@@ -153,7 +214,11 @@ struct LogView: View {
                     }
                     hapticTrigger += 1
                     Sounds.shared.play(.end)
-                    dismiss()
+                    if isClinic {
+                        showSummary = true
+                    } else {
+                        dismiss()
+                    }
                 } label: {
                     Text("END")
                         .font(.system(size: 11, weight: .bold))
@@ -374,11 +439,22 @@ struct LogView: View {
                                     .frame(width: 22, height: 22)
                                     .background(g.color)
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                Text(g.name)
+                                if isClinic {
+                                    RenameField(prompt: "Mat Name", value: g.name) { new in
+                                        g.name = new
+                                        try? context.save()
+                                    }
                                     .font(.system(size: 11.5, weight: .semibold))
                                     .foregroundStyle(Theme.label)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.7)
+                                } else {
+                                    Text(g.name)
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(Theme.label)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.7)
+                                }
                                 flameBadge(streakN)
                             }
                             .padding(.vertical, groups.count > 8 ? 1 : 3)

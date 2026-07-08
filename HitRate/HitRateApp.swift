@@ -6,6 +6,9 @@ struct HitRateApp: App {
     let container: ModelContainer
 
     init() {
+        if CommandLine.arguments.contains("--run-e2e-tests") {
+            QuickClinicTests.runAndExit()
+        }
         do {
             let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

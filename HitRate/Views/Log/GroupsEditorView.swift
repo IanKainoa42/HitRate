@@ -9,48 +9,6 @@ import CheerRulesKit
 /// the inset-well restyle, re-composited every shadow) mid-edit — the cursor
 /// fought the keyboard. Committing on commit keeps the e2-1/e2-2 invariant
 /// (labels re-render app-wide once the rename lands, just not per keystroke).
-private struct RenameField: View {
-    let prompt: String
-    let value: String
-    let commit: (String) -> Void
-
-    @State private var draft = ""
-    @State private var loaded = false
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            TextField(prompt, text: $draft)
-                .focused($focused)
-                .submitLabel(.done)
-                .onAppear {
-                    guard !loaded else { return }
-                    draft = value
-                    loaded = true
-                }
-                // Only commit on a REAL change — committing an unchanged value
-                // still triggers a SwiftData write → @Query refresh → row
-                // re-render → onDisappear fires again → infinite animation loop
-                // (the "spazz" when entering Edit mode). Guarding breaks it.
-                .onChange(of: focused) { _, nowFocused in
-                    if !nowFocused, draft != value { commit(draft) }   // tapped away
-                }
-                .onSubmit { if draft != value { commit(draft) } }
-                .onDisappear { if loaded, draft != value { commit(draft) } }
-            // Pencil signals the word is editable (the plain field read as a
-            // fixed label before). Hidden while editing.
-            if !focused {
-                Image(systemName: "pencil")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.label3)
-            }
-        }
-        // Tapping anywhere on the row — pencil or padding — starts editing.
-        .contentShape(Rectangle())
-        .onTapGesture { focused = true }
-    }
-}
-
 /// Manage the roster of skills/groups, identity, outcome names, and mode.
 struct GroupsEditorView: View {
     @Environment(\.modelContext) private var context
