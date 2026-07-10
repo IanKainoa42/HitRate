@@ -40,6 +40,21 @@ enum SkillKind: String, CaseIterable, Identifiable {
     var icon: String { self == .stunt ? "person.3.fill" : "figure.gymnastics" }
 }
 
+// MARK: - Subject kind (who threw the rep)
+
+/// Who a logged rep is attributed to. A `Subject` is the ROW in a recording:
+/// an athlete (tumbling / athlete mode) or a stunt group (coach floor). Same
+/// slot either way — only the icon/word differ. Orthogonal to `SkillKind`
+/// (which is about outcome WORDS): a person can throw a stunt or a tumbling
+/// pass, a group can be graded on either.
+enum SubjectKind: String, CaseIterable, Identifiable, Codable {
+    case person, group
+
+    var id: String { rawValue }
+    var label: String { self == .person ? "Athlete" : "Group" }
+    var icon: String { self == .person ? "person.fill" : "person.3.fill" }
+}
+
 // MARK: - Skill category (United Scoring System)
 
 /// `SkillCategory` (CheerRulesKit) is the United score-sheet classification a
@@ -359,6 +374,11 @@ final class Team {
     /// Deleting the folder removes them (and each cascades its tallies).
     @Relationship(deleteRule: .cascade, inverse: \CustomOutcome.team)
     var customOutcomes: [CustomOutcome] = []
+    /// The subjects (athletes or stunt groups) this folder attributes reps to —
+    /// the ROWS in a recording. Deleting the folder removes them; their reps just
+    /// lose attribution (the Attempt.subject relationship nullifies), never delete.
+    @Relationship(deleteRule: .cascade, inverse: \Subject.team)
+    var subjects: [Subject] = []
 
     init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
@@ -565,25 +585,32 @@ final class Attempt {
     var outcomeRaw: Int
     var group: StuntGroup?
     var session: PracticeSession?
+    /// Who threw this rep — the recording ROW (athlete or group). Optional so
+    /// every pre-subject rep stays valid as an un-attributed skill-level tally;
+    /// nil means "logged against the skill, no subject picked". Nullify on the
+    /// subject's delete so history survives losing a roster member.
+    var subject: Subject?
     /// Reps committed together as one wave/routine share a `waveID`; reps logged
     /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
     /// container in the practice log. Optional → additive lightweight migration.
     var waveID: UUID?
 
-    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
+    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
         self.group = group
         self.session = session
+        self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
     }
 
     /// Log a rep by its outcome SLOT index into the skill's flexible list — the
     /// path used now that a skill can have any number of outcomes.
-    init(slot: Int, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
+    init(slot: Int, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = slot
         self.group = group
         self.session = session
+        self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
     }
@@ -651,6 +678,64 @@ final class CustomTally {
         self.group = group
         self.session = session
         self.timestamp = timestamp
+    }
+}
+
+// MARK: - Subject (the recording ROW: athlete or stunt group)
+
+/// Who reps are attributed to inside a recording. An athlete ("Maya") or a stunt
+/// group ("Group 2"). Scoped to a `Team`/folder. Deliberately lightweight: a
+/// blank name is allowed (capture-first, name-later — "someone's doing
+/// something"), reconciled later from suggestion chips so the same person never
+/// double-creates. Soft-deletable like `StuntGroup`/`Team`.
+@Model
+final class Subject {
+    /// Stable id (cross-device / wire-format friendly, like StuntGroup.id).
+    var id: UUID = UUID()
+    /// Display name; "" = unnamed, shown as a placeholder until reconciled.
+    var name: String
+    var kindRaw: String = SubjectKind.person.rawValue
+    var orderIndex: Int
+    var createdAt: Date
+    /// Soft-delete tombstone — hidden from rosters/stats, reps kept & restorable.
+    var deletedAt: Date? = nil
+    var team: Team?
+    /// Deleting a subject nullifies its reps' attribution (keeps the reps) — see
+    /// `Attempt.subject`.
+    @Relationship(deleteRule: .nullify, inverse: \Attempt.subject)
+    var attempts: [Attempt] = []
+
+    init(name: String, kind: SubjectKind = .person, orderIndex: Int,
+         id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.kindRaw = kind.rawValue
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+    }
+
+    var kind: SubjectKind {
+        get { SubjectKind(rawValue: kindRaw) ?? .person }
+        set { kindRaw = newValue.rawValue }
+    }
+
+    /// True when the name still needs reconciling (blank).
+    var isUnnamed: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Roster-facing display: the name, or a placeholder while unnamed.
+    var displayName: String { isUnnamed ? "Unnamed \(kind.label.lowercased())" : name }
+
+    /// Identity color — reuses the formation rainbow, cycled by order.
+    var color: Color { Theme.groupColor(orderIndex % Theme.groupRainbow.count) }
+}
+
+extension Array where Element == Subject {
+    /// Subjects not in the Trash, in display order.
+    var active: [Subject] { filter { $0.deletedAt == nil }.sorted { $0.orderIndex < $1.orderIndex } }
+    /// Subjects belonging to one team (non-trashed), in order. No team → all active.
+    func inTeam(_ team: Team?) -> [Subject] {
+        let live = active
+        return team.map { t in live.filter { $0.team?.id == t.id } } ?? live
     }
 }
 
