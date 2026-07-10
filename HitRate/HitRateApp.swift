@@ -1,11 +1,13 @@
 import SwiftUI
 import SwiftData
+import FirebaseCore
 
 @main
 struct HitRateApp: App {
     let container: ModelContainer
 
     init() {
+        FirebaseApp.configure()
         if CommandLine.arguments.contains("--run-e2e-tests") {
             QuickClinicTests.runAndExit()
         }
@@ -58,12 +60,14 @@ struct RootView: View {
     /// root). Deliberately @State, not persisted: every cold launch lands on the
     /// folder list, per the "open straight to folders" design.
     @State private var openFolderID: String?
+    @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var syncEngine = SyncEngine.shared
 
     var body: some View {
         Group {
-            // No tab bar — the folder list is home, a folder's dashboard is one
-            // tap in, and the counter lives in a cover off the dashboard's pill.
-            if didOnboard {
+            if authViewModel.currentUser == nil {
+                AuthView()
+            } else if didOnboard {
                 if let id = openFolderID, teams.contains(where: { $0.id.uuidString == id }) {
                     HomeView(onExit: { openFolderID = nil })
                 } else {
@@ -90,6 +94,16 @@ struct RootView: View {
             sweepOrphanedAttempts()
             endStaleSessions()
             configureWatchLogging()
+            if authViewModel.currentUser != nil {
+                syncEngine.startSyncing(context: context)
+            }
+        }
+        .onChange(of: authViewModel.currentUser) { _, newUser in
+            if newUser != nil {
+                syncEngine.startSyncing(context: context)
+            } else {
+                syncEngine.stopSyncing()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

@@ -342,6 +342,7 @@ final class Team {
     var name: String
     var orderIndex: Int
     var createdAt: Date
+    var joinCode: String? = nil
     /// What this folder calls its buckets — "athlete", "skill", "group",
     /// "driver"… Blank (default) = fall back to the global `AppMode` noun, so
     /// existing stores migrate lightweight. Stored singular + lowercase; the
@@ -561,6 +562,7 @@ final class PracticeSession {
 
 @Model
 final class Attempt {
+    var id: UUID = UUID()
     var timestamp: Date
     var outcomeRaw: Int
     var group: StuntGroup?

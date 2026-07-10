@@ -25,6 +25,8 @@ struct FolderListView: View {
     @State private var newName = ""
     @State private var renaming: Team?
     @State private var renameText = ""
+    @State private var joinOpen = false
+    @State private var joinCodeText = ""
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -60,6 +62,13 @@ struct FolderListView: View {
             Button("Cancel", role: .cancel) { newName = "" }
         } message: {
             Text("Each folder keeps its own skills and stats — a team, an athlete, a private lesson, whatever you track separately.")
+        }
+        .alert("Join folder", isPresented: $joinOpen) {
+            TextField("Join code", text: $joinCodeText)
+            Button("Join") { joinFolder() }
+            Button("Cancel", role: .cancel) { joinCodeText = "" }
+        } message: {
+            Text("Enter a 6-digit code to join an existing folder and sync stats.")
         }
         .alert("Rename folder", isPresented: Binding(
             get: { renaming != nil },
@@ -166,28 +175,53 @@ struct FolderListView: View {
     // MARK: New folder
 
     private var newFolderCTA: some View {
-        Button {
-            addOpen = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .heavy))
-                Text("NEW FOLDER")
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(1.5)
+        HStack(spacing: 8) {
+            Button {
+                addOpen = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .heavy))
+                    Text("NEW FOLDER")
+                        .font(.system(size: 13, weight: .heavy))
+                        .tracking(1.5)
+                }
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.accent)
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(.white.opacity(0.28), lineWidth: 1))
+                        .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(Theme.accentText)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Theme.accent)
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(.white.opacity(0.28), lineWidth: 1))
-                    .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            Button {
+                joinOpen = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 14, weight: .heavy))
+                    Text("JOIN FOLDER")
+                        .font(.system(size: 13, weight: .heavy))
+                        .tracking(1.5)
+                }
+                .foregroundStyle(Theme.label)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.iconTile)
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.iconTileEdge, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.24), radius: 8, y: 3))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 4)
@@ -207,5 +241,18 @@ struct FolderListView: View {
         currentTeamID = t.id.uuidString
         newName = ""
         onOpen(t)   // drop straight into the new (empty) folder to add skills
+    }
+
+    private func joinFolder() {
+        let code = joinCodeText.trimmingCharacters(in: .whitespaces)
+        joinCodeText = ""
+        guard code.count == 6 else { return } // simple validation
+        Task {
+            do {
+                try await SyncEngine.shared.joinTeam(code: code)
+            } catch {
+                print("Join failed: \(error)")
+            }
+        }
     }
 }

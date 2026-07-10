@@ -341,10 +341,10 @@ struct HomeView: View {
     private var skillsButton: some View {
         Button { editorOpen = true } label: {
             HStack(spacing: 5) {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.accent)
-                Text("SKILLS")
+                    .foregroundStyle(Theme.label2)
+                Text("SETTINGS")
                     .font(.system(size: 10, weight: .heavy))
                     .tracking(1.2)
                     .foregroundStyle(Theme.label)

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import CheerRulesKit
+import FirebaseAuth
 
 /// A rename field that types into a LOCAL buffer and only commits the result
 /// on blur / return / dismiss — never per keystroke. The old direct binding
@@ -64,6 +65,38 @@ struct GroupsEditorView: View {
                     .listRowBackground(glassRow)
                 }
 
+                if let team = currentTeam {
+                    Section("Share Team") {
+                        if let code = team.joinCode {
+                            HStack {
+                                Text("Join Code")
+                                Spacer()
+                                Text(code)
+                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Theme.accent)
+                                Button {
+                                    UIPasteboard.general.string = code
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 16))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Theme.accent)
+                            }
+                        } else {
+                            Button("Enable Cloud Sync") {
+                                if let uid = Auth.auth().currentUser?.uid {
+                                    SyncEngine.shared.push(team: team, ownerId: uid)
+                                }
+                            }
+                            .foregroundStyle(Theme.accent)
+                        }
+                    } footer: {
+                        Text("Athletes can enter this code to join your team and sync stats.")
+                    }
+                    .listRowBackground(glassRow)
+                }
+
                 Section("\(nounPluralTitle) · \(currentTeam?.name ?? "")") {
                     ForEach(groups) { g in
                         HStack(spacing: 10) {
@@ -75,6 +108,7 @@ struct GroupsEditorView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                             RenameField(prompt: "Name", value: g.name) { new in
                                 g.name = new
+                                SyncEngine.shared.push(group: g)
                                 try? context.save()
                             }
                             // United category — carries the execution drivers
@@ -83,6 +117,7 @@ struct GroupsEditorView: View {
                                 ForEach(SkillCategory.allCases, id: \.self) { c in
                                     Button {
                                         g.category = c
+                                        SyncEngine.shared.push(group: g)
                                         try? context.save()
                                     } label: {
                                         Label(c.displayName, systemImage: c.icon)
@@ -129,7 +164,10 @@ struct GroupsEditorView: View {
                     .onMove { from, to in
                         var arr = groups
                         arr.move(fromOffsets: from, toOffset: to)
-                        for (i, g) in arr.enumerated() { g.orderIndex = i }
+                        for (i, g) in arr.enumerated() {
+                            g.orderIndex = i
+                            SyncEngine.shared.push(group: g)
+                        }
                         try? context.save()
                     }
 
@@ -139,6 +177,7 @@ struct GroupsEditorView: View {
                                            number: next, orderIndex: groups.count)
                         g.team = currentTeam
                         context.insert(g)
+                        SyncEngine.shared.push(group: g)
                         try? context.save()
                     } label: {
                         Label("Add \(noun)", systemImage: "plus")
@@ -261,7 +300,10 @@ struct GroupsEditorView: View {
     }
 
     private func renumber() {
-        for (i, g) in groups.enumerated() { g.orderIndex = i }
+        for (i, g) in groups.enumerated() {
+            g.orderIndex = i
+            SyncEngine.shared.push(group: g)
+        }
         try? context.save()
     }
 
@@ -281,6 +323,7 @@ struct GroupsEditorView: View {
     /// Soft-delete: the skill + its reps move to the Trash, kept and restorable.
     private func softDelete(_ g: StuntGroup) {
         g.deletedAt = .now
+        SyncEngine.shared.push(group: g)
         try? context.save()
     }
 

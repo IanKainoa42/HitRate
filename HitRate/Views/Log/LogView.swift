@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import os
+import CheerRulesKit
+import FirebaseAuth
 
 /// The counter, presented full-screen from Home's practice pill for the
 /// duration of one session. Built for the floor: pick a group once, then
@@ -302,8 +304,12 @@ struct LogView: View {
                     ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                         let v = slot < groupCounts.count ? groupCounts[slot] : 0
                         Button {
-                            context.insert(Attempt(slot: slot, group: group, session: session))
+                            let attempt = Attempt(slot: slot, group: group, session: session)
+                            context.insert(attempt)
                             try? context.save()
+                            if let uid = Auth.auth().currentUser?.uid {
+                                SyncEngine.shared.push(attempt: attempt, loggerId: uid)
+                            }
                             selectedGroupIDRaw = group.id.uuidString
                             hapticTrigger += 1
                             Sounds.shared.play(.outcome(def.soundOutcome))
@@ -477,8 +483,12 @@ struct LogView: View {
                                             .onLongPressGesture(minimumDuration: 0.4) { unstage(g, slot) }
                                     } else {
                                         Button {
-                                            context.insert(Attempt(slot: slot, group: g, session: session))
+                                            let attempt = Attempt(slot: slot, group: g, session: session)
+                                            context.insert(attempt)
                                             try? context.save()
+                                            if let uid = Auth.auth().currentUser?.uid {
+                                                SyncEngine.shared.push(attempt: attempt, loggerId: uid)
+                                            }
                                             hapticTrigger += 1
                                             Sounds.shared.play(.outcome(def.soundOutcome))
                                         } label: {
@@ -664,6 +674,7 @@ struct LogView: View {
     private func commitWave() {
         let waveID = UUID()   // ties this batch together for the grouped log container
         var committed: [Attempt] = []
+        let uid = Auth.auth().currentUser?.uid
         for g in groups {
             guard let c = staged[g.persistentModelID] else { continue }
             for (slot, n) in c.enumerated() where n > 0 {
@@ -671,6 +682,9 @@ struct LogView: View {
                     let a = Attempt(slot: slot, group: g, session: session, waveID: waveID)
                     context.insert(a)
                     committed.append(a)
+                    if let uid = uid {
+                        SyncEngine.shared.push(attempt: a, loggerId: uid)
+                    }
                 }
             }
         }
@@ -789,6 +803,7 @@ struct LogView: View {
     private func undoLastRep(_ attempts: [Attempt]) {
         guard let last = attempts.last else { return }
         context.delete(last)
+        SyncEngine.shared.delete(attempt: last)
         try? context.save()
         hapticTrigger += 1
         Sounds.shared.play(.undo)

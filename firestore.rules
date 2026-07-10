@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // FTeam collection
+    match /teams/{teamId} {
+      // Anyone authenticated can create a team (they become the owner)
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      
+      // A user can read a team if they are the owner OR they are in the memberIds array
+      allow read: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid || 
+        request.auth.uid in resource.data.memberIds
+      );
+      
+      // A user can update/delete a team only if they are the owner
+      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+    
+    // FStuntGroup collection
+    match /groups/{groupId} {
+      // Helper function to check if the user is a member/owner of the parent team
+      function isTeamMember(teamId) {
+        let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
+        return team.ownerId == request.auth.uid || request.auth.uid in team.memberIds;
+      }
+      
+      // Anyone in the team can create, read, update, or delete groups for that team
+      allow read, write: if isAuthenticated() && isTeamMember(resource.data.teamId);
+      // For create, we also need to check the incoming data instead of existing resource
+      allow create: if isAuthenticated() && isTeamMember(request.resource.data.teamId);
+    }
+    
+    // FAttempt collection
+    match /attempts/{attemptId} {
+      // Helper function to check if the user is a member/owner of the parent team
+      function isTeamMember(teamId) {
+        let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
+        return team.ownerId == request.auth.uid || request.auth.uid in team.memberIds;
+      }
+      
+      // Anyone in the team can read or add attempts
+      allow read: if isAuthenticated() && isTeamMember(resource.data.teamId);
+      
+      // Only team members can create attempts, and they must record themselves as the logger
+      allow create: if isAuthenticated() && 
+                    isTeamMember(request.resource.data.teamId) && 
+                    request.resource.data.loggerId == request.auth.uid;
+      
+      // Only the person who logged the attempt (or the team owner) can delete/update it
+      allow update, delete: if isAuthenticated() && (
+        resource.data.loggerId == request.auth.uid || 
+        get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.ownerId == request.auth.uid
+      );
+    }
+  }
+}
