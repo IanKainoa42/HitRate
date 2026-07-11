@@ -612,11 +612,13 @@ struct SkillOutcomesEditor: View {
 
                             Spacer(minLength: 6)
 
-                            // Credit — the weight that drives the hit rate.
+                            // Credit — the weight that drives the hit rate AND
+                            // whether the rep is a landing (≥50% keeps a streak).
                             Menu {
                                 ForEach(OutcomeCredit.allCases) { cr in
                                     Button { defs[i].credit = cr.rawValue; commit() } label: {
-                                        Text(cr.label)
+                                        Label("\(cr.label) — \(cr.isLanding ? "landing" : "fall")",
+                                              systemImage: cr.isLanding ? "checkmark.circle.fill" : "xmark.circle")
                                     }
                                 }
                             } label: {
@@ -649,7 +651,7 @@ struct SkillOutcomesEditor: View {
                 } header: {
                     Text("Outcomes · good → bad")
                 } footer: {
-                    Text("Color is yours (e.g. a blue \"Balk\"). Credit is the weight: a Hit is 100%, a Miss 0% — your hit rate is the weighted average, and any 100% outcome counts as a hit. Only a trailing outcome with no reps can be removed.")
+                    CreditLegend()
                 }
                 .listRowBackground(Theme.well)
 
@@ -735,7 +737,8 @@ struct OutcomeTemplateEditor: View {
                             Menu {
                                 ForEach(OutcomeCredit.allCases) { cr in
                                     Button { defs[i].credit = cr.rawValue; commit() } label: {
-                                        Text(cr.label)
+                                        Label("\(cr.label) — \(cr.isLanding ? "landing" : "fall")",
+                                              systemImage: cr.isLanding ? "checkmark.circle.fill" : "xmark.circle")
                                     }
                                 }
                             } label: {
@@ -768,7 +771,7 @@ struct OutcomeTemplateEditor: View {
                 } header: {
                     Text("Outcomes · good → bad")
                 } footer: {
-                    Text("Color is yours; credit is the weight (Hit 100% … Miss 0%). This set seeds any skill you give this type — good → bad, left to right.")
+                    CreditLegend()
                 }
                 .listRowBackground(Theme.well)
             }
@@ -782,6 +785,25 @@ struct OutcomeTemplateEditor: View {
                 }
             }
             .onAppear { defs = template.defs }
+        }
+    }
+}
+
+/// Shared credit-tier legend for both outcome editors — spells out what each
+/// credit means and the 50% LANDING line (a landing keeps a streak; a fall
+/// breaks it), so the number you assign each outcome is unambiguous.
+struct CreditLegend: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Credit is the weight behind each outcome — your hit rate is the average of these.")
+            ForEach(OutcomeCredit.allCases) { cr in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: cr.isLanding ? "checkmark.circle.fill" : "xmark.circle")
+                        .foregroundStyle(cr.isLanding ? Theme.accent : Theme.label3)
+                    Text("\(cr.label) — \(cr.definition)")
+                }
+            }
+            Text("50% or more is a LANDING — you stayed up, and it keeps a streak going. Below 50% is a fall or balk and breaks a streak. Color is yours; only a trailing outcome with no reps can be removed.")
         }
     }
 }

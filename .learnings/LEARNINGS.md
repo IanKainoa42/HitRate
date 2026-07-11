@@ -272,3 +272,9 @@
 - **Category:** correction
 - **What happened:** In CaptureView the pivot toggle pins Skill or Subject and the pin picker lists that axis, but the + button hardcoded addSubject(). Ian expected: pinned on Skill -> + makes a skill; pinned on Group -> + makes a group. Mental model = '+ adds more of what the picker above lists / what's pinned'; flip the pin to add the other kind.
 - **Rule:** Any 'add' affordance next to a pivot/segment picker adds an item of the CURRENTLY PINNED axis. New skills are deferred-name (blank, named later) like subjects and should inherit the pinned skill's category so context (e.g. tumbling → Balk) carries over.
+
+## 2026-07-11 — RenameField draws its own pencil; capture rows use it for inline naming
+
+- **Category:** knowledge_gap
+- **What happened:** Added an extra pencil Image next to RenameField in the capture headers → two pencils. RenameField (Components.swift) already renders a pencil when unfocused and makes the whole field tap-to-edit.
+- **Rule:** Never add a pencil next to RenameField. To make any label inline-editable in CaptureView, swap the static Text for RenameField (value: model.name, commit → save). Skill rows, subject rows, and both pivot headers all use it.

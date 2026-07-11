@@ -9,7 +9,7 @@ import SwiftData
 /// week boundary:
 ///   RATE CUP   — best clean-hit rate (min 10 reps)
 ///   GRIND CUP  — most reps logged, volume wins
-///   STREAK CUP — longest run of clean hits (min 5 reps)
+///   STREAK CUP — longest run of landings (credit ≥50%, min 5 reps)
 /// Deliberately week-scoped and INDEPENDENT of the Home timeframe filter —
 /// the cup is always "this week", whatever the dashboard is showing. Rate is
 /// hits/total (a bobble is NOT a hit) so the numbers agree with StatsEngine.
@@ -59,7 +59,7 @@ enum WeeklyGame: Int, CaseIterable {
         switch self {
         case .rate: "Best clean-hit rate takes the week · min \(minReps) reps"
         case .grind: "Most reps logged takes the week — volume wins"
-        case .streak: "Longest run of clean hits takes the week · min \(minReps) reps"
+        case .streak: "Longest run of landings takes the week · min \(minReps) reps"
         }
     }
 
@@ -493,7 +493,7 @@ enum WeeklyLeague {
             .sorted { $0.timestamp < $1.timestamp }
         var best = 0, run = 0
         for a in attempts {
-            if a.isHitRep {
+            if a.isLandingRep {   // a landing (≥50%) keeps the run; a fall/balk breaks it
                 run += 1
                 best = max(best, run)
             } else {

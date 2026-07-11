@@ -950,14 +950,15 @@ struct CaptureView: View {
 
     // MARK: Hot streak (heating up / on fire)
 
-    /// Trailing run of clean hits (100%-credit) for one (skill, subject) cell in
-    /// this session. Any non-hit breaks it. 2 = heating up, 3+ = on fire. Keys on
-    /// the cell so the flame rides whichever axis is the row.
+    /// Trailing run of LANDINGS (credit ≥ 50% — stuck it, clean or not) for one
+    /// (skill, subject) cell in this session. A fall/miss/balk (< 50%) breaks it.
+    /// 2 = heating up, 3+ = on fire. Keys on the cell so the flame rides whichever
+    /// axis is the row.
     private func hotStreak(group: StuntGroup, subject: Subject, in attempts: [Attempt]) -> Int {
         var run = 0
         for a in attempts.reversed() {
             guard a.group === group && a.subject === subject else { continue }
-            guard a.isHitRep else { break }
+            guard a.isLandingRep else { break }
             run += 1
         }
         return run
@@ -971,8 +972,8 @@ struct CaptureView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(streak >= 3 ? Theme.fireHot : Theme.fireWarm)
                 .symbolEffect(.pulse, options: .repeating, isActive: streak >= 3)
-                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) hits in a row"
-                                                : "Heating up — 2 hits in a row")
+                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) landings in a row"
+                                                : "Heating up — 2 landings in a row")
         }
     }
 

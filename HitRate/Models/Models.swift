@@ -118,12 +118,33 @@ extension SkillCategory {
 enum OutcomeCredit: Int, CaseIterable, Codable, Identifiable {
     case hit = 100, decent = 67, rough = 33, miss = 0
     var id: Int { rawValue }
+
+    /// The line between "a landing" and "not". A rep worth THIS or more counts
+    /// as landed/stuck (keeps a streak, stays up); below it is a fall/miss/balk
+    /// (breaks a streak). Ian: "anything 50% or above is landing at least."
+    static let landingThreshold = 50
+
     var label: String {
         switch self {
         case .hit: "Hit · 100%"
         case .decent: "Decent · 67%"
         case .rough: "Rough · 33%"
         case .miss: "Miss · 0%"
+        }
+    }
+
+    /// True when a rep of this credit counts as a LANDING (kept it up) — the
+    /// same rule streaks use.
+    var isLanding: Bool { rawValue >= OutcomeCredit.landingThreshold }
+
+    /// Plain-language meaning, shown in the outcome maker so the credit you pick
+    /// is unambiguous — including whether it keeps a streak going.
+    var definition: String {
+        switch self {
+        case .hit:    "Clean — landed with no issues. Keeps a streak."
+        case .decent: "Landed — stayed up, just not clean. Still counts, keeps a streak."
+        case .rough:  "Off — didn't really land. Breaks a streak."
+        case .miss:   "Miss, fall, or balk. Breaks a streak."
         }
     }
     var defaultColor: OutcomeColor {
@@ -176,8 +197,11 @@ struct OutcomeDef: Codable, Hashable, Identifiable {
     var id: String { "\(label)|\(colorRaw)|\(credit)" }
     var color: Color { (OutcomeColor(rawValue: colorRaw) ?? .gray).color }
     var creditTier: OutcomeCredit { OutcomeCredit(rawValue: credit) ?? .miss }
-    /// A "hit" for streaks / the green accent / hit milestones.
+    /// A "hit" — the green accent / clean-hit milestones (credit 100).
     var isHit: Bool { credit >= 100 }
+    /// A "landing" — stayed up (credit ≥ 50%). The rule streaks use, so a
+    /// landed-but-not-clean rep keeps a streak alive.
+    var isLanding: Bool { credit >= OutcomeCredit.landingThreshold }
     var short: String { Outcome.deriveShort(label) }
     /// Maps the credit tier onto a legacy `Outcome` purely to pick a tap sound.
     var soundOutcome: Outcome {
@@ -666,8 +690,11 @@ final class Attempt {
     var outcomeDef: OutcomeDef? { group?.outcomeDef(at: outcomeRaw) }
     /// Credit toward the weighted hit rate (0…100); a deleted outcome → 0.
     var creditValue: Int { outcomeDef?.credit ?? 0 }
-    /// A clean hit — drives streaks, the green accent, and hit milestones.
+    /// A clean hit — the green accent and clean-hit milestones (credit 100).
     var isHitRep: Bool { outcomeDef?.isHit ?? false }
+    /// A landing — stayed up (credit ≥ 50%). This is what streaks count, so a
+    /// landed-but-not-clean rep keeps a streak going; a fall/miss/balk breaks it.
+    var isLandingRep: Bool { creditValue >= OutcomeCredit.landingThreshold }
     /// The legacy severity `Outcome` this rep maps to by credit TIER (hit/decent/
     /// rough/miss → hit/bobble/buildingFall/majorFall). Used only by aggregate
     /// stats/visuals (tape color, tier histograms) so they stay 4-bucket and
