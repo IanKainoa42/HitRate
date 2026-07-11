@@ -137,10 +137,14 @@ Key invariants:
   of 7 attempts with ≥4 misses. **Every number is confined to the passed
   `groups`** (via an `allowed` Set of persistentModelIDs) — trend and the
   latest-session tape filter attempts by group membership, so the stunt-only /
-  tumbling-only kind filter can't leak the other kind's reps. `rate` is
-  hits/total (a bobble is NOT a hit), i.e. already the *clean-hit* rate; the
+  tumbling-only kind filter can't leak the other kind's reps. `rate` is the
+  credit-WEIGHTED score (`weightedRate`: hit 100 · decent 67 · rough 33 ·
+  miss 0 — the average `creditValue`), NOT clean hits/total — so a bobble
+  contributes partial credit and the headline can exceed the clean-hit%. (This
+  is why the dashboard headline > the "Hit N · X%" breakdown; the "HIT RATE"
+  label vs that weighted number is a known UX wart — see IAN-514.) The
   skill-report metrics (`purity` = hits/stand-ups, `upRate` = stand-ups/total)
-  build on that. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
+  are still clean-hit based. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
   dashboard split; `FloorStats.bestSkill/worstSkill/cleanestSkill/
   mostConsistentSkill` are gated to skills with ≥`insightMinReps` reps.
 - `Stats/WeeklyTournament.swift` — the built-in weekly competition + season
@@ -196,13 +200,15 @@ Key invariants:
   before, `lifetimeHasData`) a small "No reps logged …" well for a quiet
   timeframe.
   Header hosts the wordmark (HIT + green RATE), a tappable identity subline
-  that is the TEAM SWITCHER (a Menu picking `currentTeamID` + "New team"),
-  a trophy button (opens `TrophyRoomView`), and the skills/groups editor
-  button — the only path to roster + settings outside a live practice. A
+  that OPENS THE EDITOR (`editorOpen`) — NOT a team switcher; switching/creating
+  teams now lives at the FOLDER-LIST home (`FolderListView`, reached via the
+  header back arrow / `onExit`), which is the launch root. A
+  trophy button (opens `TrophyRoomView`), and the skills/groups editor
+  button — a path to roster + settings outside a live practice. A
   freshly added (empty) team shows a `noRosterState` ("Add <skills/groups>")
-  and hides the practice CTA until it has a roster. The editor's Teams
-  section adds/renames/deletes/reorders teams and switches the active one;
-  new groups attach to the active team.
+  and hides the practice CTA until it has a roster. Team (folder) CRUD +
+  switching now lives on `FolderListView` (the "NEW FOLDER" home), NOT an
+  editor Teams section; new groups attach to the active team.
   `TrophyRoomView` (full-screen cover, training-floor register) is the
   COMPETITION HUB — everything tournament/leaderboard, kept out of Home's
   analytics: the live `WeeklyTournamentCard(weekOnly: true)` (week game with
