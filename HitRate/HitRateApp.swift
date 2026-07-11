@@ -44,15 +44,22 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var groups: [StuntGroup]
     @Query private var sessions: [PracticeSession]
+    @Query private var allSubjects: [Subject]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @AppStorage("didOnboard") private var didOnboard = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("currentTeamID") private var currentTeamID = ""
     @AppStorage("teamName") private var teamName = ""
     @AppStorage("replayingIntro") private var replayingIntro = false
-    // The pad's pulled-up skill (written by LogView) — forwarded to the watch
-    // so the wrist mirrors whatever the phone has up.
+    // The pad's pulled-up skill (written by LogView/CaptureView) — forwarded to
+    // the watch so the wrist mirrors whatever the phone has up.
     @AppStorage("selectedGroupID") private var padSelectedGroupID = ""
+    // CaptureView's pivot state. The watch is skill-only (it logs against a
+    // group), so when the phone has a SUBJECT pinned we attribute the wrist tap
+    // to that subject; when a SKILL is pinned there's no single subject on the
+    // phone, so watch reps stay skill-level (subject nil — still a valid tally).
+    @AppStorage("capturePivot") private var capturePivot = "skill"
+    @AppStorage("selectedSubjectID") private var padSelectedSubjectID = ""
 
     /// Which folder's dashboard is open. Nil → the folder-list home (the launch
     /// root). Deliberately @State, not persisted: every cold launch lands on the
@@ -165,9 +172,19 @@ struct RootView: View {
         context.insert(Attempt(outcome: outcome,
                                group: group,
                                session: session,
+                               subject: watchLogSubject,
                                timestamp: request.timestamp))
         try? context.save()
         return watchSnapshot
+    }
+
+    /// Subject to credit a wrist-logged rep to. The watch only knows the skill
+    /// (its `groupID`); the phone owns pivot state, so a wrist tap during "just
+    /// Maya today" (subject pinned) credits Maya, while skill-pivot mode leaves
+    /// the rep skill-level (nil). Falls back to nil if the pin doesn't resolve.
+    private var watchLogSubject: Subject? {
+        guard capturePivot == "subject", !padSelectedSubjectID.isEmpty else { return nil }
+        return allSubjects.inTeam(currentTeam).first { $0.id.uuidString == padSelectedSubjectID }
     }
 
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
