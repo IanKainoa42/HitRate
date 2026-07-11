@@ -148,9 +148,12 @@ Key invariants:
   and deliberately INDEPENDENT of the Home timeframe filter. THREE GAMES
   rotate weekly (`WeeklyGame`, derived from week-of-epoch mod 3 — pure, no
   stored rotation state): RATE CUP (best clean-hit rate, min 10 reps), GRIND
-  CUP (most reps, min 1), STREAK CUP (longest clean-hit run, min 5 reps).
-  Rate is the same hits/total as StatsEngine (a bobble is NOT a hit) and a
-  bobble BREAKS a streak. Standings score on the live game's metric
+  CUP (most reps, min 1), STREAK CUP (longest run of LANDINGS, min 5 reps).
+  Rate is the credit-weighted score from StatsEngine (`weightedRate`). A STREAK
+  counts LANDINGS, not clean hits: a rep with credit ≥50%
+  (`OutcomeCredit.landingThreshold`, via `Attempt.isLandingRep`) keeps the run —
+  so a landed-but-not-clean rep (decent/67) does NOT break it; a fall/miss/balk
+  (<50%) does. Same rule drives the capture hot-streak flame. Standings score on the live game's metric
   (`WeeklyStanding.score`), qualified-first (tiebreak: rate → reps → fewer
   falls), then provisional entrants by reps; `rank` is 1-based among
   qualified only; `delta` is the same game-metric vs last week. Last week's
