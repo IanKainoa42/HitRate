@@ -109,6 +109,7 @@ struct CaptureView: View {
             } else {
                 pivotBar
                 pinPicker
+                nameSuggestionBar
                 matrix(attempts)
                 // Issues tie to a single skill; only the skill pivot pins one.
                 if pivot == .skill, !customOutcomes.isEmpty, let skill = pinnedSkill {
@@ -302,6 +303,90 @@ struct CaptureView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: Deferred-naming suggestion chips
+
+    /// The blank subject the chips will name: the currently-pinned/last-added
+    /// one, ONLY while still unnamed. nil hides the strip (it self-dismisses the
+    /// moment a name lands). Add-a-subject pins the new blank in both pivots, so
+    /// the strip appears right where you just tapped "+".
+    private var namingTarget: Subject? {
+        subjects.first { $0.id.uuidString == selectedSubjectIDRaw && $0.isUnnamed }
+    }
+
+    /// Names already on THIS roster — the dedup guard. Shown greyed + checked,
+    /// never tappable, so you can see what's taken while naming a blank (kills
+    /// the "Mya" vs "Maya" double-create).
+    private var rosterNames: [String] {
+        var seen = Set<String>(); var out: [String] = []
+        for s in subjects where !s.isUnnamed {
+            if seen.insert(s.name).inserted { out.append(s.name) }
+        }
+        return out
+    }
+
+    /// Names used on your OTHER folders for the SAME kind (people vs groups),
+    /// minus names already on this roster — a reusable bank so a name typed once
+    /// is one tap away everywhere, never retyped into a variant.
+    private var nameBank: [String] {
+        let taken = Set(subjects.filter { !$0.isUnnamed }.map(\.name))
+        var seen = Set<String>(); var out: [String] = []
+        for s in allSubjects.active where s.kind == subjectKind
+            && s.team?.id != currentTeam?.id
+            && s.team?.deletedAt == nil && !s.isUnnamed {
+            if taken.contains(s.name) || !seen.insert(s.name).inserted { continue }
+            out.append(s.name)
+        }
+        return out
+    }
+
+    @ViewBuilder
+    private var nameSuggestionBar: some View {
+        if let target = namingTarget, !nameBank.isEmpty || !rosterNames.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Text("NAME")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(Theme.label3)
+                        .padding(.trailing, 2)
+                    ForEach(nameBank, id: \.self) { name in
+                        Button {
+                            target.name = name
+                            try? context.save()
+                            hapticTrigger += 1
+                        } label: { suggestionChip(name, taken: false) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Name this \(subjectNoun) \(name)")
+                    }
+                    ForEach(rosterNames, id: \.self) { name in
+                        suggestionChip(name, taken: true)
+                            .accessibilityLabel("\(name) already used on this roster")
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private func suggestionChip(_ name: String, taken: Bool) -> some View {
+        HStack(spacing: 4) {
+            if taken {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            Text(name)
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(taken ? Theme.label3 : Theme.label)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(taken ? Theme.well : Theme.iconTile)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .stroke(Theme.iconTileEdge.opacity(taken ? 0.35 : 0.65), lineWidth: 1))
+        .contentShape(Rectangle())
     }
 
     // MARK: Matrix (rows × outcome columns)
