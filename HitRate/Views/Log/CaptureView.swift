@@ -35,6 +35,16 @@ struct CaptureView: View {
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
 
+    // Wave/Routine staging: stage any number of reps per (skill, subject) CELL
+    // (tap +1, hold −1), then commit the whole batch at once. A cell can carry
+    // several outcomes in one pass, so staging is a slot-count array per cell and
+    // commit is MANUAL only — with multi-rep staging there's no "everyone staged"
+    // finish line. Works in either pivot: the pinned axis is fixed, the row axis
+    // varies, but the key always names both skill and subject.
+    @AppStorage("waveMode") private var waveMode = false
+    @State private var staged: [StageKey: [Int]] = [:]
+    @State private var lastWave: [Attempt] = []
+
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
 
@@ -59,6 +69,15 @@ struct CaptureView: View {
     /// people. The USER can still pin either axis regardless.
     private var subjectKind: SubjectKind { mode == .coach ? .group : .person }
     private var subjectNoun: String { subjectKind.label.lowercased() }
+
+    /// Wave staging armed. `waveActive` gates the cells between tap-to-log and
+    /// tap-to-stage. Coach mental model is a wave of stunt groups; athlete a
+    /// routine pass.
+    private var waveActive: Bool { waveMode }
+    private var waveNoun: String { mode == .coach ? "wave" : "routine" }
+    /// Total staged reps across every cell (a stale key can't over-count — nil rows
+    /// contribute nothing).
+    private var stagedReps: Int { staged.values.reduce(0) { $0 + $1.reduce(0, +) } }
 
     var body: some View {
         NavigationStack {
@@ -91,6 +110,7 @@ struct CaptureView: View {
                 pivotBar
                 pinPicker
                 matrix(attempts)
+                if waveActive { waveBar }
                 recentTicker(attempts)
             }
         }
@@ -124,6 +144,9 @@ struct CaptureView: View {
             }
             Spacer()
             Button {
+                // Ending must never silently drop staged reps — Submit is easy to
+                // miss. Commit any staged batch first.
+                if stagedReps > 0 { commitWave() }
                 // A session with reps ends here; an empty one stays live and Home
                 // sweeps it on dismiss (mutating-then-rendering a deleted model
                 // mid-animation crashes).
@@ -170,19 +193,54 @@ struct CaptureView: View {
             MiniSeg(options: ["Skill", subjectKind.label],
                     selection: Binding(
                         get: { pivot == .skill ? "Skill" : subjectKind.label },
-                        set: { pivotRaw = ($0 == "Skill") ? "skill" : "subject"; hapticTrigger += 1 }))
+                        set: { newValue in
+                            // Switching the pinned axis with staged-but-unsubmitted
+                            // reps: commit them rather than silently dropping.
+                            if stagedReps > 0 { commitWave() }
+                            pivotRaw = (newValue == "Skill") ? "skill" : "subject"
+                            hapticTrigger += 1
+                        }))
             Spacer()
-            Button {
-                addSubject()
-            } label: {
-                Label("Add \(subjectNoun)", systemImage: "plus")
-                    .font(.system(size: 12, weight: .semibold))
+            waveToggle
+            Button { addSubject() } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.accent)
+                    .frame(width: 34, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.iconTile))
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add \(subjectNoun)")
         }
         .padding(.horizontal, 16)
+    }
+
+    /// Compact caps pill that arms staging — green-filled on, chalk outline off.
+    /// Word adapts WAVE / ROUTINE.
+    private var waveToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { waveMode.toggle() }
+            if !waveMode { staged = [:]; lastWave = [] }   // leaving wave drops pending + undo
+            hapticTrigger += 1
+        } label: {
+            Text(waveNoun.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.2)
+                .foregroundStyle(waveMode ? Theme.well : Theme.label2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(waveMode ? Theme.accent : Theme.well)
+                        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.white.opacity(waveMode ? 0 : 0.1), lineWidth: 1))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(waveNoun) logging")
+        .accessibilityValue(waveMode ? "on" : "off")
     }
 
     // MARK: Pin picker (chips for whichever axis is pinned)
@@ -287,7 +345,7 @@ struct CaptureView: View {
                                     subjectRowLabel(s)
                                     ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                         let v = counts(group: skill, subject: s, in: attempts)[safe: slot] ?? 0
-                                        cellButton(v: v, def: def) { log(slot: slot, group: skill, subject: s, def: def) }
+                                        matrixCell(group: skill, subject: s, slot: slot, def: def, v: v)
                                     }
                                 }
                                 .frame(maxHeight: 50)
@@ -326,7 +384,7 @@ struct CaptureView: View {
                                 skillRowLabel(g)
                                 ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                     let v = counts(group: g, subject: subject, in: attempts)[safe: slot] ?? 0
-                                    cellButton(v: v, def: def) { log(slot: slot, group: g, subject: subject, def: def) }
+                                    matrixCell(group: g, subject: subject, slot: slot, def: def, v: v)
                                 }
                             }
                             .frame(maxHeight: 50)
@@ -382,34 +440,109 @@ struct CaptureView: View {
         .frame(maxHeight: .infinity)
     }
 
-    /// One engraved matrix cell — count in chalk Barlow, outcome color in the edge.
-    private func cellButton(v: Int, def: OutcomeDef, tap: @escaping () -> Void) -> some View {
-        Button(action: tap) {
-            VStack(spacing: 1) {
-                Text("\(v)")
-                    .font(Theme.barlow(20, .extrabold))
-                    .monospacedDigit()
-                    .foregroundStyle(v == 0 ? Theme.label3 : Theme.label)
-                    .contentTransition(.numericText(value: Double(v)))
-                    .animation(.spring(duration: 0.3), value: v)
-                Text(def.short)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(def.color.opacity(0.9))
-                    .lineLimit(1).minimumScaleFactor(0.6)
+    /// One matrix cell — logs immediately, or STAGES a rep in wave mode. In wave
+    /// mode the cell is a gesture view, NOT a Button: a Button fires on release
+    /// even after a hold, so a long-press decrement would re-increment on lift.
+    @ViewBuilder
+    private func matrixCell(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef, v: Int) -> some View {
+        let stagedN = waveActive ? stagedCount(group, subject, slot) : 0
+        let visual = cellVisual(v: v, def: def, stagedN: stagedN)
+        Group {
+            if waveActive {
+                visual
+                    .onTapGesture { stage(group, subject, slot) }
+                    .onLongPressGesture(minimumDuration: 0.4) { unstage(group, subject, slot) }
+            } else {
+                Button { log(slot: slot, group: group, subject: subject, def: def) } label: { visual }
+                    .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity)
-            .frame(maxHeight: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.well
-                        .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
-                        .shadow(.inner(color: def.color.opacity(0.85), radius: 1, y: -2)))
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Log \(def.label)")
-        .accessibilityValue("\(v)")
+        .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(def.label)")
+        .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
+        .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
+    }
+
+    /// The engraved cell face — count in chalk Barlow, outcome color in the edge.
+    /// While staging, the edge lights and a "+n" pip shows this cell's pending reps.
+    private func cellVisual(v: Int, def: OutcomeDef, stagedN: Int) -> some View {
+        VStack(spacing: 1) {
+            Text("\(v)")
+                .font(Theme.barlow(20, .extrabold))
+                .monospacedDigit()
+                .foregroundStyle(stagedN > 0 ? def.color : (v == 0 ? Theme.label3 : Theme.label))
+                .contentTransition(.numericText(value: Double(v)))
+                .animation(.spring(duration: 0.3), value: v)
+            Text(def.short)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(def.color.opacity(0.9))
+                .lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Theme.well
+                    .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
+                    .shadow(.inner(color: def.color.opacity(0.85), radius: 1, y: -2)))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(def.color, lineWidth: stagedN > 0 ? 2.5 : 0)
+        )
+        .overlay(alignment: .topTrailing) {
+            if stagedN > 0 {
+                Text("+\(stagedN)")
+                    .font(Theme.barlow(11, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.well)
+                    .padding(.horizontal, 5).padding(.vertical, 1.5)
+                    .background(Capsule().fill(def.color))
+                    .padding(3)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// Docked under the matrix in wave mode. While staging: rep count + Clear +
+    /// Submit. After a commit (nothing staged): Undo. Commit is ALWAYS manual.
+    private var waveBar: some View {
+        HStack(spacing: 10) {
+            Text("\(stagedReps) REP\(stagedReps == 1 ? "" : "S") STAGED")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Theme.label2)
+            Spacer()
+            if stagedReps > 0 {
+                Button { staged = [:]; hapticTrigger += 1 } label: {
+                    Text("Clear")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.label2)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Button { commitWave() } label: {
+                    Text("Submit \(stagedReps)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.well)
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else if !lastWave.isEmpty {
+                Button { undoWave() } label: {
+                    Label("Undo \(waveNoun)", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .wellBackground()
+        .padding(.horizontal, 16)
     }
 
     // MARK: Empty states
@@ -481,7 +614,7 @@ struct CaptureView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             Color.clear.frame(width: 0, height: 1).id("live")
-                            ForEach(attempts.reversed()) { repChip($0) }
+                            ForEach(Array(logSegments(attempts).reversed())) { tickerChip($0) }
                         }
                         .padding(.vertical, 2)
                     }
@@ -496,6 +629,58 @@ struct CaptureView: View {
         .wellBackground()
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+
+    /// One chunk of the recent log: a wave (reps committed together, same waveID)
+    /// or a lone rep.
+    private enum LogSegment: Identifiable {
+        case single(Attempt)
+        case wave(UUID, [Attempt])
+        var id: String {
+            switch self {
+            case .single(let a): return "s\(a.persistentModelID.hashValue)"
+            case .wave(let id, _): return "w\(id.uuidString)"
+            }
+        }
+    }
+
+    /// Collapse the chronological attempts into segments: maximal runs of the same
+    /// non-nil `waveID` become one wave; nil-waveID reps stay singletons.
+    private func logSegments(_ attempts: [Attempt]) -> [LogSegment] {
+        var segs: [LogSegment] = []
+        var i = 0
+        while i < attempts.count {
+            let a = attempts[i]
+            if let wid = a.waveID {
+                var reps = [a]
+                var j = i + 1
+                while j < attempts.count, attempts[j].waveID == wid { reps.append(attempts[j]); j += 1 }
+                segs.append(.wave(wid, reps))
+                i = j
+            } else {
+                segs.append(.single(a)); i += 1
+            }
+        }
+        return segs
+    }
+
+    /// One ticker entry: a lone rep is a single chip; a wave is its chips wrapped in
+    /// a hairline cluster so the batch reads as one event.
+    @ViewBuilder
+    private func tickerChip(_ seg: LogSegment) -> some View {
+        switch seg {
+        case .single(let a):
+            repChip(a)
+        case .wave(_, let reps):
+            HStack(spacing: 4) { ForEach(reps) { repChip($0) } }
+                .padding(.horizontal, 5).padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.white.opacity(0.03))
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1))
+                )
+        }
     }
 
     /// Engraved chip: outcome dot + subject/skill context + outcome short word.
@@ -530,6 +715,75 @@ struct CaptureView: View {
         selectedSubjectIDRaw = subject.id.uuidString
         hapticTrigger += 1
         Sounds.shared.play(.outcome(def.soundOutcome))
+    }
+
+    // MARK: Wave / Routine staging
+
+    private func stagedCount(_ g: StuntGroup, _ s: Subject, _ slot: Int) -> Int {
+        guard let arr = staged[StageKey(g, s)], slot >= 0, slot < arr.count else { return 0 }
+        return arr[slot]
+    }
+
+    /// Tap a cell in wave mode: stage one more rep of that outcome for that cell.
+    private func stage(_ g: StuntGroup, _ s: Subject, _ slot: Int) {
+        let key = StageKey(g, s)
+        let n = g.outcomeDefs.count
+        var c = staged[key] ?? Array(repeating: 0, count: n)
+        if c.count < n { c += Array(repeating: 0, count: n - c.count) }
+        guard slot >= 0, slot < c.count else { return }
+        c[slot] += 1
+        staged[key] = c
+        hapticTrigger += 1
+        Sounds.shared.play(.outcome(g.outcomeDef(at: slot)?.soundOutcome ?? .hit))
+    }
+
+    /// Hold a cell in wave mode: take one staged rep back off.
+    private func unstage(_ g: StuntGroup, _ s: Subject, _ slot: Int) {
+        let key = StageKey(g, s)
+        guard var c = staged[key], slot >= 0, slot < c.count, c[slot] > 0 else { return }
+        c[slot] -= 1
+        staged[key] = c.reduce(0, +) == 0 ? nil : c
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
+    }
+
+    /// Write one Attempt per staged rep (all sharing a `waveID`), then clear the
+    /// staging. Keeps the batch in `lastWave` so it can be pulled back in one tap.
+    private func commitWave() {
+        let waveID = UUID()
+        var committed: [Attempt] = []
+        for g in groups {
+            for s in subjects {
+                guard let c = staged[StageKey(g, s)] else { continue }
+                for (slot, n) in c.enumerated() where n > 0 {
+                    for _ in 0..<n {
+                        let a = Attempt(slot: slot, group: g, session: session, subject: s, waveID: waveID)
+                        context.insert(a)
+                        committed.append(a)
+                    }
+                }
+            }
+        }
+        guard !committed.isEmpty else { return }
+        try? context.save()
+        lastWave = committed
+        staged = [:]
+        hapticTrigger += 1
+        Sounds.shared.play(.start)
+    }
+
+    /// Delete the whole last committed batch. Guards each attempt against having
+    /// already been removed (e.g. via the Recent undo) so we never touch a deleted
+    /// model.
+    private func undoWave() {
+        let live = session.attempts
+        for a in lastWave where live.contains(where: { $0 === a }) {
+            context.delete(a)
+        }
+        try? context.save()
+        lastWave = []
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
     }
 
     /// Add a subject (unnamed — name-later). Pins it in subject pivot so it's
@@ -567,5 +821,16 @@ struct CaptureView: View {
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+/// Staging key: a rep is staged against one (skill, subject) cell. Both pivots
+/// use the same key — the pinned axis is fixed, the row axis varies.
+private struct StageKey: Hashable {
+    let group: PersistentIdentifier
+    let subject: PersistentIdentifier
+    init(_ g: StuntGroup, _ s: Subject) {
+        self.group = g.persistentModelID
+        self.subject = s.persistentModelID
     }
 }
