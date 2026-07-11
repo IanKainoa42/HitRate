@@ -170,7 +170,7 @@ struct HomeView: View {
                            orgName: identityLabel)
         }
         .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
-            LogView(session: s)
+            CaptureView(session: s)
         }
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
