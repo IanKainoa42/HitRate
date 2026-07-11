@@ -232,8 +232,11 @@ extension SkillCategory {
             return [.init("Hit", .green, .hit), .init("Bobble", .yellow, .decent),
                     .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss)]
         case .standingTumbling, .runningTumbling:
+            // Tumbling is land / didn't / balk: only Stuck (100) and Stepped out
+            // (67) are landings. A touchdown is a fall — credit 0 (orange keeps it
+            // visually distinct from a major fall), like Major fall and Balk.
             return [.init("Stuck", .green, .hit), .init("Stepped out", .yellow, .decent),
-                    .init("Touched down", .orange, .rough), .init("Major fall", .red, .miss),
+                    .init("Touched down", .orange, .miss), .init("Major fall", .red, .miss),
                     .init("Balk", .blue, .miss)]
         case .jumps:
             return [.init("Hit", .green, .hit), .init("Low", .yellow, .decent),
