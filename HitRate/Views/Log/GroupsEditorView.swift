@@ -30,6 +30,7 @@ struct GroupsEditorView: View {
     @State private var pendingDelete: StuntGroup?
     @State private var pendingTeamDelete: Team?
     @State private var editingOutcomesFor: StuntGroup?
+    @State private var editingTemplate: OutcomeTemplate?
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -40,6 +41,11 @@ struct GroupsEditorView: View {
     /// The active folder's user-created outcomes, in display order.
     private var customOutcomes: [CustomOutcome] {
         (currentTeam?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    /// The active folder's user-made skill types (reusable outcome sets).
+    private var customTypes: [OutcomeTemplate] {
+        (currentTeam?.outcomeTemplates ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
 
     // Bucket wording for the active folder (its `itemNoun` override, else the
@@ -77,22 +83,48 @@ struct GroupsEditorView: View {
                                 g.name = new
                                 try? context.save()
                             }
-                            // United category — carries the execution drivers
-                            // and (via category→kind) the outcome wording.
+                            // Skill TYPE — a United category (carries execution
+                            // drivers + outcome wording) OR a custom outcome set
+                            // (your own type / "Other", no drivers).
                             Menu {
-                                ForEach(SkillCategory.allCases, id: \.self) { c in
+                                Section("United") {
+                                    ForEach(SkillCategory.allCases, id: \.self) { c in
+                                        Button {
+                                            g.applyCategory(c)
+                                            try? context.save()
+                                        } label: {
+                                            Label(c.displayName, systemImage: c.icon)
+                                        }
+                                    }
+                                }
+                                if !customTypes.isEmpty {
+                                    Section("Your types") {
+                                        ForEach(customTypes) { t in
+                                            Button {
+                                                g.applyCustomType(name: t.name, defs: t.defs)
+                                                try? context.save()
+                                            } label: {
+                                                Label(t.name, systemImage: "square.on.square")
+                                            }
+                                        }
+                                    }
+                                }
+                                Section {
                                     Button {
-                                        g.category = c
+                                        g.applyCustomType(name: "Other", defs: OutcomeTemplate.otherDefs)
                                         try? context.save()
                                     } label: {
-                                        Label(c.displayName, systemImage: c.icon)
+                                        Label("Other (good / bad)", systemImage: "circle.dashed")
+                                    }
+                                    Button { addType() } label: {
+                                        Label("New type…", systemImage: "plus")
                                     }
                                 }
                             } label: {
                                 HStack(spacing: 4) {
-                                    Image(systemName: g.category.icon)
+                                    Image(systemName: g.usesCustomType ? "square.on.square" : g.category.icon)
                                         .font(.system(size: 10, weight: .semibold))
-                                    Text(g.category.displayName)
+                                    Text(g.typeName)
                                         .font(.system(size: 12, weight: .semibold))
                                 }
                                 .foregroundStyle(.secondary)
@@ -158,6 +190,8 @@ struct GroupsEditorView: View {
                     Text("Outcomes")
                 }
                 .listRowBackground(glassRow)
+
+                skillTypesSection
 
                 customOutcomesSection
 
@@ -248,6 +282,9 @@ struct GroupsEditorView: View {
             .sheet(item: $editingOutcomesFor) { g in
                 SkillOutcomesEditor(group: g)
             }
+            .sheet(item: $editingTemplate) { t in
+                OutcomeTemplateEditor(template: t)
+            }
         }
     }
 
@@ -282,6 +319,68 @@ struct GroupsEditorView: View {
     private func softDelete(_ g: StuntGroup) {
         g.deletedAt = .now
         try? context.save()
+    }
+
+    // MARK: Skill types (reusable outcome sets, per folder)
+
+    @ViewBuilder
+    private var skillTypesSection: some View {
+        Section {
+            ForEach(customTypes) { t in
+                Button {
+                    editingTemplate = t
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.on.square")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.accent)
+                        Text(t.name.isEmpty ? "Untitled type" : t.name)
+                            .foregroundStyle(Theme.label)
+                        Spacer(minLength: 6)
+                        Text("\(t.defs.count) outcomes")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button("Delete") { deleteType(t) }.tint(.red)
+                }
+            }
+            .onDelete { idx in if let i = idx.first { deleteType(customTypes[i]) } }
+
+            Button { addType() } label: {
+                Label("New type", systemImage: "plus")
+            }
+        } header: {
+            Text("Skill types · \(currentTeam?.name ?? "")")
+        } footer: {
+            Text("Your own pre-made outcome sets. Build one here, then pick it as a skill's type to seed its outcome buttons. Editing a type doesn't change skills already using it. (The 6 United types carry execution drivers; custom types don't.)")
+        }
+        .listRowBackground(glassRow)
+    }
+
+    /// Create a new custom type (seeded good/bad) and open its editor.
+    private func addType() {
+        guard let team = currentTeam else { return }
+        let next = (customTypes.map(\.orderIndex).max() ?? -1) + 1
+        let t = OutcomeTemplate(name: "New type", defs: OutcomeTemplate.otherDefs, orderIndex: next)
+        t.team = team
+        context.insert(t)
+        try? context.save()
+        editingTemplate = t
+    }
+
+    private func deleteType(_ t: OutcomeTemplate) {
+        withAnimation {
+            context.delete(t)
+            for (i, x) in customTypes.enumerated() { x.orderIndex = i }
+            try? context.save()
+        }
     }
 
     // MARK: Custom outcomes (per folder)
@@ -576,6 +675,113 @@ struct SkillOutcomesEditor: View {
                 }
             }
             .onAppear { defs = group.outcomeDefs }
+        }
+    }
+}
+
+/// Editor for a custom SKILL TYPE (reusable outcome set). A template has no
+/// logged reps, so any outcome can be removed (down to 1). Name + list edit a
+/// local buffer and commit back to the model on change.
+struct OutcomeTemplateEditor: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    let template: OutcomeTemplate
+
+    @State private var defs: [OutcomeDef] = []
+
+    private func commit() {
+        template.defs = defs
+        try? context.save()
+    }
+
+    private func labelBinding(_ i: Int) -> Binding<String> {
+        Binding(get: { i < defs.count ? defs[i].label : "" },
+                set: { defs[i].label = $0; commit() })
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Type name") {
+                    RenameField(prompt: "Type name", value: template.name) { new in
+                        let t = new.trimmingCharacters(in: .whitespaces)
+                        template.name = t.isEmpty ? "Untitled type" : t
+                        try? context.save()
+                    }
+                    .foregroundStyle(Theme.label)
+                }
+                .listRowBackground(Theme.well)
+
+                Section {
+                    ForEach(defs.indices, id: \.self) { i in
+                        HStack(spacing: 10) {
+                            Menu {
+                                ForEach(OutcomeColor.allCases) { c in
+                                    Button { defs[i].colorRaw = c.rawValue; commit() } label: {
+                                        Label(c.rawValue.capitalized, systemImage: "circle.fill")
+                                    }
+                                }
+                            } label: {
+                                Circle().fill(defs[i].color).frame(width: 16, height: 16)
+                                    .overlay(Circle().stroke(.white.opacity(0.15), lineWidth: 1))
+                            }
+
+                            TextField("Outcome", text: labelBinding(i))
+                                .foregroundStyle(Theme.label)
+                                .tint(Theme.accent)
+
+                            Spacer(minLength: 6)
+
+                            Menu {
+                                ForEach(OutcomeCredit.allCases) { cr in
+                                    Button { defs[i].credit = cr.rawValue; commit() } label: {
+                                        Text(cr.label)
+                                    }
+                                }
+                            } label: {
+                                Text("\(defs[i].credit)%")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(defs[i].color)
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(Theme.fill)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .swipeActions(edge: .trailing) {
+                            if defs.count > 1 {
+                                Button("Delete", role: .destructive) {
+                                    defs.remove(at: i); commit()
+                                }.tint(.red)
+                            }
+                        }
+                    }
+
+                    if defs.count < 6 {
+                        Button {
+                            defs.append(OutcomeDef("New outcome", .gray, .decent))
+                            commit()
+                        } label: {
+                            Label("Add outcome", systemImage: "plus")
+                        }
+                    }
+                } header: {
+                    Text("Outcomes · good → bad")
+                } footer: {
+                    Text("Color is yours; credit is the weight (Hit 100% … Miss 0%). This set seeds any skill you give this type — good → bad, left to right.")
+                }
+                .listRowBackground(Theme.well)
+            }
+            .scrollContentBackground(.hidden)
+            .background(FloorBackdrop().ignoresSafeArea())
+            .navigationTitle("Skill type")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { commit(); dismiss() }.fontWeight(.semibold)
+                }
+            }
+            .onAppear { defs = template.defs }
         }
     }
 }

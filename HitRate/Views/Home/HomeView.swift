@@ -764,7 +764,7 @@ struct HomeView: View {
     }
     
     private func startClinic(matCount: Int, goalRate: Int) {
-        let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self])
+        let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, OutcomeTemplate.self])
         guard let container = try? ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
             print("❌ Failed to create in-memory container for Quick Clinic")
             return

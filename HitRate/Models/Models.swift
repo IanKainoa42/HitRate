@@ -374,6 +374,9 @@ final class Team {
     /// Deleting the folder removes them (and each cascades its tallies).
     @Relationship(deleteRule: .cascade, inverse: \CustomOutcome.team)
     var customOutcomes: [CustomOutcome] = []
+    /// User-made skill types (reusable outcome sets) this folder owns.
+    @Relationship(deleteRule: .cascade, inverse: \OutcomeTemplate.team)
+    var outcomeTemplates: [OutcomeTemplate] = []
     /// The subjects (athletes or stunt groups) this folder attributes reps to —
     /// the ROWS in a recording. Deleting the folder removes them; their reps just
     /// lose attribution (the Attempt.subject relationship nullifies), never delete.
@@ -448,6 +451,11 @@ final class StuntGroup {
     /// Blank = use `category.defaultOutcomeDefs`. `Attempt.outcomeRaw` indexes
     /// into the resolved list, so the first four slots must stay legacy-aligned.
     var outcomeDefsRaw: String = ""
+    /// Display name of a CUSTOM skill type applied to this skill (a user template
+    /// or the built-in "Other"). Blank = this skill's type is its United
+    /// `category`. Custom types carry no execution drivers. Purely cosmetic — the
+    /// actual outcomes always live in `outcomeDefsRaw`.
+    var typeLabelRaw: String = ""
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -493,6 +501,35 @@ final class StuntGroup {
             categoryRaw = newValue.rawValue
             kindRaw = newValue.hitRateKind.rawValue
         }
+    }
+
+    /// The label shown for this skill's TYPE: a custom type name if one was
+    /// applied, else the United category name.
+    var typeName: String { typeLabelRaw.isEmpty ? category.displayName : typeLabelRaw }
+
+    /// True when this skill uses a custom type / "Other" — so it has no
+    /// execution drivers (those live only on the 6 United categories).
+    var usesCustomType: Bool { !typeLabelRaw.isEmpty }
+
+    /// Apply a United category as the type: re-link to its preset outcomes and
+    /// clear any custom-type label (its execution drivers come back).
+    func applyCategory(_ c: SkillCategory) {
+        category = c
+        outcomeDefsRaw = ""
+        typeLabelRaw = ""
+    }
+
+    /// Apply a custom type (a template or the built-in "Other"): seed its
+    /// outcomes and remember the type name. No execution drivers.
+    func applyCustomType(name: String, defs: [OutcomeDef]) {
+        setOutcomeDefs(defs)
+        // setOutcomeDefs re-links to "" if defs happen to equal the category
+        // preset; a named custom type must persist its own list regardless.
+        if outcomeDefsRaw.isEmpty, let data = try? JSONEncoder().encode(defs),
+           let s = String(data: data, encoding: .utf8) {
+            outcomeDefsRaw = s
+        }
+        typeLabelRaw = name
     }
 
     // MARK: Flexible outcome list (label + color + credit)
@@ -685,6 +722,56 @@ final class CustomTally {
         self.group = group
         self.session = session
         self.timestamp = timestamp
+    }
+}
+
+/// A user-made SKILL TYPE — a named, reusable outcome set. The 6 United
+/// categories ship their own presets (`SkillCategory.defaultOutcomeDefs`);
+/// this is the "make your own pre-made outcomes" path (+ the built-in "Other").
+/// Custom types carry NO execution drivers — those stay on the United
+/// categories. Applying one just seeds a skill's `outcomeDefsRaw`; the template
+/// is the reusable source. Scoped to a folder (`Team`).
+@Model
+final class OutcomeTemplate {
+    var id: UUID = UUID()
+    var name: String
+    /// JSON-encoded `[OutcomeDef]` — same wire format as `StuntGroup.outcomeDefsRaw`.
+    var defsRaw: String = ""
+    var orderIndex: Int
+    var createdAt: Date
+    var team: Team?
+
+    init(name: String, defs: [OutcomeDef] = [], orderIndex: Int,
+         id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+        self.defs = defs
+    }
+
+    /// Decoded outcome list; empty falls back to a simple good/bad so a fresh
+    /// template is always usable.
+    var defs: [OutcomeDef] {
+        get {
+            if !defsRaw.isEmpty, let data = defsRaw.data(using: .utf8),
+               let decoded = try? JSONDecoder().decode([OutcomeDef].self, from: data),
+               !decoded.isEmpty {
+                return decoded
+            }
+            return OutcomeTemplate.otherDefs
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue),
+               let s = String(data: data, encoding: .utf8) {
+                defsRaw = s
+            }
+        }
+    }
+
+    /// The built-in "Other" set: plain good/bad for non-cheer use.
+    static var otherDefs: [OutcomeDef] {
+        [.init("Hit", .green, .hit), .init("Miss", .red, .miss)]
     }
 }
 
