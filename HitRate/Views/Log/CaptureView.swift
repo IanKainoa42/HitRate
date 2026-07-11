@@ -410,22 +410,16 @@ struct CaptureView: View {
         if let skill = pinnedSkill {
             let defs = skill.outcomeDefs
             VStack(spacing: 8) {
-                if skill.isUnnamed {
-                    // Freshly added via + — name it right here (or later in the editor).
-                    RenameField(prompt: "Name this skill", value: skill.name) { new in
-                        skill.name = new
-                        try? context.save()
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.label)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("TAP A CELL TO LOG A REP")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.6)
-                        .foregroundStyle(Theme.label3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                // The pinned skill's name — always editable inline (tap to rename),
+                // not just while blank. RenameField carries its own pencil.
+                RenameField(prompt: "Name this skill", value: skill.name) { new in
+                    skill.name = new
+                    try? context.save()
                 }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(skill.isUnnamed ? Theme.label3 : Theme.label)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Shared outcome header — valid because every row is this one skill.
                 HStack(spacing: 6) {
@@ -470,11 +464,15 @@ struct CaptureView: View {
     private func subjectPinnedMatrix(_ attempts: [Attempt]) -> some View {
         if let subject = pinnedSubject {
             VStack(spacing: 8) {
-                Text("TAP A CELL TO LOG A REP · \(subject.displayName.uppercased())")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(Theme.label3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // The pinned subject's name — editable inline (tap to rename).
+                RenameField(prompt: subjectKind.label, value: subject.name) { new in
+                    subject.name = new
+                    try? context.save()
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(subject.isUnnamed ? Theme.label3 : Theme.label)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Text("← good   ·   bad →")
                     .font(.system(size: 8, weight: .bold))
                     .tracking(0.5)
@@ -541,10 +539,13 @@ struct CaptureView: View {
                 .frame(width: 22, height: 22)
                 .background(g.color)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            Text(g.displayName)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(g.isUnnamed ? Theme.label3 : Theme.label)
-                .lineLimit(2).minimumScaleFactor(0.7)
+            RenameField(prompt: "Skill", value: g.name) { new in
+                g.name = new
+                try? context.save()
+            }
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(g.isUnnamed ? Theme.label3 : Theme.label)
+            .lineLimit(1).minimumScaleFactor(0.7)
             flameBadge(streak)
         }
         .padding(.horizontal, 4)
