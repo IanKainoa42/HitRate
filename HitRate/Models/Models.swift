@@ -475,6 +475,13 @@ final class StuntGroup {
         set { kindRaw = newValue.rawValue }
     }
 
+    /// True when the name still needs reconciling (blank) — mirrors `Subject`, so
+    /// a skill can be added blank-first from the capture pad and named later.
+    var isUnnamed: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Roster-facing display: the name, or a placeholder while unnamed.
+    var displayName: String { isUnnamed ? "Unnamed skill" : name }
+
     /// United category. Reading derives from the legacy kind when unset; setting
     /// also syncs `kindRaw` so outcome wording follows the category.
     var category: SkillCategory {

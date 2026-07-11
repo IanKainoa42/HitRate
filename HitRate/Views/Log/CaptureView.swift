@@ -207,7 +207,11 @@ struct CaptureView: View {
                         }))
             Spacer()
             waveToggle
-            Button { addSubject() } label: {
+            // The + adds an item of the PINNED axis — the same list the pin picker
+            // shows. Pinned on Skill → new skill; pinned on the subject axis → new
+            // subject. To add the other kind, flip the pin. (Ian: "on the skill tab
+            // it should make a skill, not a group.")
+            Button { pivot == .skill ? addSkill() : addSubject() } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.accent)
@@ -216,7 +220,7 @@ struct CaptureView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add \(subjectNoun)")
+            .accessibilityLabel(pivot == .skill ? "Add skill" : "Add \(subjectNoun)")
         }
         .padding(.horizontal, 16)
     }
@@ -257,7 +261,7 @@ struct CaptureView: View {
                 switch pivot {
                 case .skill:
                     ForEach(groups) { g in
-                        pinChip(number: g.number, name: g.name, color: g.color,
+                        pinChip(number: g.number, name: g.displayName, color: g.color,
                                 on: pinnedSkill === g) {
                             selectedGroupIDRaw = g.id.uuidString; hapticTrigger += 1
                         }
@@ -406,11 +410,22 @@ struct CaptureView: View {
         if let skill = pinnedSkill {
             let defs = skill.outcomeDefs
             VStack(spacing: 8) {
-                Text("TAP A CELL TO LOG A REP")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.6)
-                    .foregroundStyle(Theme.label3)
+                if skill.isUnnamed {
+                    // Freshly added via + — name it right here (or later in the editor).
+                    RenameField(prompt: "Name this skill", value: skill.name) { new in
+                        skill.name = new
+                        try? context.save()
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.label)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("TAP A CELL TO LOG A REP")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(Theme.label3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 // Shared outcome header — valid because every row is this one skill.
                 HStack(spacing: 6) {
@@ -526,9 +541,9 @@ struct CaptureView: View {
                 .frame(width: 22, height: 22)
                 .background(g.color)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            Text(g.name)
+            Text(g.displayName)
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(Theme.label)
+                .foregroundStyle(g.isUnnamed ? Theme.label3 : Theme.label)
                 .lineLimit(2).minimumScaleFactor(0.7)
             flameBadge(streak)
         }
@@ -882,6 +897,23 @@ struct CaptureView: View {
         lastWave = []
         hapticTrigger += 1
         Sounds.shared.play(.undo)
+    }
+
+    /// Add a skill (unnamed — name-later, like a subject). Pins it so it's the
+    /// live one, and inherits the currently-pinned skill's category so a skill
+    /// added mid-tumbling stays tumbling (Balk and all). Name it in the header
+    /// RenameField or the skills editor; outcomes are editable in the editor.
+    private func addSkill() {
+        guard let team = currentTeam else { return }
+        let nextNum = (groups.map(\.number).max() ?? 0) + 1
+        let nextOrder = (groups.map(\.orderIndex).max() ?? -1) + 1
+        let g = StuntGroup(name: "", number: nextNum, orderIndex: nextOrder)
+        g.category = pinnedSkill?.category ?? .stunts   // sets kindRaw too
+        g.team = team
+        context.insert(g)
+        try? context.save()
+        selectedGroupIDRaw = g.id.uuidString
+        hapticTrigger += 1
     }
 
     /// Add a subject (unnamed — name-later). Pins it in subject pivot so it's
