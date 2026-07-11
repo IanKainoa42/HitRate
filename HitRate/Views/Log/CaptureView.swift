@@ -110,6 +110,10 @@ struct CaptureView: View {
                 pivotBar
                 pinPicker
                 matrix(attempts)
+                // Issues tie to a single skill; only the skill pivot pins one.
+                if pivot == .skill, !customOutcomes.isEmpty, let skill = pinnedSkill {
+                    customOutcomePad(group: skill)
+                }
                 if waveActive { waveBar }
                 recentTicker(attempts)
             }
@@ -341,8 +345,9 @@ struct CaptureView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: subjects.count > 8 ? 4 : 6) {
                             ForEach(subjects) { s in
+                                let streakN = hotStreak(group: skill, subject: s, in: attempts)
                                 HStack(spacing: 6) {
-                                    subjectRowLabel(s)
+                                    subjectRowLabel(s, streak: streakN)
                                     ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                         let v = counts(group: skill, subject: s, in: attempts)[safe: slot] ?? 0
                                         matrixCell(group: skill, subject: s, slot: slot, def: def, v: v)
@@ -380,8 +385,9 @@ struct CaptureView: View {
                     VStack(spacing: groups.count > 8 ? 4 : 6) {
                         ForEach(groups) { g in
                             let defs = g.outcomeDefs
+                            let streakN = hotStreak(group: g, subject: subject, in: attempts)
                             HStack(spacing: 6) {
-                                skillRowLabel(g)
+                                skillRowLabel(g, streak: streakN)
                                 ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                     let v = counts(group: g, subject: subject, in: attempts)[safe: slot] ?? 0
                                     matrixCell(group: g, subject: subject, slot: slot, def: def, v: v)
@@ -401,8 +407,9 @@ struct CaptureView: View {
 
     private var rowLabelWidth: CGFloat { 96 }
 
-    /// A subject row label — colored badge + inline-renameable name (name-later).
-    private func subjectRowLabel(_ s: Subject) -> some View {
+    /// A subject row label — colored badge + inline-renameable name (name-later),
+    /// with the hot-streak flame once the cell strings clean hits together.
+    private func subjectRowLabel(_ s: Subject, streak: Int) -> some View {
         HStack(spacing: 6) {
             Text("\(s.orderIndex + 1)")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -417,13 +424,16 @@ struct CaptureView: View {
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(s.isUnnamed ? Theme.label3 : Theme.label)
             .lineLimit(1).minimumScaleFactor(0.7)
+            flameBadge(streak)
         }
+        .padding(.horizontal, 4)
+        .modifier(FireBorder(active: streak >= 3, cornerRadius: 7))
         .frame(width: rowLabelWidth, alignment: .leading)
         .frame(maxHeight: .infinity)
     }
 
-    /// A skill row label (subject pivot) — colored number badge + name.
-    private func skillRowLabel(_ g: StuntGroup) -> some View {
+    /// A skill row label (subject pivot) — colored number badge + name + flame.
+    private func skillRowLabel(_ g: StuntGroup, streak: Int) -> some View {
         HStack(spacing: 6) {
             Text("\(g.number)")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -435,7 +445,10 @@ struct CaptureView: View {
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Theme.label)
                 .lineLimit(2).minimumScaleFactor(0.7)
+            flameBadge(streak)
         }
+        .padding(.horizontal, 4)
+        .modifier(FireBorder(active: streak >= 3, cornerRadius: 7))
         .frame(width: rowLabelWidth, alignment: .leading)
         .frame(maxHeight: .infinity)
     }
@@ -816,6 +829,116 @@ struct CaptureView: View {
         hapticTrigger += 1
         Sounds.shared.play(.undo)
     }
+
+    // MARK: Hot streak (heating up / on fire)
+
+    /// Trailing run of clean hits (100%-credit) for one (skill, subject) cell in
+    /// this session. Any non-hit breaks it. 2 = heating up, 3+ = on fire. Keys on
+    /// the cell so the flame rides whichever axis is the row.
+    private func hotStreak(group: StuntGroup, subject: Subject, in attempts: [Attempt]) -> Int {
+        var run = 0
+        for a in attempts.reversed() {
+            guard a.group === group && a.subject === subject else { continue }
+            guard a.isHitRep else { break }
+            run += 1
+        }
+        return run
+    }
+
+    /// Ember at 2 straight hits, pulsing flame at 3+. Rides next to the row label.
+    @ViewBuilder
+    private func flameBadge(_ streak: Int) -> some View {
+        if streak >= 2 {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(streak >= 3 ? Theme.fireHot : Theme.fireWarm)
+                .symbolEffect(.pulse, options: .repeating, isActive: streak >= 3)
+                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) hits in a row"
+                                                : "Heating up — 2 hits in a row")
+        }
+    }
+
+    // MARK: Custom-outcome "issues" pad (skill pivot only)
+
+    /// The active folder's user-created outcomes — tallied SEPARATELY from the
+    /// hit-rate (a distinct model), shown as a secondary tier under the matrix.
+    private var customOutcomes: [CustomOutcome] {
+        (currentTeam?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    /// A row of tap buttons under the matrix — the folder's own outcomes, tallied
+    /// against the pinned skill (subject-agnostic, matching the legacy semantics).
+    /// Tap = +1, hold = −1 (gesture view, not a Button: a Button fires on release
+    /// after a hold and would re-increment a decrement).
+    @ViewBuilder
+    private func customOutcomePad(group: StuntGroup) -> some View {
+        VStack(spacing: 6) {
+            Text("ISSUES · \(group.name.uppercased())")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.6)
+                .foregroundStyle(Theme.label2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+                ForEach(customOutcomes) { o in
+                    let c = customCount(o, group: group)
+                    HStack(spacing: 7) {
+                        Circle().fill(o.color).frame(width: 8, height: 8)
+                        Text(o.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                        Spacer(minLength: 4)
+                        Text("\(c)")
+                            .font(Theme.barlow(18, .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(c == 0 ? Theme.label3 : Theme.label)
+                            .contentTransition(.numericText(value: Double(c)))
+                            .animation(.spring(duration: 0.3), value: c)
+                    }
+                    .padding(.horizontal, 11)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(Theme.well.shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
+                    )
+                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(o.color.opacity(0.35), lineWidth: 1))
+                    .contentShape(Rectangle())
+                    .onTapGesture { addCustom(o, group) }
+                    .onLongPressGesture(minimumDuration: 0.4) { removeCustom(o, group) }
+                    .accessibilityLabel("Log \(o.name)")
+                    .accessibilityValue("\(c) logged for \(group.name)")
+                    .accessibilityHint("Tap to add one, hold to remove one")
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    /// This session's tally count of a custom outcome on one skill.
+    private func customCount(_ o: CustomOutcome, group: StuntGroup) -> Int {
+        session.customTallies.filter { $0.outcome?.id == o.id && $0.group === group }.count
+    }
+
+    private func addCustom(_ o: CustomOutcome, _ group: StuntGroup) {
+        context.insert(CustomTally(outcome: o, group: group, session: session))
+        try? context.save()
+        hapticTrigger += 1
+    }
+
+    /// Remove the most recent tally of this outcome+skill (long-press undo).
+    private func removeCustom(_ o: CustomOutcome, _ group: StuntGroup) {
+        let mine = session.customTallies
+            .filter { $0.outcome?.id == o.id && $0.group === group }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard let last = mine.last else { return }
+        context.delete(last)
+        try? context.save()
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
+    }
 }
 
 private extension Array {
@@ -832,5 +955,30 @@ private struct StageKey: Hashable {
     init(_ g: StuntGroup, _ s: Subject) {
         self.group = g.persistentModelID
         self.subject = s.persistentModelID
+    }
+}
+
+/// "On fire" chrome: a slow warm gradient sweeping around a row label once its
+/// cell has 3+ straight hits. The one sanctioned flame on the training floor
+/// (Ian asked for it 2026-06-11) — keep it small and warm, never sparkle.
+private struct FireBorder: ViewModifier {
+    let active: Bool
+    var cornerRadius: CGFloat = 8
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if active {
+                TimelineView(.animation(minimumInterval: 1 / 20)) { tl in
+                    let t = tl.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 2.5) / 2.5
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(AngularGradient(
+                            colors: [Theme.fireHot, Theme.fireWarm, Theme.fireHot.opacity(0.25),
+                                     Theme.fireWarm, Theme.fireHot],
+                            center: .center, angle: .degrees(t * 360)), lineWidth: 2)
+                }
+                .allowsHitTesting(false)
+            }
+        }
     }
 }
