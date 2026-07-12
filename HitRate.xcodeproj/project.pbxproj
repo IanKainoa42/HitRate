@@ -58,6 +58,7 @@
 		C6CE9FFACF20F129D966110D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 682FC96676B2F3C23E0A2C50 /* Assets.xcassets */; };
 		C99416CD5862BBED4B7E884F /* QuickClinicExitWarningSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9E2BC0A4095CA11B4B4114 /* QuickClinicExitWarningSheet.swift */; };
 		CA745130292CAC719774B178 /* HitRateApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354E38DADE87EAEA70210445 /* HitRateApp.swift */; };
+		D61621AB7AEAF64DC2C31BFE /* FirestoreModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A537A9DBCA16D9D49620A /* FirestoreModels.swift */; };
 		D9E1104B0EB188559FA6F688 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E30AC6D5D161DB570B82771 /* Models.swift */; };
 		DAA7D95E1EEC7D56696487D8 /* BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ADE8856144E336B0B6126686 /* BarlowCondensed-Bold.ttf */; };
 		DBFACF79DEB82E9341905CE5 /* WatchLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E6D11E0FC569761032886D /* WatchLogView.swift */; };
@@ -104,6 +105,7 @@
 		077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCatalogRenderer.swift; sourceTree = "<group>"; };
 		0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionBridge.swift; sourceTree = "<group>"; };
 		138B89E3489E75197EA700F8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
+		168A537A9DBCA16D9D49620A /* FirestoreModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreModels.swift; sourceTree = "<group>"; };
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
@@ -284,6 +286,7 @@
 		7E0A280BAB4AC01C806E74AD /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				168A537A9DBCA16D9D49620A /* FirestoreModels.swift */,
 				9E30AC6D5D161DB570B82771 /* Models.swift */,
 				69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */,
 			);
@@ -534,6 +537,7 @@
 				FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */,
 				4A2264B0343EFAB8B8AA10D2 /* ExecutionCard.swift in Sources */,
 				14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */,
+				D61621AB7AEAF64DC2C31BFE /* FirestoreModels.swift in Sources */,
 				C3D91D1EFFBD17AD2D9D0882 /* FolderListView.swift in Sources */,
 				52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */,
 				FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */,

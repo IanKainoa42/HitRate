@@ -1,62 +1,80 @@
 rules_version = '2';
 
+// HitRate cloud sync — multi-user team sharing.
+//
+// Layout (matches SyncEngine.swift / FirestoreModels.swift):
+//   teams/{teamId}                          FTeam meta (ownerUID, memberIds)
+//   teams/{teamId}/subjects/{id}            FSubject   (owner writes, members read)
+//   teams/{teamId}/groups/{id}              FGroup     (owner writes, members read)
+//   teams/{teamId}/templates/{id}           FTemplate  (owner writes, members read)
+//   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps)
+//   joinCodes/{code}                        { teamId } — public code→team lookup
+//
+// Roster is OWNER-authoritative; attempts are append-only and tagged with the
+// logger's uid. A joiner resolves a code via joinCodes/, then adds only itself
+// to the team's memberIds (the sole member-write allowed on the team doc).
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    // Parent-team lookup for subcollection rules.
+    function teamData(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data;
     }
-    
-    // FTeam collection
+    function ownsTeam(teamId) {
+      return signedIn() && teamData(teamId).ownerUID == uid();
+    }
+    function inTeam(teamId) {
+      let t = teamData(teamId);
+      return signedIn() && (t.ownerUID == uid() || uid() in t.memberIds);
+    }
+
     match /teams/{teamId} {
-      // Anyone authenticated can create a team (they become the owner)
-      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
-      
-      // A user can read a team if they are the owner OR they are in the memberIds array
-      allow read: if isAuthenticated() && (
-        resource.data.ownerId == request.auth.uid || 
-        request.auth.uid in resource.data.memberIds
+      allow read:   if signedIn() && (resource.data.ownerUID == uid()
+                                       || uid() in resource.data.memberIds);
+      allow create: if signedIn() && request.resource.data.ownerUID == uid();
+      allow delete: if signedIn() && resource.data.ownerUID == uid();
+      // Owner: full update. Member: may change ONLY memberIds/updatedAt (join or
+      // leave), and only to add or remove THEMSELVES — never touch other fields.
+      allow update: if signedIn() && (
+        resource.data.ownerUID == uid()
+        || (
+          request.resource.data.ownerUID == resource.data.ownerUID
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['memberIds', 'updatedAt'])
+        )
       );
-      
-      // A user can update/delete a team only if they are the owner
-      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
-    }
-    
-    // FStuntGroup collection
-    match /groups/{groupId} {
-      // Helper function to check if the user is a member/owner of the parent team
-      function isTeamMember(teamId) {
-        let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
-        return team.ownerId == request.auth.uid || request.auth.uid in team.memberIds;
+
+      match /subjects/{docId} {
+        allow read:  if inTeam(teamId);
+        allow write: if ownsTeam(teamId);
       }
-      
-      // Anyone in the team can create, read, update, or delete groups for that team
-      allow read, write: if isAuthenticated() && isTeamMember(resource.data.teamId);
-      // For create, we also need to check the incoming data instead of existing resource
-      allow create: if isAuthenticated() && isTeamMember(request.resource.data.teamId);
-    }
-    
-    // FAttempt collection
-    match /attempts/{attemptId} {
-      // Helper function to check if the user is a member/owner of the parent team
-      function isTeamMember(teamId) {
-        let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
-        return team.ownerId == request.auth.uid || request.auth.uid in team.memberIds;
+      match /groups/{docId} {
+        allow read:  if inTeam(teamId);
+        allow write: if ownsTeam(teamId);
       }
-      
-      // Anyone in the team can read or add attempts
-      allow read: if isAuthenticated() && isTeamMember(resource.data.teamId);
-      
-      // Only team members can create attempts, and they must record themselves as the logger
-      allow create: if isAuthenticated() && 
-                    isTeamMember(request.resource.data.teamId) && 
-                    request.resource.data.loggerId == request.auth.uid;
-      
-      // Only the person who logged the attempt (or the team owner) can delete/update it
-      allow update, delete: if isAuthenticated() && (
-        resource.data.loggerId == request.auth.uid || 
-        get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.ownerId == request.auth.uid
-      );
+      match /templates/{docId} {
+        allow read:  if inTeam(teamId);
+        allow write: if ownsTeam(teamId);
+      }
+      match /attempts/{docId} {
+        allow read:   if inTeam(teamId);
+        allow create: if inTeam(teamId) && request.resource.data.loggerId == uid();
+        allow update, delete: if signedIn()
+          && (resource.data.loggerId == uid() || ownsTeam(teamId));
+      }
+    }
+
+    // Public code→team directory so a joiner can resolve a 6-digit code before
+    // they're a member. Owner-written; readable by any signed-in user. Holds only
+    // { teamId } — no roster data leaks.
+    match /joinCodes/{code} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.ownerUID == uid();
+      allow update, delete: if signedIn() && resource.data.ownerUID == uid();
     }
   }
 }

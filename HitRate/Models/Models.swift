@@ -399,6 +399,10 @@ final class Team {
     /// until first pushed). Both additive with defaults → lightweight migration.
     var ownerUID: String? = nil
     var joinCode: String? = nil
+    /// Firebase uids of everyone who has joined this shared folder (besides the
+    /// owner). Owner-authoritative: the owner's device writes this list; members
+    /// mirror it. Stored as a plain [String] (SwiftData handles Codable arrays).
+    var memberIds: [String] = []
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
