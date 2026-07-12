@@ -278,3 +278,10 @@
 - **Category:** knowledge_gap
 - **What happened:** Added an extra pencil Image next to RenameField in the capture headers → two pencils. RenameField (Components.swift) already renders a pencil when unfocused and makes the whole field tap-to-edit.
 - **Rule:** Never add a pencil next to RenameField. To make any label inline-editable in CaptureView, swap the static Text for RenameField (value: model.name, commit → save). Skill rows, subject rows, and both pivot headers all use it.
+
+## 2026-07-11 — /qa on HitRate: harness gotchas + first-scheme trap
+
+- **Category:** best_practice
+- **Build:** `xcodebuild -list` sorts CheerRulesKit (SPM dep) FIRST, so the qa skill's auto-scheme picks the kit and produces no .app. Always build scheme `HitRate` explicitly.
+- **mobile MCP limits (not app bugs):** (1) can't select from SwiftUI `Menu`s via quick-tap; (2) can't reliably focus EXISTING `TextField`/`RenameField`s by tap — only auto-focused new fields accept typed text; (3) app occasionally launches to springboard — relaunch once. Explorers must be told these, or they log false 'text didn't land' / 'menu dead' findings.
+- **Rate semantics:** the dashboard headline is the WEIGHTED score (weightedRate), so it legitimately exceeds the clean-hit% breakdown — not a bug (IAN-514 is the label wart).

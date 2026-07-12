@@ -125,8 +125,10 @@ struct CaptureView: View {
 
     @ViewBuilder
     private func header(_ attempts: [Attempt]) -> some View {
+        // Clean-hit rate — hits ÷ total (a bobble is NOT a hit), matching the
+        // dashboard headline and the "% HIT" label.
         let rate = attempts.isEmpty ? nil
-            : Int((Double(attempts.reduce(0) { $0 + $1.creditValue }) / Double(attempts.count)).rounded())
+            : Int((Double(attempts.filter(\.isHitRep).count) / Double(attempts.count) * 100).rounded())
 
         HStack {
             VStack(alignment: .leading, spacing: 2) {

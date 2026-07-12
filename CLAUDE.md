@@ -138,13 +138,13 @@ Key invariants:
   `groups`** (via an `allowed` Set of persistentModelIDs) — trend and the
   latest-session tape filter attempts by group membership, so the stunt-only /
   tumbling-only kind filter can't leak the other kind's reps. `rate` is the
-  credit-WEIGHTED score (`weightedRate`: hit 100 · decent 67 · rough 33 ·
-  miss 0 — the average `creditValue`), NOT clean hits/total — so a bobble
-  contributes partial credit and the headline can exceed the clean-hit%. (This
-  is why the dashboard headline > the "Hit N · X%" breakdown; the "HIT RATE"
-  label vs that weighted number is a known UX wart — see IAN-514.) The
-  skill-report metrics (`purity` = hits/stand-ups, `upRate` = stand-ups/total)
-  are still clean-hit based. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
+  CLEAN-HIT rate (`cleanRate`: hits/total, a bobble is NOT a hit) — the plain
+  "did you stick it" number, so it matches the per-skill %, the weekly RATE CUP,
+  and the "Hit N · X%" breakdown. Credits 67/33 still exist but ONLY drive
+  streaks via `isLandingRep` (≥50% = a landing) — they no longer weight the
+  headline (the brief weighted-score headline was reverted 2026-07-11, IAN-514).
+  The skill-report metrics (`purity` = hits/stand-ups, `upRate` = stand-ups/total)
+  build on the same clean-hit base. `SkillKindFilter` (all/stunt/tumbling) drives the athlete
   dashboard split; `FloorStats.bestSkill/worstSkill/cleanestSkill/
   mostConsistentSkill` are gated to skills with ≥`insightMinReps` reps.
 - `Stats/WeeklyTournament.swift` — the built-in weekly competition + season
