@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CheerRulesKit
 
 // MARK: - Timeframe (the global Home filter)
 
@@ -57,6 +58,23 @@ struct SessionSnapshot {
     let roughPatch: Range<Int>?  // index range of the worst stretch, if bad enough
 }
 
+/// One row of the EXECUTION breakdown (Feature B): how often a single United
+/// execution driver HELD across the reps where execution was actually scored.
+/// The denominator is scored-reps-only, so a driver never reads as "clean" from
+/// reps nobody judged (the non-inflating rule made visible).
+struct ExecutionDriverStat: Identifiable {
+    let key: String
+    let name: String            // "Body Control"
+    let categoryName: String    // "Standing Tumbling" — groups rows by category
+    let scored: Int             // scored reps whose skill carries this driver
+    let held: Int               // of those, how many kept the driver
+
+    var id: String { key }
+    var lost: Int { scored - held }
+    /// Hold rate 0–100 (share of scored reps where the driver stayed clean).
+    var holdRate: Int { scored > 0 ? Int((Double(held) / Double(scored) * 100).rounded()) : 0 }
+}
+
 struct FloorStats {
     let timeframe: Timeframe
     let groups: [GroupStat]      // display order
@@ -70,6 +88,15 @@ struct FloorStats {
     let rangeNote: String
     let trend: [Int]
     let latest: SessionSnapshot?
+    /// Execution breakdown (Feature B), driver rows ordered by category then sheet
+    /// order. Empty when no reps in range were execution-scored.
+    let execution: [ExecutionDriverStat]
+    /// How many reps in range carried a committed execution read — the shared
+    /// denominator context for the whole breakdown ("scored on N of M reps").
+    let executionScoredReps: Int
+
+    /// True once at least one rep in range was execution-scored — gates the card.
+    var hasExecution: Bool { executionScoredReps > 0 && !execution.isEmpty }
 
     var falls: Int { overall[Outcome.buildingFall.rawValue] + overall[Outcome.majorFall.rawValue] }
     var best: GroupStat? { ranked.first }
@@ -214,6 +241,9 @@ enum StatsEngine {
             delta = rate - cleanRate(prevOverall)
         }
 
+        let (execution, executionScoredReps) = executionBreakdown(
+            in: current, groups: ordered, within: currentInterval, subject: subject)
+
         return FloorStats(
             timeframe: timeframe,
             groups: groupStats,
@@ -222,7 +252,61 @@ enum StatsEngine {
             overall: overall, total: total, hits: hits, rate: rate,
             delta: delta, deltaNote: deltaNote, rangeNote: rangeNote,
             trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe, now: now, subject: subject),
-            latest: latestSnapshot(sorted: sorted, allowed: allowed, subject: subject))
+            latest: latestSnapshot(sorted: sorted, allowed: allowed, subject: subject),
+            execution: execution, executionScoredReps: executionScoredReps)
+    }
+
+    // MARK: Execution breakdown (Feature B)
+
+    /// Aggregate the optional execution reads across the passed groups. Only reps
+    /// with `executionScored == true` count — an unscored rep contributes NOTHING
+    /// (never assumed clean), so the breakdown can't be inflated by untracked work.
+    /// Returns the per-driver rows (category → sheet order) and the total number of
+    /// execution-scored reps in range.
+    private static func executionBreakdown(
+        in sessions: [PracticeSession], groups: [StuntGroup],
+        within interval: DateInterval?, subject: Subject?
+    ) -> (rows: [ExecutionDriverStat], scoredReps: Int) {
+        // key → (name, category, order, scored, held)
+        var scoredByKey: [String: Int] = [:]
+        var heldByKey: [String: Int] = [:]
+        // Preserve the sheet's driver order: category index, then driver index.
+        var order: [String: (cat: Int, idx: Int, name: String, category: String)] = [:]
+        var scoredReps = 0
+
+        let allowed = Set(groups.map { $0.persistentModelID })
+        for s in sessions {
+            for a in s.attempts {
+                guard a.executionScored,
+                      let g = a.group, allowed.contains(g.persistentModelID) else { continue }
+                if let interval, !interval.contains(a.timestamp) { continue }
+                guard subjectMatch(a, subject) else { continue }
+                let drivers = g.executionDrivers
+                guard !drivers.isEmpty else { continue }
+                scoredReps += 1
+                let lost = Set(a.lostDrivers)
+                let catIndex = SkillCategory.allCases.firstIndex(of: g.category) ?? 0
+                for (i, d) in drivers.enumerated() {
+                    scoredByKey[d.key, default: 0] += 1
+                    if !lost.contains(d.key) { heldByKey[d.key, default: 0] += 1 }
+                    if order[d.key] == nil {
+                        order[d.key] = (catIndex, i, d.name, g.category.displayName)
+                    }
+                }
+            }
+        }
+
+        let rows = scoredByKey.keys.compactMap { key -> ExecutionDriverStat? in
+            guard let o = order[key] else { return nil }
+            return ExecutionDriverStat(
+                key: key, name: o.name, categoryName: o.category,
+                scored: scoredByKey[key] ?? 0, held: heldByKey[key] ?? 0)
+        }
+        .sorted {
+            let a = order[$0.key]!, b = order[$1.key]!
+            return a.cat != b.cat ? a.cat < b.cat : a.idx < b.idx
+        }
+        return (rows, scoredReps)
     }
 
     // MARK: Trend series

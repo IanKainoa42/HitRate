@@ -187,6 +187,25 @@ Key invariants:
   milestones have no storage of their own, "earned" is recomputed from the
   attempts every time. Good milestones (volume/streak/session quality/skill
   mastery) + "DUBIOUS HONOR" bad ones (falls, cold streaks). Tier = difficulty.
+- **EXECUTION drivers ("Feature B")** — an OPTIONAL, advanced, per-rep layer of
+  BINARY held/lost tags. NEVER point math (the kit's `ExecutionDriver.maxDeduction`
+  is deliberately ignored). Drivers come from the United `SkillCategory`
+  (`CheerRulesKit.ExecutionDriver`: stunts/pyramid/standing/running tumbling = 4,
+  tosses/jumps = 3); custom / "Other" types carry NONE — `StuntGroup.scoresExecution`
+  gates the whole feature. Stored on `Attempt` as two additive fields
+  (`executionScored: Bool`, `lostDriversRaw: String`; lightweight migration — NOT a
+  UUID default, so the id-backfill gotcha doesn't apply). The NON-INFLATING rule is
+  load-bearing: a rep is only counted once a coach COMMITS a read
+  (`scoreExecution(lost:)`); a rep nobody opens stays `executionScored == false` and
+  contributes ZERO — it is never assumed clean. So execution NEVER touches the hit
+  rate / streak / cards / tournament — it's a separate breakdown only.
+  `ExecutionSheet` (per-rep, opened by TAPPING a recent chip on a United-category
+  skill; all drivers start HELD, tap to mark SLIPPED, Save commits) is the input;
+  scored chips show a shield (green = all held, amber = something slipped).
+  `StatsEngine.executionBreakdown` → `FloorStats.execution` (denominator =
+  scored-reps-only, so an untracked practice can't inflate a driver to 100%);
+  `ExecutionCard` renders it BELOW the analytics cards, hidden unless
+  `stats.hasExecution`.
 - `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
   fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`

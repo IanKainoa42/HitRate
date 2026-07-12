@@ -601,6 +601,7 @@ struct HomeView: View {
             TrendCard(stats: d)
             GroupsCard(stats: d)
             SkillInsightsCard(stats: d)
+            if d.hasExecution { ExecutionCard(stats: d) }
         } else {
             FeedCard {
                 Text("No reps logged \(timeframe.label.lowercased()).")

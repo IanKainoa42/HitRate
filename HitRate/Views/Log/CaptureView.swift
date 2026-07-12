@@ -34,6 +34,9 @@ struct CaptureView: View {
 
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
+    /// The rep whose optional EXECUTION read (Feature B) is open, if any. Tapping a
+    /// recent chip on a United-category skill sets this and presents the sheet.
+    @State private var scoringAttempt: Attempt?
 
     // Wave/Routine staging: stage any number of reps per (skill, subject) CELL
     // (tap +1, hold −1), then commit the whole batch at once. A cell can carry
@@ -91,6 +94,7 @@ struct CaptureView: View {
                     }
                 }
                 .sheet(isPresented: $showGroupsEditor) { GroupsEditorView() }
+                .sheet(item: $scoringAttempt) { ExecutionSheet(attempt: $0) }
                 .onAppear { seedFirstSubjectIfNeeded() }
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
@@ -821,8 +825,13 @@ struct CaptureView: View {
     }
 
     /// Engraved chip: outcome dot + subject/skill context + outcome short word.
+    /// On a United-category skill the chip is tappable — it opens the optional
+    /// EXECUTION read (Feature B) for that rep, and shows a small shield once a
+    /// read has been committed (green = all held, amber = something slipped).
+    @ViewBuilder
     private func repChip(_ a: Attempt) -> some View {
-        HStack(spacing: 5) {
+        let scorable = a.group?.scoresExecution ?? false
+        let body = HStack(spacing: 5) {
             Circle().fill(a.outcomeDef?.color ?? Theme.label3).frame(width: 7, height: 7)
             Text(a.subject?.displayName ?? a.group?.name ?? "—")
                 .font(.system(size: 12, weight: .semibold))
@@ -832,6 +841,11 @@ struct CaptureView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
+            if a.executionScored {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(a.lostDrivers.isEmpty ? Theme.accent : Theme.buildingFall)
+            }
         }
         .fixedSize()
         .padding(.horizontal, 9)
@@ -840,6 +854,12 @@ struct CaptureView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Theme.well.shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
         )
+        if scorable {
+            Button { scoringAttempt = a } label: { body }
+                .buttonStyle(.plain)
+        } else {
+            body
+        }
     }
 
     // MARK: Actions

@@ -338,6 +338,14 @@ struct RenameField: View {
                 }
                 .onSubmit { if draft != value { commit(draft) } }
                 .onDisappear { if loaded, draft != value { commit(draft) } }
+                // Re-seed when the underlying value changes UNDERNEATH us while
+                // we're not editing — e.g. the pinned skill/subject switches, so
+                // one persistent header field now represents a different row.
+                // Guarded on !focused so a live edit is never yanked out from
+                // under the keyboard.
+                .onChange(of: value) { _, newValue in
+                    if !focused { draft = newValue }
+                }
             // Pencil signals the word is editable (the plain field read as a
             // fixed label before). Hidden while editing.
             if !focused {

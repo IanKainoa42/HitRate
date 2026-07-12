@@ -538,6 +538,16 @@ final class StuntGroup {
     /// execution drivers (those live only on the 6 United categories).
     var usesCustomType: Bool { !typeLabelRaw.isEmpty }
 
+    /// The execution drivers this skill can be scored against (Feature B): the
+    /// United category's judge sub-criteria, used here as BINARY held/lost tags
+    /// (the `maxDeduction` is ignored — HitRate never does point math). Custom /
+    /// "Other" types carry NONE, so execution scoring is offered only for the 6
+    /// United categories.
+    var executionDrivers: [ExecutionDriver] { usesCustomType ? [] : category.executionDrivers }
+
+    /// True when this skill supports the optional execution layer.
+    var scoresExecution: Bool { !executionDrivers.isEmpty }
+
     /// Apply a United category as the type: re-link to its preset outcomes and
     /// clear any custom-type label (its execution drivers come back).
     func applyCategory(_ c: SkillCategory) {
@@ -665,6 +675,15 @@ final class Attempt {
     /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
     /// container in the practice log. Optional → additive lightweight migration.
     var waveID: UUID?
+    /// Optional EXECUTION layer (Feature B). `false` = execution was NOT scored on
+    /// this rep, so it contributes NO execution data — an untracked rep is never
+    /// assumed clean and can't inflate the breakdown (the NON-INFLATING rule).
+    /// `true` means a coach committed an execution read; `lostDriversRaw` then
+    /// holds the driver keys that SLIPPED (empty = every driver held = a clean
+    /// execution, and that's real because it was actively scored). Both fields are
+    /// additive with defaults → lightweight migration.
+    var executionScored: Bool = false
+    var lostDriversRaw: String = ""
 
     init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
@@ -698,6 +717,25 @@ final class Attempt {
     /// A landing — stayed up (credit ≥ 50%). This is what streaks count, so a
     /// landed-but-not-clean rep keeps a streak going; a fall/miss/balk breaks it.
     var isLandingRep: Bool { creditValue >= OutcomeCredit.landingThreshold }
+
+    // MARK: Execution (Feature B — optional binary held/lost tags)
+
+    /// The execution-driver keys that slipped on this rep. Only meaningful when
+    /// `executionScored`; empty means every driver held.
+    var lostDrivers: [String] {
+        get { lostDriversRaw.isEmpty ? [] : lostDriversRaw.components(separatedBy: "\n").filter { !$0.isEmpty } }
+        set { lostDriversRaw = newValue.joined(separator: "\n") }
+    }
+    /// Commit an execution read: the listed driver keys slipped, the rest held.
+    func scoreExecution(lost: [String]) {
+        executionScored = true
+        lostDrivers = lost
+    }
+    /// Discard this rep's execution read entirely — back to "not scored" (no data).
+    func clearExecution() {
+        executionScored = false
+        lostDriversRaw = ""
+    }
     /// The legacy severity `Outcome` this rep maps to by credit TIER (hit/decent/
     /// rough/miss → hit/bobble/buildingFall/majorFall). Used only by aggregate
     /// stats/visuals (tape color, tier histograms) so they stay 4-bucket and
