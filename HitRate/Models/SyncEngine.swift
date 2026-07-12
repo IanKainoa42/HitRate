@@ -347,6 +347,85 @@ final class SyncEngine: ObservableObject {
         try? context.save()
     }
 
+    // MARK: - Sharing (join codes)
+
+    /// Outcome of redeeming a join code, surfaced to the join sheet.
+    enum JoinOutcome: Equatable {
+        case joined          // membership written; the roster pulls down via listener
+        case invalidCode     // no such code
+        case notSignedIn
+        case failed(String)  // network / permission error
+    }
+
+    /// Human-friendly code alphabet — no 0/O, 1/I/L, so a shared code can't be
+    /// misread. 6 chars over 31 symbols ≈ 887M combos; collisions are vanishing.
+    private static let codeAlphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
+
+    private func generateCode() -> String {
+        String((0..<6).map { _ in SyncEngine.codeAlphabet.randomElement()! })
+    }
+
+    /// Make `team` shareable: mint (or reuse) a join code, publish a public
+    /// `joinCodes/{code}` → { teamId, ownerUID } directory entry, stamp the code
+    /// on the team, and push the team meta so members see it. Returns the code
+    /// (existing or new), or nil on failure. Owner-only in practice — a joined
+    /// team already carries a code and this just returns it.
+    func shareTeam(_ team: Team) async -> String? {
+        guard let uid else { lastError = "Not signed in."; return nil }
+        // Claim ownership of a not-yet-synced local team so the code is valid.
+        if team.ownerUID == nil { team.ownerUID = uid }
+        if let existing = team.joinCode, !existing.isEmpty { return existing }
+        let teamID = team.id.uuidString
+        for _ in 0..<5 {
+            let code = generateCode()
+            let ref = db.collection("joinCodes").document(code)
+            do {
+                let snap = try await ref.getDocument()
+                if snap.exists { continue }   // extremely unlikely; try another
+                try await ref.setData([
+                    "teamId": teamID,
+                    "ownerUID": uid,
+                    "createdAt": FieldValue.serverTimestamp()
+                ])
+                team.joinCode = code
+                try? modelContext?.save()
+                pushTeamMeta(team)   // propagate the code onto the team doc
+                lastError = nil
+                return code
+            } catch {
+                lastError = "Share failed: \(error.localizedDescription)"
+                return nil
+            }
+        }
+        lastError = "Couldn't allocate a code — try again."
+        return nil
+    }
+
+    /// Redeem a join code: resolve it to a team and add ourselves to that team's
+    /// `memberIds` (the sole member-write the rules allow). The `memberIds`
+    /// listener then pulls the roster + attempts down automatically.
+    func joinTeam(code rawCode: String) async -> JoinOutcome {
+        guard let uid else { return .notSignedIn }
+        let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !code.isEmpty else { return .invalidCode }
+        do {
+            let snap = try await db.collection("joinCodes").document(code).getDocument()
+            guard snap.exists, let teamID = snap.data()?["teamId"] as? String else {
+                return .invalidCode
+            }
+            try await db.collection("teams").document(teamID).updateData([
+                "memberIds": FieldValue.arrayUnion([uid]),
+                "updatedAt": FieldValue.serverTimestamp()
+            ])
+            // Ensure the pull listeners are live so the joined roster lands.
+            if let modelContext, !isRunning { startSyncing(context: modelContext) }
+            lastError = nil
+            return .joined
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     private func applyAttempt(_ remote: FAttempt) {
         guard let context = modelContext, let idStr = remote.id,
               let groupUUID = UUID(uuidString: remote.groupId) else { return }

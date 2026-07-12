@@ -17,6 +17,8 @@ struct FolderListView: View {
     @AppStorage("orgName") private var orgName = ""
     @AppStorage("currentTeamID") private var currentTeamID = ""
 
+    @EnvironmentObject private var auth: AuthViewModel
+
     /// Open a folder's dashboard. The parent (RootView) wires this to set the
     /// active team and push Home.
     let onOpen: (Team) -> Void
@@ -25,6 +27,17 @@ struct FolderListView: View {
     @State private var newName = ""
     @State private var renaming: Team?
     @State private var renameText = ""
+    @State private var sharing: Team?
+    @State private var joinOpen = false
+
+    /// You own a folder if it's never been claimed (local-only) or its cloud
+    /// owner is you. A folder you JOINED carries someone else's ownerUID.
+    private func isOwner(_ t: Team) -> Bool {
+        t.ownerUID == nil || t.ownerUID == auth.uid
+    }
+    private func isShared(_ t: Team) -> Bool {
+        !(t.joinCode ?? "").isEmpty || !t.memberIds.isEmpty || !isOwner(t)
+    }
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -72,7 +85,15 @@ struct FolderListView: View {
             }
             Button("Cancel", role: .cancel) { renaming = nil }
         }
-        .onAppear {
+        .sheet(item: $sharing) { t in
+            ShareFolderSheet(team: t)
+                .presentationDetents([.medium])
+                .presentationBackground(Theme.appBGBottom)
+        }
+        .sheet(isPresented: $joinOpen) {
+            JoinFolderSheet()
+                .presentationDetents([.height(300)])
+                .presentationBackground(Theme.appBGBottom)
         }
     }
 
@@ -140,6 +161,9 @@ struct FolderListView: View {
                         .foregroundStyle(Theme.label2)
                 }
                 Spacer(minLength: 6)
+                if isShared(t) {
+                    sharedBadge(owner: isOwner(t))
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.label3)
@@ -155,6 +179,12 @@ struct FolderListView: View {
                 renameText = t.name
                 renaming = t
             } label: { Label("Rename", systemImage: "pencil") }
+            if isOwner(t) {
+                Button {
+                    sharing = t
+                } label: { Label(isShared(t) ? "Sharing code" : "Share folder",
+                                 systemImage: "person.2.fill") }
+            }
             if teams.active.count > 1 {
                 Button(role: .destructive) {
                     withAnimation { trashFolder(t) }
@@ -163,9 +193,49 @@ struct FolderListView: View {
         }
     }
 
+    /// Small chalk chip marking a folder as shared — "SHARED" if you own it,
+    /// "JOINED" if you're logging into someone else's.
+    private func sharedBadge(owner: Bool) -> some View {
+        Text(owner ? "SHARED" : "JOINED")
+            .font(.system(size: 8.5, weight: .heavy))
+            .tracking(1.1)
+            .foregroundStyle(owner ? Theme.accent : Theme.label2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(Theme.iconTile)
+                    .overlay(Capsule().strokeBorder(
+                        (owner ? Theme.accent : Theme.label3).opacity(0.4), lineWidth: 1)))
+    }
+
     // MARK: New folder
 
     private var newFolderCTA: some View {
+        VStack(spacing: 10) {
+            Button {
+                joinOpen = true
+            } label: {
+                Text("Join a folder with a code")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.label2)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            newFolderButton
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        .background(
+            LinearGradient(colors: [Theme.appBGBottom.opacity(0), Theme.appBGBottom],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    private var newFolderButton: some View {
         Button {
             addOpen = true
         } label: {
@@ -188,14 +258,6 @@ struct FolderListView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
-        .background(
-            LinearGradient(colors: [Theme.appBGBottom.opacity(0), Theme.appBGBottom],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea(edges: .bottom)
-        )
     }
 
     private func addFolder() {
@@ -207,5 +269,173 @@ struct FolderListView: View {
         currentTeamID = t.id.uuidString
         newName = ""
         onOpen(t)   // drop straight into the new (empty) folder to add skills
+    }
+}
+
+// MARK: - Share folder sheet
+
+/// Owner-side: mints (or reuses) the folder's join code and presents it to hand
+/// to another coach. The code is generated on appear via SyncEngine, which also
+/// publishes the public `joinCodes/{code}` directory entry.
+private struct ShareFolderSheet: View {
+    let team: Team
+    @Environment(\.dismiss) private var dismiss
+    @State private var code: String?
+    @State private var failed = false
+    @State private var copied = false
+    private let sync = SyncEngine.shared
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Text("SHARE FOLDER")
+                .font(.system(size: 11, weight: .heavy)).tracking(2)
+                .foregroundStyle(Theme.label3)
+                .padding(.top, 22)
+
+            Text(team.name)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Theme.label)
+
+            if let code {
+                Text(code)
+                    .font(Theme.barlow(46, .extrabold))
+                    .tracking(6)
+                    .foregroundStyle(Theme.accent)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity)
+                    .wellBackground()
+
+                HStack(spacing: 10) {
+                    Button {
+                        UIPasteboard.general.string = code
+                        withAnimation { copied = true }
+                    } label: {
+                        Label(copied ? "Copied" : "Copy code",
+                              systemImage: copied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .wellBackground()
+                    }
+                    .buttonStyle(.plain)
+
+                    ShareLink(item: "Join my HitRate folder “\(team.name)” with code \(code)") {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .wellBackground()
+                    }
+                }
+
+                Text("Anyone with this code can open “\(team.name)” and log reps into it. You stay the owner — only you can edit the roster.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.label2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if failed {
+                Text("Couldn’t create a code. Check your connection and try again.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.label2)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 24)
+            } else {
+                ProgressView().tint(Theme.accent).padding(.vertical, 30)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(FloorBackdrop().ignoresSafeArea())
+        .task {
+            if let c = await sync.shareTeam(team) { code = c } else { failed = true }
+        }
+    }
+}
+
+// MARK: - Join folder sheet
+
+/// Member-side: enter a 6-char code to join someone else's folder. On success
+/// the sheet dismisses and the roster streams in via SyncEngine's listeners.
+private struct JoinFolderSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error: String?
+    private let sync = SyncEngine.shared
+
+    private var trimmed: String {
+        code.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("JOIN A FOLDER")
+                .font(.system(size: 11, weight: .heavy)).tracking(2)
+                .foregroundStyle(Theme.label3)
+                .padding(.top, 22)
+
+            TextField("", text: $code, prompt:
+                Text("CODE").foregroundStyle(Theme.label3))
+                .font(Theme.barlow(34, .bold))
+                .tracking(6)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Theme.label)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .wellBackground()
+                .onChange(of: code) { _, _ in error = nil }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.majorFall)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button { join() } label: {
+                Group {
+                    if busy { ProgressView().tint(Theme.accentText) }
+                    else { Text("JOIN").font(.system(size: 14, weight: .heavy)).tracking(1.5) }
+                }
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.accent.opacity(trimmed.count < 6 ? 0.35 : 1)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(trimmed.count < 6 || busy)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(FloorBackdrop().ignoresSafeArea())
+    }
+
+    private func join() {
+        busy = true
+        error = nil
+        Task {
+            switch await sync.joinTeam(code: trimmed) {
+            case .joined:
+                dismiss()
+            case .invalidCode:
+                error = "No folder found for that code."
+            case .notSignedIn:
+                error = "Sign-in isn’t ready yet — try again in a moment."
+            case .failed(let msg):
+                error = "Couldn’t join: \(msg)"
+            }
+            busy = false
+        }
     }
 }
