@@ -40,6 +40,21 @@ enum SkillKind: String, CaseIterable, Identifiable {
     var icon: String { self == .stunt ? "person.3.fill" : "figure.gymnastics" }
 }
 
+// MARK: - Subject kind (who threw the rep)
+
+/// Who a logged rep is attributed to. A `Subject` is the ROW in a recording:
+/// an athlete (tumbling / athlete mode) or a stunt group (coach floor). Same
+/// slot either way — only the icon/word differ. Orthogonal to `SkillKind`
+/// (which is about outcome WORDS): a person can throw a stunt or a tumbling
+/// pass, a group can be graded on either.
+enum SubjectKind: String, CaseIterable, Identifiable, Codable {
+    case person, group
+
+    var id: String { rawValue }
+    var label: String { self == .person ? "Athlete" : "Group" }
+    var icon: String { self == .person ? "person.fill" : "person.3.fill" }
+}
+
 // MARK: - Skill category (United Scoring System)
 
 /// `SkillCategory` (CheerRulesKit) is the United score-sheet classification a
@@ -103,12 +118,33 @@ extension SkillCategory {
 enum OutcomeCredit: Int, CaseIterable, Codable, Identifiable {
     case hit = 100, decent = 67, rough = 33, miss = 0
     var id: Int { rawValue }
+
+    /// The line between "a landing" and "not". A rep worth THIS or more counts
+    /// as landed/stuck (keeps a streak, stays up); below it is a fall/miss/balk
+    /// (breaks a streak). Ian: "anything 50% or above is landing at least."
+    static let landingThreshold = 50
+
     var label: String {
         switch self {
         case .hit: "Hit · 100%"
         case .decent: "Decent · 67%"
         case .rough: "Rough · 33%"
         case .miss: "Miss · 0%"
+        }
+    }
+
+    /// True when a rep of this credit counts as a LANDING (kept it up) — the
+    /// same rule streaks use.
+    var isLanding: Bool { rawValue >= OutcomeCredit.landingThreshold }
+
+    /// Plain-language meaning, shown in the outcome maker so the credit you pick
+    /// is unambiguous — including whether it keeps a streak going.
+    var definition: String {
+        switch self {
+        case .hit:    "Clean — landed with no issues. Keeps a streak."
+        case .decent: "Landed — stayed up, just not clean. Still counts, keeps a streak."
+        case .rough:  "Off — didn't really land. Breaks a streak."
+        case .miss:   "Miss, fall, or balk. Breaks a streak."
         }
     }
     var defaultColor: OutcomeColor {
@@ -161,8 +197,11 @@ struct OutcomeDef: Codable, Hashable, Identifiable {
     var id: String { "\(label)|\(colorRaw)|\(credit)" }
     var color: Color { (OutcomeColor(rawValue: colorRaw) ?? .gray).color }
     var creditTier: OutcomeCredit { OutcomeCredit(rawValue: credit) ?? .miss }
-    /// A "hit" for streaks / the green accent / hit milestones.
+    /// A "hit" — the green accent / clean-hit milestones (credit 100).
     var isHit: Bool { credit >= 100 }
+    /// A "landing" — stayed up (credit ≥ 50%). The rule streaks use, so a
+    /// landed-but-not-clean rep keeps a streak alive.
+    var isLanding: Bool { credit >= OutcomeCredit.landingThreshold }
     var short: String { Outcome.deriveShort(label) }
     /// Maps the credit tier onto a legacy `Outcome` purely to pick a tap sound.
     var soundOutcome: Outcome {
@@ -193,8 +232,11 @@ extension SkillCategory {
             return [.init("Hit", .green, .hit), .init("Bobble", .yellow, .decent),
                     .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss)]
         case .standingTumbling, .runningTumbling:
+            // Tumbling is land / didn't / balk: only Stuck (100) and Stepped out
+            // (67) are landings. A touchdown is a fall — credit 0 (orange keeps it
+            // visually distinct from a major fall), like Major fall and Balk.
             return [.init("Stuck", .green, .hit), .init("Stepped out", .yellow, .decent),
-                    .init("Touched down", .orange, .rough), .init("Major fall", .red, .miss),
+                    .init("Touched down", .orange, .miss), .init("Major fall", .red, .miss),
                     .init("Balk", .blue, .miss)]
         case .jumps:
             return [.init("Hit", .green, .hit), .init("Low", .yellow, .decent),
@@ -359,6 +401,14 @@ final class Team {
     /// Deleting the folder removes them (and each cascades its tallies).
     @Relationship(deleteRule: .cascade, inverse: \CustomOutcome.team)
     var customOutcomes: [CustomOutcome] = []
+    /// User-made skill types (reusable outcome sets) this folder owns.
+    @Relationship(deleteRule: .cascade, inverse: \OutcomeTemplate.team)
+    var outcomeTemplates: [OutcomeTemplate] = []
+    /// The subjects (athletes or stunt groups) this folder attributes reps to —
+    /// the ROWS in a recording. Deleting the folder removes them; their reps just
+    /// lose attribution (the Attempt.subject relationship nullifies), never delete.
+    @Relationship(deleteRule: .cascade, inverse: \Subject.team)
+    var subjects: [Subject] = []
 
     init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
@@ -428,6 +478,11 @@ final class StuntGroup {
     /// Blank = use `category.defaultOutcomeDefs`. `Attempt.outcomeRaw` indexes
     /// into the resolved list, so the first four slots must stay legacy-aligned.
     var outcomeDefsRaw: String = ""
+    /// Display name of a CUSTOM skill type applied to this skill (a user template
+    /// or the built-in "Other"). Blank = this skill's type is its United
+    /// `category`. Custom types carry no execution drivers. Purely cosmetic — the
+    /// actual outcomes always live in `outcomeDefsRaw`.
+    var typeLabelRaw: String = ""
     /// The team/roster this bucket belongs to. Optional so single-team stores
     /// migrate lightweight; RootView assigns teamless groups to a default team
     /// on launch.
@@ -455,6 +510,13 @@ final class StuntGroup {
         set { kindRaw = newValue.rawValue }
     }
 
+    /// True when the name still needs reconciling (blank) — mirrors `Subject`, so
+    /// a skill can be added blank-first from the capture pad and named later.
+    var isUnnamed: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Roster-facing display: the name, or a placeholder while unnamed.
+    var displayName: String { isUnnamed ? "Unnamed skill" : name }
+
     /// United category. Reading derives from the legacy kind when unset; setting
     /// also syncs `kindRaw` so outcome wording follows the category.
     var category: SkillCategory {
@@ -466,6 +528,35 @@ final class StuntGroup {
             categoryRaw = newValue.rawValue
             kindRaw = newValue.hitRateKind.rawValue
         }
+    }
+
+    /// The label shown for this skill's TYPE: a custom type name if one was
+    /// applied, else the United category name.
+    var typeName: String { typeLabelRaw.isEmpty ? category.displayName : typeLabelRaw }
+
+    /// True when this skill uses a custom type / "Other" — so it has no
+    /// execution drivers (those live only on the 6 United categories).
+    var usesCustomType: Bool { !typeLabelRaw.isEmpty }
+
+    /// Apply a United category as the type: re-link to its preset outcomes and
+    /// clear any custom-type label (its execution drivers come back).
+    func applyCategory(_ c: SkillCategory) {
+        category = c
+        outcomeDefsRaw = ""
+        typeLabelRaw = ""
+    }
+
+    /// Apply a custom type (a template or the built-in "Other"): seed its
+    /// outcomes and remember the type name. No execution drivers.
+    func applyCustomType(name: String, defs: [OutcomeDef]) {
+        setOutcomeDefs(defs)
+        // setOutcomeDefs re-links to "" if defs happen to equal the category
+        // preset; a named custom type must persist its own list regardless.
+        if outcomeDefsRaw.isEmpty, let data = try? JSONEncoder().encode(defs),
+           let s = String(data: data, encoding: .utf8) {
+            outcomeDefsRaw = s
+        }
+        typeLabelRaw = name
     }
 
     // MARK: Flexible outcome list (label + color + credit)
@@ -565,25 +656,32 @@ final class Attempt {
     var outcomeRaw: Int
     var group: StuntGroup?
     var session: PracticeSession?
+    /// Who threw this rep — the recording ROW (athlete or group). Optional so
+    /// every pre-subject rep stays valid as an un-attributed skill-level tally;
+    /// nil means "logged against the skill, no subject picked". Nullify on the
+    /// subject's delete so history survives losing a roster member.
+    var subject: Subject?
     /// Reps committed together as one wave/routine share a `waveID`; reps logged
     /// one at a time (pad or immediate grid) leave it nil. Drives the grouped
     /// container in the practice log. Optional → additive lightweight migration.
     var waveID: UUID?
 
-    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
+    init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
         self.group = group
         self.session = session
+        self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
     }
 
     /// Log a rep by its outcome SLOT index into the skill's flexible list — the
     /// path used now that a skill can have any number of outcomes.
-    init(slot: Int, group: StuntGroup?, session: PracticeSession?, timestamp: Date = .now, waveID: UUID? = nil) {
+    init(slot: Int, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = slot
         self.group = group
         self.session = session
+        self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
     }
@@ -595,8 +693,11 @@ final class Attempt {
     var outcomeDef: OutcomeDef? { group?.outcomeDef(at: outcomeRaw) }
     /// Credit toward the weighted hit rate (0…100); a deleted outcome → 0.
     var creditValue: Int { outcomeDef?.credit ?? 0 }
-    /// A clean hit — drives streaks, the green accent, and hit milestones.
+    /// A clean hit — the green accent and clean-hit milestones (credit 100).
     var isHitRep: Bool { outcomeDef?.isHit ?? false }
+    /// A landing — stayed up (credit ≥ 50%). This is what streaks count, so a
+    /// landed-but-not-clean rep keeps a streak going; a fall/miss/balk breaks it.
+    var isLandingRep: Bool { creditValue >= OutcomeCredit.landingThreshold }
     /// The legacy severity `Outcome` this rep maps to by credit TIER (hit/decent/
     /// rough/miss → hit/bobble/buildingFall/majorFall). Used only by aggregate
     /// stats/visuals (tape color, tier histograms) so they stay 4-bucket and
@@ -651,6 +752,114 @@ final class CustomTally {
         self.group = group
         self.session = session
         self.timestamp = timestamp
+    }
+}
+
+/// A user-made SKILL TYPE — a named, reusable outcome set. The 6 United
+/// categories ship their own presets (`SkillCategory.defaultOutcomeDefs`);
+/// this is the "make your own pre-made outcomes" path (+ the built-in "Other").
+/// Custom types carry NO execution drivers — those stay on the United
+/// categories. Applying one just seeds a skill's `outcomeDefsRaw`; the template
+/// is the reusable source. Scoped to a folder (`Team`).
+@Model
+final class OutcomeTemplate {
+    var id: UUID = UUID()
+    var name: String
+    /// JSON-encoded `[OutcomeDef]` — same wire format as `StuntGroup.outcomeDefsRaw`.
+    var defsRaw: String = ""
+    var orderIndex: Int
+    var createdAt: Date
+    var team: Team?
+
+    init(name: String, defs: [OutcomeDef] = [], orderIndex: Int,
+         id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+        self.defs = defs
+    }
+
+    /// Decoded outcome list; empty falls back to a simple good/bad so a fresh
+    /// template is always usable.
+    var defs: [OutcomeDef] {
+        get {
+            if !defsRaw.isEmpty, let data = defsRaw.data(using: .utf8),
+               let decoded = try? JSONDecoder().decode([OutcomeDef].self, from: data),
+               !decoded.isEmpty {
+                return decoded
+            }
+            return OutcomeTemplate.otherDefs
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue),
+               let s = String(data: data, encoding: .utf8) {
+                defsRaw = s
+            }
+        }
+    }
+
+    /// The built-in "Other" set: plain good/bad for non-cheer use.
+    static var otherDefs: [OutcomeDef] {
+        [.init("Hit", .green, .hit), .init("Miss", .red, .miss)]
+    }
+}
+
+// MARK: - Subject (the recording ROW: athlete or stunt group)
+
+/// Who reps are attributed to inside a recording. An athlete ("Maya") or a stunt
+/// group ("Group 2"). Scoped to a `Team`/folder. Deliberately lightweight: a
+/// blank name is allowed (capture-first, name-later — "someone's doing
+/// something"), reconciled later from suggestion chips so the same person never
+/// double-creates. Soft-deletable like `StuntGroup`/`Team`.
+@Model
+final class Subject {
+    /// Stable id (cross-device / wire-format friendly, like StuntGroup.id).
+    var id: UUID = UUID()
+    /// Display name; "" = unnamed, shown as a placeholder until reconciled.
+    var name: String
+    var kindRaw: String = SubjectKind.person.rawValue
+    var orderIndex: Int
+    var createdAt: Date
+    /// Soft-delete tombstone — hidden from rosters/stats, reps kept & restorable.
+    var deletedAt: Date? = nil
+    var team: Team?
+    /// Deleting a subject nullifies its reps' attribution (keeps the reps) — see
+    /// `Attempt.subject`.
+    @Relationship(deleteRule: .nullify, inverse: \Attempt.subject)
+    var attempts: [Attempt] = []
+
+    init(name: String, kind: SubjectKind = .person, orderIndex: Int,
+         id: UUID = UUID(), createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.kindRaw = kind.rawValue
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+    }
+
+    var kind: SubjectKind {
+        get { SubjectKind(rawValue: kindRaw) ?? .person }
+        set { kindRaw = newValue.rawValue }
+    }
+
+    /// True when the name still needs reconciling (blank).
+    var isUnnamed: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Roster-facing display: the name, or a placeholder while unnamed.
+    var displayName: String { isUnnamed ? "Unnamed \(kind.label.lowercased())" : name }
+
+    /// Identity color — reuses the formation rainbow, cycled by order.
+    var color: Color { Theme.groupColor(orderIndex % Theme.groupRainbow.count) }
+}
+
+extension Array where Element == Subject {
+    /// Subjects not in the Trash, in display order.
+    var active: [Subject] { filter { $0.deletedAt == nil }.sorted { $0.orderIndex < $1.orderIndex } }
+    /// Subjects belonging to one team (non-trashed), in order. No team → all active.
+    func inTeam(_ team: Team?) -> [Subject] {
+        let live = active
+        return team.map { t in live.filter { $0.team?.id == t.id } } ?? live
     }
 }
 

@@ -17,7 +17,9 @@ public struct QuickClinicTests {
             Attempt.self,
             UnlockedMilestone.self,
             CustomOutcome.self,
-            CustomTally.self
+            CustomTally.self,
+            Subject.self,
+            OutcomeTemplate.self
         ])
         
         guard let ephemeralContainer = try? ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {

@@ -9,6 +9,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var context
     @Query private var sessions: [PracticeSession]
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
+    @Query(sort: \Subject.orderIndex) private var allSubjects: [Subject]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var unlockedMilestones: [UnlockedMilestone]
 
@@ -18,6 +19,9 @@ struct HomeView: View {
     @AppStorage("currentTeamID") private var currentTeamID = ""
 
     @State private var timeframe: Timeframe = .today
+    /// Cross-cutting review filters (Phase 4). nil = everyone / all skills.
+    @State private var personFilter: Subject?
+    @State private var skillFilter: StuntGroup?
     @State private var shareOpen = false
     @State private var trophyOpen = false
     @State private var editorOpen = false
@@ -38,6 +42,29 @@ struct HomeView: View {
     /// The active team and its roster — every stat below is scoped to it.
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
+    private var subjects: [Subject] { allSubjects.inTeam(currentTeam) }
+
+    /// Which axis the person filter runs on — a person (athlete) or a stunt
+    /// group (coach), mirroring the capture pivot.
+    private var subjectKind: SubjectKind { mode == .coach ? .group : .person }
+
+    /// Filters validated against the current roster (a deleted/other-team pick
+    /// falls back to "all"), so a stale @State selection can't dangle.
+    private var activePerson: Subject? {
+        personFilter.flatMap { sel in
+            subjects.contains { $0.persistentModelID == sel.persistentModelID } ? sel : nil
+        }
+    }
+    private var activeSkill: StuntGroup? {
+        skillFilter.flatMap { sel in
+            groups.contains { $0.persistentModelID == sel.persistentModelID } ? sel : nil
+        }
+    }
+    /// Skill (group) confinement after the skill filter — one skill, or all.
+    private var filteredGroups: [StuntGroup] {
+        activeSkill.map { [$0] } ?? groups
+    }
+    private var isFiltered: Bool { activePerson != nil || activeSkill != nil }
 
     /// The stunt/tumbling split only makes sense in athlete mode once BOTH
     /// kinds have logged reps (coach is all-stunt; a single-kind athlete has
@@ -45,16 +72,19 @@ struct HomeView: View {
     /// over a STUNT section over a TUMBLING section — not a one-at-a-time tab.
     private var showsKindSplit: Bool {
         guard mode == .athlete else { return false }
-        let kinds = Set(groups.filter { !$0.attempts.isEmpty }.map(\.kind))
+        // A single pinned skill is one kind — no split to show.
+        guard activeSkill == nil else { return false }
+        let kinds = Set(filteredGroups.filter { !$0.attempts.isEmpty }.map(\.kind))
         return kinds.contains(.stunt) && kinds.contains(.tumbling)
     }
 
     /// A dashboard scoped to one skill kind — same numbers, confined to the
-    /// stunt-only (or tumbling-only) groups.
+    /// stunt-only (or tumbling-only) groups, honoring the active person filter.
     private func kindStats(_ kind: SkillKind) -> FloorStats {
         StatsEngine.compute(sessions: sessions,
-                            groups: groups.filter { $0.kind == kind },
-                            timeframe: timeframe)
+                            groups: filteredGroups.filter { $0.kind == kind },
+                            timeframe: timeframe,
+                            subject: activePerson)
     }
 
     /// A live session survives the app being killed mid-practice — the pill
@@ -81,7 +111,14 @@ struct HomeView: View {
     private var shareTeamName: String { mode == .coach ? teamLabel : identityLabel }
 
     private var stats: FloorStats {
-        StatsEngine.compute(sessions: sessions, groups: groups, timeframe: timeframe)
+        StatsEngine.compute(sessions: sessions, groups: filteredGroups,
+                            timeframe: timeframe, subject: activePerson)
+    }
+
+    /// Show the review filter bar only when there's something worth slicing:
+    /// the team has logged, and there's more than one skill or any subject.
+    private var showsFilterBar: Bool {
+        lifetimeHasData && (groups.count > 1 || !subjects.isEmpty)
     }
 
     /// Whether the active team has any buckets to log into yet.
@@ -101,6 +138,10 @@ struct HomeView: View {
 
             // Timeframe — the global filter; every number below scales to it.
             timeframeTabs
+
+            // Cross-cutting review filters (person / skill), scaling every number
+            // below just like the timeframe does.
+            if showsFilterBar { reviewFilterBar }
 
             ScrollView {
                 VStack(spacing: 9) {
@@ -170,7 +211,7 @@ struct HomeView: View {
                            orgName: identityLabel)
         }
         .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
-            LogView(session: s)
+            CaptureView(session: s)
         }
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
@@ -477,6 +518,77 @@ struct HomeView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: Review filters (person / skill)
+
+    private var everyoneLabel: String { subjectKind == .person ? "Everyone" : "All groups" }
+
+    private var reviewFilterBar: some View {
+        HStack(spacing: 6) {
+            if !subjects.isEmpty {
+                filterChip(title: activePerson?.displayName ?? everyoneLabel,
+                           active: activePerson != nil) {
+                    Button(everyoneLabel) { personFilter = nil }
+                    Divider()
+                    ForEach(subjects) { s in
+                        Button(s.displayName) { personFilter = s }
+                    }
+                }
+            }
+            filterChip(title: activeSkill?.displayName ?? "All skills",
+                       active: activeSkill != nil) {
+                Button("All skills") { skillFilter = nil }
+                Divider()
+                ForEach(groups) { g in
+                    Button(g.displayName) { skillFilter = g }
+                }
+            }
+            Spacer(minLength: 0)
+            if isFiltered {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        personFilter = nil; skillFilter = nil
+                    }
+                    hapticTrigger += 1
+                } label: {
+                    Text("CLEAR")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.label3)
+                        .padding(.horizontal, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(5)
+        .wellBackground()
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private func filterChip<Content: View>(title: String, active: Bool,
+                                           @ViewBuilder menu: () -> Content) -> some View {
+        Menu {
+            menu()
+        } label: {
+            HStack(spacing: 5) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(active ? Theme.well : Theme.label2)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(active ? Theme.label : Theme.iconTile)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(active ? .clear : Theme.iconTileEdge.opacity(0.7), lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+    }
+
     // MARK: Stacked sections (overall / stunt / tumbling)
 
     /// One dashboard's worth of cards for a given kind scope. Sits empty-aware:
@@ -652,7 +764,7 @@ struct HomeView: View {
     }
     
     private func startClinic(matCount: Int, goalRate: Int) {
-        let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self])
+        let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, OutcomeTemplate.self])
         guard let container = try? ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
             print("❌ Failed to create in-memory container for Quick Clinic")
             return

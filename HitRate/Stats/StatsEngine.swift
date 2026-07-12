@@ -113,8 +113,12 @@ struct FloorStats {
 
 enum StatsEngine {
 
+    /// `subject` is the cross-cutting PERSON filter (Phase 4 review): non-nil
+    /// confines every number to that athlete/group's reps, on top of the group
+    /// (skill) confinement the caller already applies via `groups`. nil = everyone.
     static func compute(sessions: [PracticeSession], groups: [StuntGroup],
-                        timeframe: Timeframe, now: Date = .now) -> FloorStats {
+                        timeframe: Timeframe, now: Date = .now,
+                        subject: Subject? = nil) -> FloorStats {
         let cal = Calendar.current
         let sorted = sessions.sorted { $0.startedAt < $1.startedAt }
         // Every derived number is confined to the passed groups — so a
@@ -171,18 +175,18 @@ enum StatsEngine {
         var groupStats: [GroupStat] = []
         var prevOverall = [0, 0, 0, 0]
         for g in ordered {
-            let counts = outcomeCounts(in: current, group: g, within: currentInterval)
+            let counts = outcomeCounts(in: current, group: g, within: currentInterval, subject: subject)
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
-            let rate = weightedRate(counts)
+            let rate = cleanRate(counts)
 
-            let prevCounts = outcomeCounts(in: previous, group: g, within: previousInterval)
+            let prevCounts = outcomeCounts(in: previous, group: g, within: previousInterval, subject: subject)
             let prevTotal = prevCounts.reduce(0, +)
             for i in 0..<4 { prevOverall[i] += prevCounts[i] }
             var delta: Int?
             if total > 0, prevTotal > 0 {
                 // For .all, compare against the first session (season start) — "growth since Sept".
-                delta = rate - weightedRate(prevCounts)
+                delta = rate - cleanRate(prevCounts)
             }
 
             groupStats.append(GroupStat(
@@ -198,7 +202,7 @@ enum StatsEngine {
         for s in groupStats { for i in 0..<4 { overall[i] += s.counts[i] } }
         let total = overall.reduce(0, +)
         let hits = overall[Outcome.hit.rawValue]
-        let rate = weightedRate(overall)
+        let rate = cleanRate(overall)
 
         // prevOverall is rolled up from per-group counts (not raw session
         // attempts) so the floor delta and the per-group deltas agree — raw
@@ -207,7 +211,7 @@ enum StatsEngine {
         let prevTotal = prevOverall.reduce(0, +)
         var delta: Int?
         if total > 0, prevTotal > 0 {
-            delta = rate - weightedRate(prevOverall)
+            delta = rate - cleanRate(prevOverall)
         }
 
         return FloorStats(
@@ -217,26 +221,27 @@ enum StatsEngine {
                 + groupStats.filter { $0.total == 0 },
             overall: overall, total: total, hits: hits, rate: rate,
             delta: delta, deltaNote: deltaNote, rangeNote: rangeNote,
-            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe, now: now),
-            latest: latestSnapshot(sorted: sorted, allowed: allowed))
+            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe, now: now, subject: subject),
+            latest: latestSnapshot(sorted: sorted, allowed: allowed, subject: subject))
     }
 
     // MARK: Trend series
 
     private static func trendSeries(sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
-                                    timeframe: Timeframe, now: Date) -> [Int] {
+                                    timeframe: Timeframe, now: Date, subject: Subject? = nil) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
-            var creditSum = 0, total = 0
+            var hits = 0, total = 0
             for s in sessions {
                 for a in s.attempts
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     if let interval, !interval.contains(a.timestamp) { continue }
+                    guard subjectMatch(a, subject) else { continue }
                     total += 1
-                    creditSum += a.creditValue   // weighted: partial credit for decent/rough
+                    if a.isHitRep { hits += 1 }   // clean-hit rate: a bobble is NOT a hit
                 }
             }
-            return total > 0 ? Int((Double(creditSum) / Double(total)).rounded()) : nil
+            return total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : nil
         }
 
         switch timeframe {
@@ -271,11 +276,15 @@ enum StatsEngine {
     // MARK: Latest session tape
 
     private static func latestSnapshot(sorted: [PracticeSession],
-                                       allowed: Set<PersistentIdentifier>) -> SessionSnapshot? {
+                                       allowed: Set<PersistentIdentifier>,
+                                       subject: Subject? = nil) -> SessionSnapshot? {
         // Latest session that has reps of an allowed kind — and only those reps
         // (a mixed session viewed under a kind filter shows just that kind's tape).
         func inKind(_ s: PracticeSession) -> [Attempt] {
-            s.sortedAttempts.filter { $0.group.map { allowed.contains($0.persistentModelID) } ?? false }
+            s.sortedAttempts.filter {
+                ($0.group.map { allowed.contains($0.persistentModelID) } ?? false)
+                    && subjectMatch($0, subject)
+            }
         }
         guard let last = sorted.last(where: { !inKind($0).isEmpty }) else { return nil }
         let attempts = inKind(last)
@@ -307,24 +316,35 @@ enum StatsEngine {
     /// regardless of how many distinct outcomes it has — so aggregates stay
     /// 4-wide and crash-safe while logging carries any number of outcomes.
     private static func outcomeCounts(in sessions: [PracticeSession], group: StuntGroup,
-                                      within interval: DateInterval? = nil) -> [Int] {
+                                      within interval: DateInterval? = nil,
+                                      subject: Subject? = nil) -> [Int] {
         var counts = [0, 0, 0, 0]
         for s in sessions {
             for a in s.attempts where a.group === group {
                 if let interval, !interval.contains(a.timestamp) { continue }
+                guard subjectMatch(a, subject) else { continue }
                 counts[a.tierOutcome.rawValue] += 1
             }
         }
         return counts
     }
 
-    /// Weighted hit rate (0–100) from a 4-tier count array: credit ladder is
-    /// hit 100 · decent 67 · rough 33 · miss 0, so a "decent" rep earns partial.
-    static func weightedRate(_ tierCounts: [Int]) -> Int {
+    /// Cross-cutting person filter: nil subject = everyone; otherwise the rep
+    /// must be attributed to that subject. Compares by persistent id so it holds
+    /// across model contexts.
+    private static func subjectMatch(_ a: Attempt, _ subject: Subject?) -> Bool {
+        guard let subject else { return true }
+        return a.subject?.persistentModelID == subject.persistentModelID
+    }
+
+    /// Clean-hit rate (0–100): hits (tier 0) ÷ total. A bobble/fall is NOT a hit,
+    /// so this is the plain "did you stick it" number — it matches the per-skill %
+    /// and the weekly RATE CUP, and agrees with the "Hit N · X%" breakdown.
+    /// (Partial credit 67/33 still exists, but only to drive streaks via
+    /// `isLandingRep` — it no longer weights this headline.)
+    static func cleanRate(_ tierCounts: [Int]) -> Int {
         let total = tierCounts.reduce(0, +)
         guard total > 0 else { return 0 }
-        let credits = [100, 67, 33, 0]
-        let sum = zip(tierCounts, credits).reduce(0) { $0 + $1.0 * $1.1 }
-        return Int((Double(sum) / Double(total)).rounded())
+        return Int((Double(tierCounts[Outcome.hit.rawValue]) / Double(total) * 100).rounded())
     }
 }

@@ -266,3 +266,22 @@
 - **Category:** correction
 - **What happened:** Tapping the editor's Edit button "spazzed out hardcore" — an animation loop. Cause: the custom `RenameField` committed its draft on `.onChange(of: focused)`, `.onSubmit`, AND `.onDisappear` *unconditionally*. Committing an unchanged value still does `model.x = same; try? context.save()`, which publishes a @Query change → row re-render → `onDisappear` fires again → save → loop. EditButton toggling row layout triggered the first disappear.
 - **Rule:** A commit-on-blur/disappear field MUST guard `draft != value` before committing. Never write to a @Model (even the same value) from a lifecycle callback that re-fires on re-render. Same class of bug as binding a TextField directly through @Observable/@Model.
+
+## 2026-07-11 — Capture + button must add the PINNED axis, not always subjects
+
+- **Category:** correction
+- **What happened:** In CaptureView the pivot toggle pins Skill or Subject and the pin picker lists that axis, but the + button hardcoded addSubject(). Ian expected: pinned on Skill -> + makes a skill; pinned on Group -> + makes a group. Mental model = '+ adds more of what the picker above lists / what's pinned'; flip the pin to add the other kind.
+- **Rule:** Any 'add' affordance next to a pivot/segment picker adds an item of the CURRENTLY PINNED axis. New skills are deferred-name (blank, named later) like subjects and should inherit the pinned skill's category so context (e.g. tumbling → Balk) carries over.
+
+## 2026-07-11 — RenameField draws its own pencil; capture rows use it for inline naming
+
+- **Category:** knowledge_gap
+- **What happened:** Added an extra pencil Image next to RenameField in the capture headers → two pencils. RenameField (Components.swift) already renders a pencil when unfocused and makes the whole field tap-to-edit.
+- **Rule:** Never add a pencil next to RenameField. To make any label inline-editable in CaptureView, swap the static Text for RenameField (value: model.name, commit → save). Skill rows, subject rows, and both pivot headers all use it.
+
+## 2026-07-11 — /qa on HitRate: harness gotchas + first-scheme trap
+
+- **Category:** best_practice
+- **Build:** `xcodebuild -list` sorts CheerRulesKit (SPM dep) FIRST, so the qa skill's auto-scheme picks the kit and produces no .app. Always build scheme `HitRate` explicitly.
+- **mobile MCP limits (not app bugs):** (1) can't select from SwiftUI `Menu`s via quick-tap; (2) can't reliably focus EXISTING `TextField`/`RenameField`s by tap — only auto-focused new fields accept typed text; (3) app occasionally launches to springboard — relaunch once. Explorers must be told these, or they log false 'text didn't land' / 'menu dead' findings.
+- **Rate semantics:** the dashboard headline is the WEIGHTED score (weightedRate), so it legitimately exceeds the clean-hit% breakdown — not a bug (IAN-514 is the label wart).
