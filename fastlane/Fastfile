@@ -99,6 +99,13 @@ platform :ios do
       sh("codesign --verify --strict --verbose=2 #{watch_app.shellescape}")
     end
 
+    # Re-sign embedded frameworks (Firebase/GoogleSignIn ship dynamic frameworks)
+    # BEFORE sealing the app bundle, or --verify --strict rejects the outer sign.
+    sh("if [ -d #{app.shellescape}/Frameworks ]; then " \
+       "for fw in #{app.shellescape}/Frameworks/*.framework; do " \
+       "codesign --force --sign #{cert_sha1.shellescape} \"$fw\"; " \
+       "done; fi")
+
     sh("cp #{profile.shellescape} #{"#{app}/embedded.mobileprovision".shellescape}")
     sh("codesign -d --entitlements - --xml #{app.shellescape} > #{ent.shellescape}")
     sh("plutil -remove get-task-allow #{ent.shellescape} || true")

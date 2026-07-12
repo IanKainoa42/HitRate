@@ -16,6 +16,12 @@ packages:
     # Local path — single source of truth shared with CheerCenter. No GitHub
     # round-trip during dev; the kit lives beside this repo.
     path: ../CheerRulesKit
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    exactVersion: 10.28.0
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 7.0.0
 targets:
   HitRate:
     type: application
@@ -27,11 +33,19 @@ targets:
         embed: true
         platformFilters: [ios]
       - package: CheerRulesKit
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 14
+        CURRENT_PROJECT_VERSION: 18
         MARKETING_VERSION: "1.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
@@ -43,6 +57,7 @@ targets:
       path: HitRate/HitRate.entitlements
       properties:
         com.apple.developer.healthkit: true
+        com.apple.developer.applesignin: ["Default"]
     info:
       path: HitRate/Info.plist
       properties:
@@ -67,6 +82,10 @@ targets:
         NSPhotoLibraryAddUsageDescription: HitRate saves your stunt cards to Photos so you can post them.
         LSApplicationQueriesSchemes:
           - instagram
+        # Google Sign-In callback (REVERSED_CLIENT_ID from GoogleService-Info.plist).
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+            - com.googleusercontent.apps.602780812787-1s7rtbkvf29sqgrbm9jv3ajrm5sai36s
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -81,7 +100,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate.watchkitapp
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 14
+        CURRENT_PROJECT_VERSION: 18
         MARKETING_VERSION: "1.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA

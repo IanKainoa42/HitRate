@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
+import FirebaseCore
+import GoogleSignIn
 
 @main
 struct HitRateApp: App {
     let container: ModelContainer
 
     init() {
+        FirebaseApp.configure()
         if CommandLine.arguments.contains("--run-e2e-tests") {
             QuickClinicTests.runAndExit()
         }
@@ -34,6 +37,8 @@ struct HitRateApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark) // whole app lives in the brand register now
+                // Google Sign-In hands control back through a custom URL scheme.
+                .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
         }
         .modelContainer(container)
     }
@@ -66,6 +71,13 @@ struct RootView: View {
     /// folder list, per the "open straight to folders" design.
     @State private var openFolderID: String?
 
+    // Cloud sync (Firebase). Anonymous-FIRST: the app never blocks on a login —
+    // a wrist-free anonymous session is created on launch so everything works
+    // offline, and the user can later UPGRADE to Apple/Google (claiming the same
+    // account) from settings. Sync runs whenever there's any signed-in user.
+    @StateObject private var auth = AuthViewModel()
+    @StateObject private var sync = SyncEngine.shared
+
     var body: some View {
         Group {
             // No tab bar — the folder list is home, a folder's dashboard is one
@@ -97,6 +109,14 @@ struct RootView: View {
             sweepOrphanedAttempts()
             endStaleSessions()
             configureWatchLogging()
+            // Anonymous-first: guarantee a signed-in session so cloud sync has a
+            // uid to own/join teams, without ever blocking the UI on a login.
+            auth.signInAnonymouslyIfNeeded()
+            if auth.uid != nil { sync.startSyncing(context: context) }
+        }
+        .onChange(of: auth.uid) { _, uid in
+            if uid != nil { sync.startSyncing(context: context) }
+            else { sync.stopSyncing() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -104,6 +124,7 @@ struct RootView: View {
                 syncWatchLogging()
             }
         }
+        .environmentObject(auth)
         .onChange(of: watchSnapshot) { _, snapshot in
             WatchSessionBridge.shared.publishSnapshot(snapshot)
         }

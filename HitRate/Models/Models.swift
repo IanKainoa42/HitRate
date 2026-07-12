@@ -393,6 +393,12 @@ final class Team {
     /// stat but its skills and reps are KEPT and restorable. Nothing is hard-
     /// deleted without an explicit "Delete permanently" from the Trash.
     var deletedAt: Date? = nil
+    /// Cloud sync / team sharing (Firebase). `ownerUID` = the Firebase uid that
+    /// owns this folder in the cloud (nil = local-only, never pushed). `joinCode`
+    /// = the 6-digit code others enter to join this folder's shared roster (nil
+    /// until first pushed). Both additive with defaults → lightweight migration.
+    var ownerUID: String? = nil
+    var joinCode: String? = nil
     /// Deleting a team takes its roster with it (and each group cascades its
     /// own logged reps) — the team's whole history goes.
     @Relationship(deleteRule: .cascade, inverse: \StuntGroup.team)
