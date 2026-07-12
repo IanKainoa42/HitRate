@@ -91,8 +91,22 @@ struct CaptureView: View {
                     }
                 }
                 .sheet(isPresented: $showGroupsEditor) { GroupsEditorView() }
+                .onAppear { seedFirstSubjectIfNeeded() }
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
+    }
+
+    /// A roster of skills with ZERO subjects dead-ends the pad ("Add a group to
+    /// start logging" — QA IAN-515): onboarding creates skills but no subject
+    /// rows. Seed one unnamed subject so practice is immediately loggable; the
+    /// user renames it inline (or it's just "you" in athlete mode).
+    private func seedFirstSubjectIfNeeded() {
+        guard let team = currentTeam, !groups.isEmpty, subjects.isEmpty else { return }
+        let s = Subject(name: "", kind: subjectKind, orderIndex: 0)
+        s.team = team
+        context.insert(s)
+        try? context.save()
+        selectedSubjectIDRaw = s.id.uuidString
     }
 
     // MARK: Screen
@@ -565,9 +579,16 @@ struct CaptureView: View {
         let visual = cellVisual(v: v, def: def, stagedN: stagedN)
         Group {
             if waveActive {
+                // Long-press decrements, tap stages. highPriorityGesture lets a
+                // genuine hold win over the tap so it reliably removes one (a plain
+                // onLongPressGesture alongside onTapGesture let the tap steal ~0.5s
+                // holds and re-increment — QA IAN-516).
                 visual
+                    .highPriorityGesture(
+                        LongPressGesture(minimumDuration: 0.3)
+                            .onEnded { _ in unstage(group, subject, slot) }
+                    )
                     .onTapGesture { stage(group, subject, slot) }
-                    .onLongPressGesture(minimumDuration: 0.4) { unstage(group, subject, slot) }
             } else {
                 Button { log(slot: slot, group: group, subject: subject, def: def) } label: { visual }
                     .buttonStyle(.plain)
