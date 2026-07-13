@@ -11,6 +11,7 @@
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0545801EE9DA971ED89EDBCD /* ExecutionSheet.swift */; };
 		17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */; };
+		226DD6B7AC3D3E7DCA340B3F /* RosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D5351887DF8EBB491B3E2F /* RosterView.swift */; };
 		273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05982546BF2BB526C6B9356D /* LogView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
 		2CACF8CAEAF3750A28C25CC1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 370E93B7A33E3347D40365F5 /* GoogleService-Info.plist */; };
@@ -153,6 +154,7 @@
 		B8E106687D6F5AA09DD3A66E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BC4A053415866660A35A4745 /* SummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryCard.swift; sourceTree = "<group>"; };
 		BCD1AA942B68F4E661CF6471 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		C1D5351887DF8EBB491B3E2F /* RosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterView.swift; sourceTree = "<group>"; };
 		CA8E6F0EF3500932ED680415 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
@@ -225,6 +227,7 @@
 				404429588572142C218018D5 /* FolderListView.swift */,
 				FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */,
 				BCD1AA942B68F4E661CF6471 /* HomeView.swift */,
+				C1D5351887DF8EBB491B3E2F /* RosterView.swift */,
 				3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */,
 				245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */,
 				BC4A053415866660A35A4745 /* SummaryCard.swift */,
@@ -556,6 +559,7 @@
 				2D6D391FD8A6ACCE8E245799 /* QuickClinicSetupSheet.swift in Sources */,
 				5CD6AE7AA709FEFA6BF343B0 /* QuickClinicSummaryView.swift in Sources */,
 				ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */,
+				226DD6B7AC3D3E7DCA340B3F /* RosterView.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,
 				380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */,
