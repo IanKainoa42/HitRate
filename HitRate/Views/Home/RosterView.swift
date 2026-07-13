@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 /// The roster — every athlete (coach mode: every group) ranked by clean-hit
 /// rate so a coach can triage who's hitting and who needs reps at a glance.
@@ -117,7 +116,7 @@ struct RosterView: View {
                                     Text("\(abs(d))")
                                         .font(.system(size: 11, weight: .semibold))
                                 }
-                                .foregroundStyle(d > 0 ? Theme.accent : Theme.label2)
+                                .foregroundStyle(d > 0 ? Theme.accent : Theme.majorFall)
                             }
                         }
                     } else {
