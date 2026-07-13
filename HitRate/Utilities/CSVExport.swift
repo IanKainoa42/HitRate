@@ -11,19 +11,23 @@ struct CSVExportItem: Transferable {
         let timestamp: Date
         let sessionStart: Date
         let group: String
+        let subject: String
         let outcome: String
     }
 
     let rows: [Row]
-    let noun: String   // CSV header column for the bucket ("skill"/"group")
+    let noun: String          // CSV header column for the bucket ("skill"/"group")
+    let subjectNoun: String   // CSV header column for the row ("athlete"/"group")
 
     init(sessions: [PracticeSession]) {
         noun = AppMode.current.noun
+        subjectNoun = AppMode.current == .coach ? "group" : "athlete"
         rows = sessions
             .flatMap { s in
                 s.sortedAttempts.map {
                     Row(timestamp: $0.timestamp, sessionStart: s.startedAt,
                         group: $0.group?.name ?? "",
+                        subject: $0.subject?.name ?? "",
                         outcome: $0.outcome.label($0.group?.kind ?? .stunt))
                 }
             }
@@ -34,12 +38,13 @@ struct CSVExportItem: Transferable {
 
     private func write() throws -> URL {
         let iso = ISO8601DateFormatter()
-        var csv = ["timestamp", "session_start", noun, "outcome"].map(Self.csvField).joined(separator: ",") + "\n"
+        var csv = ["timestamp", "session_start", noun, subjectNoun, "outcome"].map(Self.csvField).joined(separator: ",") + "\n"
         for r in rows {
             csv += [
                 iso.string(from: r.timestamp),
                 iso.string(from: r.sessionStart),
                 r.group,
+                r.subject,
                 r.outcome
             ].map(Self.csvField).joined(separator: ",") + "\n"
         }

@@ -26,6 +26,7 @@ struct HomeView: View {
     @State private var trophyOpen = false
     @State private var editorOpen = false
     @State private var watchOpen = false
+    @State private var rosterOpen = false
     @State private var addTeamOpen = false
     @State private var newTeamName = ""
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
@@ -209,6 +210,13 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $trophyOpen) {
             TrophyRoomView(sessions: sessions, groups: groups, mode: mode,
                            orgName: identityLabel)
+        }
+        .fullScreenCover(isPresented: $rosterOpen) {
+            RosterView(sessions: sessions, groups: groups, subjects: subjects,
+                       timeframe: timeframe, subjectKind: subjectKind) { subject in
+                personFilter = subject
+                rosterOpen = false
+            }
         }
         .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
             CaptureView(session: s)
@@ -452,6 +460,21 @@ struct HomeView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            // Roster — every athlete/group ranked by clean-hit rate.
+            if !subjects.isEmpty {
+                Button {
+                    rosterOpen = true
+                } label: {
+                    Image(systemName: "person.2")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.label2)
+                        .frame(width: 34, height: 34)
+                        .background(iconButtonBackground)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
 
             Button {
                 shareOpen = true
