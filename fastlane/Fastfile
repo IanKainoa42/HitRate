@@ -185,7 +185,7 @@ platform :ios do
     )
   end
 
-  desc "Set App Privacy to 'Data Not Collected' (HitRate is fully on-device)."
+  desc "Push App Privacy declaration from app_privacy_details.json (User ID + User Content, linked, App Functionality — Firebase sync; no tracking/analytics)."
   lane :ship_privacy do
     require "spaceship"
     p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
