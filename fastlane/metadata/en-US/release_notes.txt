@@ -1,7 +1,5 @@
-A big 1.1 redesign, built from real practice-floor feedback:
+Share a folder with your whole staff — everyone logs into the same numbers.
 
-• New folder home — open the app to your folders, tap one to dive into its dashboard.
-• Flexible outcomes — define 2–6 custom outcomes per skill with your own labels, colors, and credit weights. Hit rate is now a weighted average, so partial reps count for what they're worth.
-• Skills button — jump between skills right from the dashboard.
-• Redesigned onboarding — pick your focus areas and get suggested skills to track from the first launch.
-• Trash with restore — deleted folders and skills go to Trash instead of vanishing, and your rep history stays safe.
+• Team sync — tap the share icon on any folder to get a join code. Coaches and athletes who join see the same roster and log reps together.
+• Join with a code — got a code from your coach? Tap "Join a folder with a code" on the folder home to hop in.
+• Reliability and polish fixes throughout.
