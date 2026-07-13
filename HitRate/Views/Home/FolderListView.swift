@@ -138,42 +138,69 @@ struct FolderListView: View {
     private func folderRow(_ t: Team) -> some View {
         let count = skills(in: t).count
         let active = t.id.uuidString == currentTeamID
-        return Button {
-            onOpen(t)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(active ? Theme.accent : Theme.label2)
-                    .frame(width: 38, height: 38)
-                    .background(Theme.iconTile)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .strokeBorder(Theme.iconTileEdge.opacity(0.85), lineWidth: 1))
+        // Row = a big "open" button + separate trailing controls (a share icon
+        // for folders you own, a JOINED chip for ones you joined). Kept as
+        // sibling buttons, NOT nested — a Button inside a Button's label doesn't
+        // route taps. The open button still fills the row for a fat tap target.
+        return HStack(spacing: 8) {
+            Button {
+                onOpen(t)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(active ? Theme.accent : Theme.label2)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.iconTile)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Theme.iconTileEdge.opacity(0.85), lineWidth: 1))
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(t.name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.label)
-                        .lineLimit(1)
-                    Text("\(count) skill\(count == 1 ? "" : "s") · \(reps(in: t)) rep\(reps(in: t) == 1 ? "" : "s")")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.label2)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(t.name)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .lineLimit(1)
+                        Text("\(count) skill\(count == 1 ? "" : "s") · \(reps(in: t)) rep\(reps(in: t) == 1 ? "" : "s")")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.label2)
+                    }
+                    Spacer(minLength: 6)
                 }
-                Spacer(minLength: 6)
-                if isShared(t) {
-                    sharedBadge(owner: isOwner(t))
-                }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.label3)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 11)
-            .wellBackground()
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if isOwner(t) {
+                // Visible Share affordance. Green once a code exists (= shared),
+                // muted before. Tapping opens the code sheet directly.
+                Button {
+                    sharing = t
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isShared(t) ? Theme.accent : Theme.label2)
+                        .frame(width: 34, height: 34)
+                        .background(Theme.iconTile)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder((isShared(t) ? Theme.accent : Theme.iconTileEdge)
+                                .opacity(isShared(t) ? 0.55 : 0.85), lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isShared(t) ? "Sharing code for \(t.name)" : "Share \(t.name)")
+            } else if isShared(t) {
+                sharedBadge(owner: false)   // a folder you joined — not yours to share
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.label3)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .wellBackground()
         .contextMenu {
             Button {
                 renameText = t.name
@@ -215,11 +242,21 @@ struct FolderListView: View {
             Button {
                 joinOpen = true
             } label: {
-                Text("Join a folder with a code")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.label2)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
+                HStack(spacing: 7) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Join a folder with a code")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(Theme.label)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.well)
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.iconTileEdge.opacity(0.9), lineWidth: 1)))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
