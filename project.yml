@@ -45,7 +45,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 18
+        CURRENT_PROJECT_VERSION: 19
         MARKETING_VERSION: "1.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
@@ -100,7 +100,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRate.watchkitapp
         PRODUCT_NAME: HitRate
-        CURRENT_PROJECT_VERSION: 18
+        CURRENT_PROJECT_VERSION: 19
         MARKETING_VERSION: "1.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: WC46K49VFA
