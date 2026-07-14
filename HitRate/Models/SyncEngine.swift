@@ -42,14 +42,16 @@ final class SyncEngine: ObservableObject {
 
     private let db = Firestore.firestore()
     private var listeners: [ListenerRegistration] = []
+    private var teamListeners: [String: [ListenerRegistration]] = [:]
     private var modelContext: ModelContext?
     private var isRunning = false
 
-    /// Ids we've already mirrored to Firestore this session, so a full re-push on
-    /// every `didSave` skips unchanged docs (cheap idempotence, not correctness).
-    private var pushedTeamIDs: Set<String> = []
-    private var pushedRosterIDs: Set<String> = []
-    private var pushedAttemptIDs: Set<String> = []
+    /// Last payload sent/received for each document this session. A plain id set
+    /// cannot distinguish "already uploaded" from "edited since upload"; it also
+    /// caused 1.2 to rewrite every document after every SwiftData save because the
+    /// old set was populated but never consulted. Fingerprints make the debounce
+    /// genuinely incremental while still allowing later edits to sync.
+    private var syncedFingerprints: [String: String] = [:]
 
     /// Debounce token for save-triggered pushes.
     private var pushWorkItem: DispatchWorkItem?
@@ -78,14 +80,14 @@ final class SyncEngine: ObservableObject {
     func stopSyncing() {
         listeners.forEach { $0.remove() }
         listeners.removeAll()
+        teamListeners.values.flatMap { $0 }.forEach { $0.remove() }
+        teamListeners.removeAll()
         if let saveObserver {
             NotificationCenter.default.removeObserver(saveObserver)
             self.saveObserver = nil
         }
         pushWorkItem?.cancel()
-        pushedTeamIDs.removeAll()
-        pushedRosterIDs.removeAll()
-        pushedAttemptIDs.removeAll()
+        syncedFingerprints.removeAll()
         isRunning = false
     }
 
@@ -117,6 +119,7 @@ final class SyncEngine: ObservableObject {
         guard let context = modelContext, let uid else { return }
         do {
             let teams = try context.fetch(FetchDescriptor<Team>())
+            var wroteDocument = false
             for team in teams {
                 let teamID = team.id.uuidString
                 let isOwner = (team.ownerUID == nil) || (team.ownerUID == uid)
@@ -124,17 +127,25 @@ final class SyncEngine: ObservableObject {
                 if team.ownerUID == nil { team.ownerUID = uid }
 
                 if isOwner {
-                    pushTeamMeta(team)
-                    for subject in team.subjects { pushSubject(subject, teamID: teamID) }
-                    for group in team.groups { pushGroup(group, teamID: teamID) }
-                    for template in team.outcomeTemplates { pushTemplate(template, teamID: teamID) }
+                    wroteDocument = pushTeamMeta(team) || wroteDocument
+                    for subject in team.subjects {
+                        wroteDocument = pushSubject(subject, teamID: teamID) || wroteDocument
+                    }
+                    for group in team.groups {
+                        wroteDocument = pushGroup(group, teamID: teamID) || wroteDocument
+                    }
+                    for template in team.outcomeTemplates {
+                        wroteDocument = pushTemplate(template, teamID: teamID) || wroteDocument
+                    }
                 }
                 // Attempts: everyone pushes their own new reps (append-only).
                 for group in team.groups {
-                    for attempt in group.attempts { pushAttempt(attempt, teamID: teamID, uid: uid) }
+                    for attempt in group.attempts {
+                        wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
+                    }
                 }
             }
-            lastPushedAt = .now
+            if wroteDocument { lastPushedAt = .now }
             lastError = nil
         } catch {
             lastError = "Sync push failed: \(error.localizedDescription)"
@@ -145,7 +156,8 @@ final class SyncEngine: ObservableObject {
         db.collection("teams").document(teamID)
     }
 
-    private func pushTeamMeta(_ team: Team) {
+    @discardableResult
+    private func pushTeamMeta(_ team: Team) -> Bool {
         let id = team.id.uuidString
         let doc = FTeam(
             id: id,
@@ -158,21 +170,23 @@ final class SyncEngine: ObservableObject {
             deletedAt: team.deletedAt,
             updatedAt: .now
         )
-        setDoc(teamDoc(id), doc, cache: &pushedTeamIDs, key: id)
+        return setDoc(teamDoc(id), doc, key: teamKey(id), fingerprint: teamFingerprint(team))
     }
 
-    private func pushSubject(_ subject: Subject, teamID: String) {
+    @discardableResult
+    private func pushSubject(_ subject: Subject, teamID: String) -> Bool {
         let id = subject.id.uuidString
         let doc = FSubject(
             id: id, teamId: teamID, name: subject.name,
             kindRaw: subject.kindRaw, orderIndex: subject.orderIndex,
             deletedAt: subject.deletedAt, updatedAt: .now
         )
-        setDoc(teamDoc(teamID).collection("subjects").document(id), doc,
-               cache: &pushedRosterIDs, key: "s-\(id)")
+        return setDoc(teamDoc(teamID).collection("subjects").document(id), doc,
+                      key: subjectKey(teamID, id), fingerprint: subjectFingerprint(subject, teamID: teamID))
     }
 
-    private func pushGroup(_ group: StuntGroup, teamID: String) {
+    @discardableResult
+    private func pushGroup(_ group: StuntGroup, teamID: String) -> Bool {
         let id = group.id.uuidString
         let doc = FGroup(
             id: id, teamId: teamID, name: group.name, number: group.number,
@@ -182,23 +196,25 @@ final class SyncEngine: ObservableObject {
             outcomeOverridesRaw: group.outcomeOverridesRaw,
             deletedAt: group.deletedAt, updatedAt: .now
         )
-        setDoc(teamDoc(teamID).collection("groups").document(id), doc,
-               cache: &pushedRosterIDs, key: "g-\(id)")
+        return setDoc(teamDoc(teamID).collection("groups").document(id), doc,
+                      key: groupKey(teamID, id), fingerprint: groupFingerprint(group, teamID: teamID))
     }
 
-    private func pushTemplate(_ template: OutcomeTemplate, teamID: String) {
+    @discardableResult
+    private func pushTemplate(_ template: OutcomeTemplate, teamID: String) -> Bool {
         let id = template.id.uuidString
         let doc = FTemplate(
             id: id, teamId: teamID, name: template.name,
             defsRaw: template.defsRaw, orderIndex: template.orderIndex,
             updatedAt: .now
         )
-        setDoc(teamDoc(teamID).collection("templates").document(id), doc,
-               cache: &pushedRosterIDs, key: "t-\(id)")
+        return setDoc(teamDoc(teamID).collection("templates").document(id), doc,
+                      key: templateKey(teamID, id), fingerprint: templateFingerprint(template, teamID: teamID))
     }
 
-    private func pushAttempt(_ attempt: Attempt, teamID: String, uid: String) {
-        guard let groupID = attempt.group?.id.uuidString else { return }
+    @discardableResult
+    private func pushAttempt(_ attempt: Attempt, teamID: String, uid: String) -> Bool {
+        guard let groupID = attempt.group?.id.uuidString else { return false }
         let docID = attemptDocID(attempt)
         let doc = FAttempt(
             id: docID, teamId: teamID, groupId: groupID,
@@ -209,8 +225,9 @@ final class SyncEngine: ObservableObject {
             lostDriversRaw: attempt.lostDriversRaw,
             loggerId: uid, updatedAt: .now
         )
-        setDoc(teamDoc(teamID).collection("attempts").document(docID), doc,
-               cache: &pushedAttemptIDs, key: docID)
+        return setDoc(teamDoc(teamID).collection("attempts").document(docID), doc,
+                      key: attemptKey(teamID, docID),
+                      fingerprint: attemptFingerprint(attempt, teamID: teamID, loggerID: uid))
     }
 
     /// Attempt has no stored UUID id, so we derive a deterministic doc id from its
@@ -222,13 +239,17 @@ final class SyncEngine: ObservableObject {
         return "\(group)-\(subject)-\(attempt.outcomeRaw)-\(ts)"
     }
 
+    @discardableResult
     private func setDoc<T: Encodable>(_ ref: DocumentReference, _ value: T,
-                                      cache: inout Set<String>, key: String) {
+                                      key: String, fingerprint: String) -> Bool {
+        guard syncedFingerprints[key] != fingerprint else { return false }
         do {
             try ref.setData(from: value, merge: true)
-            cache.insert(key)
+            syncedFingerprints[key] = fingerprint
+            return true
         } catch {
             lastError = "Encode failed: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -256,22 +277,30 @@ final class SyncEngine: ObservableObject {
     }
 
     private func attachTeamSubcollections(teamID: String) {
+        guard teamListeners[teamID] == nil else { return }
         let base = teamDoc(teamID)
-        listeners.append(base.collection("subjects").addSnapshotListener { [weak self] snap, _ in
+        var registrations: [ListenerRegistration] = []
+        registrations.append(base.collection("subjects").addSnapshotListener { [weak self] snap, _ in
             snap?.documentChanges.forEach { c in
                 if let s = try? c.document.data(as: FSubject.self) { self?.applySubject(s) }
             }
         })
-        listeners.append(base.collection("groups").addSnapshotListener { [weak self] snap, _ in
+        registrations.append(base.collection("groups").addSnapshotListener { [weak self] snap, _ in
             snap?.documentChanges.forEach { c in
                 if let g = try? c.document.data(as: FGroup.self) { self?.applyGroup(g) }
             }
         })
-        listeners.append(base.collection("attempts").addSnapshotListener { [weak self] snap, _ in
+        registrations.append(base.collection("templates").addSnapshotListener { [weak self] snap, _ in
+            snap?.documentChanges.forEach { c in
+                if let t = try? c.document.data(as: FTemplate.self) { self?.applyTemplate(t) }
+            }
+        })
+        registrations.append(base.collection("attempts").addSnapshotListener { [weak self] snap, _ in
             snap?.documentChanges.forEach { c in
                 if let a = try? c.document.data(as: FAttempt.self) { self?.applyAttempt(a) }
             }
         })
+        teamListeners[teamID] = registrations
     }
 
     // MARK: - Apply remote docs into SwiftData
@@ -286,15 +315,16 @@ final class SyncEngine: ObservableObject {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr) else { return }
         let local = team(idStr)
+        var changed = false
         if let local {
             // Members mirror owner's roster meta; don't clobber our own ownership.
-            local.name = remote.name
-            local.itemNoun = remote.itemNoun
-            local.orderIndex = remote.orderIndex
-            local.memberIds = remote.memberIds
-            local.joinCode = remote.joinCode
-            local.deletedAt = remote.deletedAt
-            if local.ownerUID == nil { local.ownerUID = remote.ownerUID }
+            if local.name != remote.name { local.name = remote.name; changed = true }
+            if local.itemNoun != remote.itemNoun { local.itemNoun = remote.itemNoun; changed = true }
+            if local.orderIndex != remote.orderIndex { local.orderIndex = remote.orderIndex; changed = true }
+            if local.memberIds != remote.memberIds { local.memberIds = remote.memberIds; changed = true }
+            if local.joinCode != remote.joinCode { local.joinCode = remote.joinCode; changed = true }
+            if local.deletedAt != remote.deletedAt { local.deletedAt = remote.deletedAt; changed = true }
+            if local.ownerUID == nil { local.ownerUID = remote.ownerUID; changed = true }
         } else {
             let t = Team(name: remote.name, orderIndex: remote.orderIndex, id: uuid)
             t.itemNoun = remote.itemNoun
@@ -303,8 +333,12 @@ final class SyncEngine: ObservableObject {
             t.joinCode = remote.joinCode
             t.deletedAt = remote.deletedAt
             context.insert(t)
+            changed = true
         }
-        try? context.save()
+        if let local = team(idStr) {
+            syncedFingerprints[teamKey(idStr)] = teamFingerprint(local)
+        }
+        if changed { try? context.save() }
     }
 
     private func applySubject(_ remote: FSubject) {
@@ -312,9 +346,15 @@ final class SyncEngine: ObservableObject {
               let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
         let existing = try? context.fetch(FetchDescriptor<Subject>(
             predicate: #Predicate { $0.id == uuid })).first
+        var changed = false
+        let subject: Subject
         if let s = existing.flatMap({ $0 }) {
-            s.name = remote.name; s.kindRaw = remote.kindRaw
-            s.orderIndex = remote.orderIndex; s.deletedAt = remote.deletedAt
+            subject = s
+            if s.name != remote.name { s.name = remote.name; changed = true }
+            if s.kindRaw != remote.kindRaw { s.kindRaw = remote.kindRaw; changed = true }
+            if s.orderIndex != remote.orderIndex { s.orderIndex = remote.orderIndex; changed = true }
+            if s.deletedAt != remote.deletedAt { s.deletedAt = remote.deletedAt; changed = true }
+            if s.team?.id != team.id { s.team = team; changed = true }
         } else {
             let s = Subject(name: remote.name,
                             kind: SubjectKind(rawValue: remote.kindRaw) ?? .person,
@@ -322,8 +362,11 @@ final class SyncEngine: ObservableObject {
             s.deletedAt = remote.deletedAt
             s.team = team
             context.insert(s)
+            subject = s
+            changed = true
         }
-        try? context.save()
+        syncedFingerprints[subjectKey(remote.teamId, idStr)] = subjectFingerprint(subject, teamID: remote.teamId)
+        if changed { try? context.save() }
     }
 
     private func applyGroup(_ remote: FGroup) {
@@ -334,17 +377,39 @@ final class SyncEngine: ObservableObject {
         let g: StuntGroup
         if let existing { g = existing } else {
             g = StuntGroup(name: remote.name, number: remote.number,
-                           orderIndex: remote.orderIndex)
+                           orderIndex: remote.orderIndex, id: uuid)
             g.team = team
             context.insert(g)
         }
-        g.name = remote.name; g.number = remote.number
-        g.orderIndex = remote.orderIndex; g.kindRaw = remote.kindRaw
-        g.categoryRaw = remote.categoryRaw; g.typeLabelRaw = remote.typeLabelRaw
-        g.outcomeDefsRaw = remote.outcomeDefsRaw
-        g.outcomeOverridesRaw = remote.outcomeOverridesRaw
-        g.deletedAt = remote.deletedAt
-        try? context.save()
+        var changed = existing == nil
+        if g.name != remote.name { g.name = remote.name; changed = true }
+        if g.number != remote.number { g.number = remote.number; changed = true }
+        if g.orderIndex != remote.orderIndex { g.orderIndex = remote.orderIndex; changed = true }
+        if g.kindRaw != remote.kindRaw { g.kindRaw = remote.kindRaw; changed = true }
+        if g.categoryRaw != remote.categoryRaw { g.categoryRaw = remote.categoryRaw; changed = true }
+        if g.typeLabelRaw != remote.typeLabelRaw { g.typeLabelRaw = remote.typeLabelRaw; changed = true }
+        if g.outcomeDefsRaw != remote.outcomeDefsRaw { g.outcomeDefsRaw = remote.outcomeDefsRaw; changed = true }
+        if g.outcomeOverridesRaw != remote.outcomeOverridesRaw { g.outcomeOverridesRaw = remote.outcomeOverridesRaw; changed = true }
+        if g.deletedAt != remote.deletedAt { g.deletedAt = remote.deletedAt; changed = true }
+        if g.team?.id != team.id { g.team = team; changed = true }
+        syncedFingerprints[groupKey(remote.teamId, idStr)] = groupFingerprint(g, teamID: remote.teamId)
+        if changed { try? context.save() }
+    }
+
+    private func applyTemplate(_ remote: FTemplate) {
+        guard let context = modelContext, let idStr = remote.id,
+              let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
+        let existing = (try? context.fetch(FetchDescriptor<OutcomeTemplate>(
+            predicate: #Predicate { $0.id == uuid })))?.first
+        let template = existing ?? OutcomeTemplate(name: remote.name, orderIndex: remote.orderIndex, id: uuid)
+        if existing == nil { template.team = team; context.insert(template) }
+        var changed = existing == nil
+        if template.name != remote.name { template.name = remote.name; changed = true }
+        if template.defsRaw != remote.defsRaw { template.defsRaw = remote.defsRaw; changed = true }
+        if template.orderIndex != remote.orderIndex { template.orderIndex = remote.orderIndex; changed = true }
+        if template.team?.id != team.id { template.team = team; changed = true }
+        syncedFingerprints[templateKey(remote.teamId, idStr)] = templateFingerprint(template, teamID: remote.teamId)
+        if changed { try? context.save() }
     }
 
     // MARK: - Sharing (join codes)
@@ -434,7 +499,11 @@ final class SyncEngine: ObservableObject {
             predicate: #Predicate { $0.id == groupUUID })))?.first
         guard let group else { return }
         let alreadyHave = group.attempts.contains { attemptDocID($0) == idStr }
-        if alreadyHave { return }
+        let key = attemptKey(remote.teamId, idStr)
+        if alreadyHave {
+            syncedFingerprints[key] = remoteAttemptFingerprint(remote)
+            return
+        }
         let subject: Subject? = remote.subjectId.flatMap { sid in
             guard let su = UUID(uuidString: sid) else { return nil }
             return (try? context.fetch(FetchDescriptor<Subject>(
@@ -446,6 +515,57 @@ final class SyncEngine: ObservableObject {
         attempt.executionScored = remote.executionScored
         attempt.lostDriversRaw = remote.lostDriversRaw
         context.insert(attempt)
+        syncedFingerprints[key] = remoteAttemptFingerprint(remote)
         try? context.save()
+    }
+
+    // MARK: - Sync fingerprints
+
+    private func stamp(_ values: Any?...) -> String {
+        values.map { value in
+            switch value {
+            case let date as Date: return String(date.timeIntervalSinceReferenceDate)
+            case let strings as [String]: return strings.joined(separator: "\u{1E}")
+            case .none: return "∅"
+            default: return String(describing: value!)
+            }
+        }.joined(separator: "\u{1F}")
+    }
+
+    private func teamKey(_ id: String) -> String { "team:\(id)" }
+    private func subjectKey(_ teamID: String, _ id: String) -> String { "\(teamID):subject:\(id)" }
+    private func groupKey(_ teamID: String, _ id: String) -> String { "\(teamID):group:\(id)" }
+    private func templateKey(_ teamID: String, _ id: String) -> String { "\(teamID):template:\(id)" }
+    private func attemptKey(_ teamID: String, _ id: String) -> String { "\(teamID):attempt:\(id)" }
+
+    private func teamFingerprint(_ team: Team) -> String {
+        stamp(team.name, team.ownerUID, team.memberIds, team.orderIndex, team.itemNoun,
+              team.joinCode, team.deletedAt)
+    }
+
+    private func subjectFingerprint(_ subject: Subject, teamID: String) -> String {
+        stamp(teamID, subject.name, subject.kindRaw, subject.orderIndex, subject.deletedAt)
+    }
+
+    private func groupFingerprint(_ group: StuntGroup, teamID: String) -> String {
+        stamp(teamID, group.name, group.number, group.orderIndex, group.kindRaw,
+              group.categoryRaw, group.typeLabelRaw, group.outcomeDefsRaw,
+              group.outcomeOverridesRaw, group.deletedAt)
+    }
+
+    private func templateFingerprint(_ template: OutcomeTemplate, teamID: String) -> String {
+        stamp(teamID, template.name, template.defsRaw, template.orderIndex)
+    }
+
+    private func attemptFingerprint(_ attempt: Attempt, teamID: String, loggerID: String) -> String {
+        stamp(teamID, attempt.group?.id.uuidString, attempt.subject?.id.uuidString,
+              attempt.outcomeRaw, attempt.timestamp, attempt.waveID?.uuidString,
+              attempt.executionScored, attempt.lostDriversRaw, loggerID)
+    }
+
+    private func remoteAttemptFingerprint(_ attempt: FAttempt) -> String {
+        stamp(attempt.teamId, attempt.groupId, attempt.subjectId, attempt.outcomeRaw,
+              attempt.timestamp, attempt.waveID, attempt.executionScored,
+              attempt.lostDriversRaw, attempt.loggerId)
     }
 }
