@@ -1,5 +1,5 @@
-Share a folder with your whole staff — everyone logs into the same numbers.
+Folder sharing now stays fast and responsive.
 
-• Team sync — tap the share icon on any folder to get a join code. Coaches and athletes who join see the same roster and log reps together.
-• Join with a code — got a code from your coach? Tap "Join a folder with a code" on the folder home to hop in.
-• Reliability and polish fixes throughout.
+• Fixed a sync issue that could make the app slow after sharing a folder.
+• Added a Roster screen with per-athlete reps, hit rate, trends, and skill breakdowns.
+• Reliability and polish improvements throughout.

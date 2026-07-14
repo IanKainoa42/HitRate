@@ -155,10 +155,11 @@ platform :ios do
     upload_to_app_store(
       api_key: app_store_api_key,
       app_identifier: APP_IDENTIFIER,
+      app_version: ENV["SHIP_APP_VERSION"],
       build_number: ENV["SHIP_BUILD_NUMBER"],
       skip_binary_upload: true,    # binary already uploaded by ship_upload
       skip_screenshots: true,
-      skip_metadata: true,
+      skip_metadata: false,        # includes the required What's New text
       force: true,
       run_precheck_before_submit: false,  # precheck needs Apple ID auth, not API key
       reject_if_possible: true,
