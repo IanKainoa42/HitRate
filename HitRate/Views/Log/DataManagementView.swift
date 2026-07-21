@@ -212,8 +212,11 @@ struct DataManagementView: View {
     /// cascades their attempts; the explicit attempt sweep then catches any
     /// group-linked or orphaned reps left behind.
     private func clearHistory() {
+        for a in all(Attempt.self) {
+            SyncEngine.shared.queueDeletion(of: a, in: context)
+            context.delete(a)
+        }
         for s in all(PracticeSession.self) { context.delete(s) }
-        for a in all(Attempt.self) { context.delete(a) }
         try? context.save()
     }
 
@@ -221,10 +224,15 @@ struct DataManagementView: View {
     /// outcome labels live in UserDefaults and are intentionally preserved
     /// (settings, not practice data).
     private func eraseAll() {
-        for t in all(Team.self) { context.delete(t) }
-        for g in all(StuntGroup.self) { context.delete(g) }
+        // Queue remote tombstones while every attempt can still resolve its
+        // folder. Deleting teams/groups first can sever those relationships.
+        for a in all(Attempt.self) {
+            SyncEngine.shared.queueDeletion(of: a, in: context)
+            context.delete(a)
+        }
         for s in all(PracticeSession.self) { context.delete(s) }
-        for a in all(Attempt.self) { context.delete(a) }
+        for g in all(StuntGroup.self) { context.delete(g) }
+        for t in all(Team.self) { context.delete(t) }
         try? context.save()
         didOnboard = false
     }

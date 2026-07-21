@@ -935,6 +935,7 @@ struct CaptureView: View {
     private func undoWave() {
         let live = session.attempts
         for a in lastWave where live.contains(where: { $0 === a }) {
+            SyncEngine.shared.queueDeletion(of: a, in: context)
             context.delete(a)
         }
         try? context.save()
@@ -985,6 +986,7 @@ struct CaptureView: View {
 
     private func undoLastRep(_ attempts: [Attempt]) {
         guard let last = attempts.last else { return }
+        SyncEngine.shared.queueDeletion(of: last, in: context)
         context.delete(last)
         try? context.save()
         hapticTrigger += 1

@@ -4,10 +4,10 @@ import FirebaseFirestore
 // Firestore wire models for cloud sync (Feature: team sharing). These mirror the
 // CURRENT SwiftData schema field-for-field, storing the same raw strings/ints the
 // @Models already persist (kindRaw, categoryRaw, outcomeDefsRaw, …) so there's no
-// lossy re-derivation. Every doc id IS the local model's stable `id.uuidString`,
-// so push/pull is a straight upsert keyed by that id. `updatedAt` drives
-// last-write-wins; `deletedAt` is a soft-delete tombstone that syncs like any
-// other field (so a delete propagates to every device).
+// lossy re-derivation. Push/pull is a straight upsert by stable identity:
+// attempts and sessions use their cloud ids, while roster documents retain
+// model UUID ids. `deletedAt` is a soft-delete tombstone that syncs like any
+// other field so a delete propagates to every device.
 
 struct FTeam: Codable {
     @DocumentID var id: String?
@@ -55,6 +55,15 @@ struct FTemplate: Codable {
     var updatedAt: Date
 }
 
+struct FSession: Codable {
+    @DocumentID var id: String?
+    var teamId: String
+    var startedAt: Date
+    var endedAt: Date?
+    var loggerId: String
+    var updatedAt: Date
+}
+
 struct FAttempt: Codable {
     @DocumentID var id: String?
     var teamId: String
@@ -63,9 +72,13 @@ struct FAttempt: Codable {
     var outcomeRaw: Int
     var timestamp: Date
     var waveID: String?
+    /// Added after the first sharing release. Nil decodes legacy documents;
+    /// SyncSessionIdentity maps those into a stable per-team/day session.
+    var sessionId: String?
     var executionScored: Bool
     var lostDriversRaw: String
     /// The Firebase uid of whoever logged this rep (team-sharing attribution).
     var loggerId: String
+    var deletedAt: Date?
     var updatedAt: Date
 }

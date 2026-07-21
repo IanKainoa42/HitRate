@@ -11,6 +11,7 @@ struct FolderListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
+    @Query private var allAttempts: [Attempt]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
@@ -47,17 +48,29 @@ struct FolderListView: View {
             : (orgName.isEmpty ? "My program" : orgName)
     }
 
-    private func skills(in t: Team) -> [StuntGroup] { allGroups.inTeam(t) }
-    private func reps(in t: Team) -> Int { skills(in: t).reduce(0) { $0 + $1.attempts.count } }
+    private var folderSummaries: [String: FolderSummaryIndex.Summary] {
+        FolderSummaryIndex.build(
+            groups: allGroups.compactMap { group in
+                guard let teamID = group.team?.id.uuidString else { return nil }
+                return .init(teamID: teamID, isDeleted: group.deletedAt != nil)
+            },
+            attempts: allAttempts.compactMap { attempt in
+                guard let group = attempt.group,
+                      let teamID = group.team?.id.uuidString else { return nil }
+                return .init(teamID: teamID, isDeleted: group.deletedAt != nil)
+            }
+        )
+    }
 
     var body: some View {
+        let summaries = folderSummaries
         VStack(spacing: 9) {
             header
 
             ScrollView {
                 VStack(spacing: 9) {
                     ForEach(teams.active) { t in
-                        folderRow(t)
+                        folderRow(t, summary: summaries[t.id.uuidString] ?? .init())
                     }
                 }
                 .padding(.horizontal, 16)
@@ -135,8 +148,9 @@ struct FolderListView: View {
 
     // MARK: Folder row
 
-    private func folderRow(_ t: Team) -> some View {
-        let count = skills(in: t).count
+    private func folderRow(_ t: Team, summary: FolderSummaryIndex.Summary) -> some View {
+        let count = summary.skillCount
+        let reps = summary.repCount
         let active = t.id.uuidString == currentTeamID
         // Row = a big "open" button + separate trailing controls (a share icon
         // for folders you own, a JOINED chip for ones you joined). Kept as
@@ -161,7 +175,7 @@ struct FolderListView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Theme.label)
                             .lineLimit(1)
-                        Text("\(count) skill\(count == 1 ? "" : "s") · \(reps(in: t)) rep\(reps(in: t) == 1 ? "" : "s")")
+                        Text("\(count) skill\(count == 1 ? "" : "s") · \(reps) rep\(reps == 1 ? "" : "s")")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Theme.label2)
                     }

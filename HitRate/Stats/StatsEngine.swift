@@ -199,15 +199,21 @@ enum StatsEngine {
 
         // Per-group stats in the current and previous periods.
         let ordered = groups.sorted { $0.orderIndex < $1.orderIndex }
+        let currentAttempts = attemptsByGroup(
+            in: current, allowed: allowed, within: currentInterval, subject: subject
+        )
+        let previousAttempts = attemptsByGroup(
+            in: previous, allowed: allowed, within: previousInterval, subject: subject
+        )
         var groupStats: [GroupStat] = []
         var prevOverall = [0, 0, 0, 0]
         for g in ordered {
-            let counts = outcomeCounts(in: current, group: g, within: currentInterval, subject: subject)
+            let counts = outcomeCounts(currentAttempts[g.persistentModelID] ?? [])
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
             let rate = cleanRate(counts)
 
-            let prevCounts = outcomeCounts(in: previous, group: g, within: previousInterval, subject: subject)
+            let prevCounts = outcomeCounts(previousAttempts[g.persistentModelID] ?? [])
             let prevTotal = prevCounts.reduce(0, +)
             for i in 0..<4 { prevOverall[i] += prevCounts[i] }
             var delta: Int?
@@ -242,7 +248,7 @@ enum StatsEngine {
         }
 
         let (execution, executionScoredReps) = executionBreakdown(
-            in: current, groups: ordered, within: currentInterval, subject: subject)
+            attempts: currentAttempts.values.flatMap { $0 })
 
         return FloorStats(
             timeframe: timeframe,
@@ -264,8 +270,7 @@ enum StatsEngine {
     /// Returns the per-driver rows (category → sheet order) and the total number of
     /// execution-scored reps in range.
     private static func executionBreakdown(
-        in sessions: [PracticeSession], groups: [StuntGroup],
-        within interval: DateInterval?, subject: Subject?
+        attempts: [Attempt]
     ) -> (rows: [ExecutionDriverStat], scoredReps: Int) {
         // key → (name, category, order, scored, held)
         var scoredByKey: [String: Int] = [:]
@@ -274,24 +279,18 @@ enum StatsEngine {
         var order: [String: (cat: Int, idx: Int, name: String, category: String)] = [:]
         var scoredReps = 0
 
-        let allowed = Set(groups.map { $0.persistentModelID })
-        for s in sessions {
-            for a in s.attempts {
-                guard a.executionScored,
-                      let g = a.group, allowed.contains(g.persistentModelID) else { continue }
-                if let interval, !interval.contains(a.timestamp) { continue }
-                guard subjectMatch(a, subject) else { continue }
-                let drivers = g.executionDrivers
-                guard !drivers.isEmpty else { continue }
-                scoredReps += 1
-                let lost = Set(a.lostDrivers)
-                let catIndex = SkillCategory.allCases.firstIndex(of: g.category) ?? 0
-                for (i, d) in drivers.enumerated() {
-                    scoredByKey[d.key, default: 0] += 1
-                    if !lost.contains(d.key) { heldByKey[d.key, default: 0] += 1 }
-                    if order[d.key] == nil {
-                        order[d.key] = (catIndex, i, d.name, g.category.displayName)
-                    }
+        for a in attempts {
+            guard a.executionScored, let g = a.group else { continue }
+            let drivers = g.executionDrivers
+            guard !drivers.isEmpty else { continue }
+            scoredReps += 1
+            let lost = Set(a.lostDrivers)
+            let catIndex = SkillCategory.allCases.firstIndex(of: g.category) ?? 0
+            for (i, d) in drivers.enumerated() {
+                scoredByKey[d.key, default: 0] += 1
+                if !lost.contains(d.key) { heldByKey[d.key, default: 0] += 1 }
+                if order[d.key] == nil {
+                    order[d.key] = (catIndex, i, d.name, g.category.displayName)
                 }
             }
         }
@@ -396,19 +395,31 @@ enum StatsEngine {
         return best >= minMisses ? bestStart..<(bestStart + window) : nil
     }
 
-    /// A skill's reps bucketed into the 4 credit TIERS (hit/decent/rough/miss),
-    /// regardless of how many distinct outcomes it has — so aggregates stay
-    /// 4-wide and crash-safe while logging carries any number of outcomes.
-    private static func outcomeCounts(in sessions: [PracticeSession], group: StuntGroup,
-                                      within interval: DateInterval? = nil,
-                                      subject: Subject? = nil) -> [Int] {
-        var counts = [0, 0, 0, 0]
-        for s in sessions {
-            for a in s.attempts where a.group === group {
-                if let interval, !interval.contains(a.timestamp) { continue }
-                guard subjectMatch(a, subject) else { continue }
-                counts[a.tierOutcome.rawValue] += 1
+    /// Index the requested slice once. The previous implementation rescanned
+    /// every session for every skill, making dashboard entry O(skills × reps).
+    private static func attemptsByGroup(
+        in sessions: [PracticeSession], allowed: Set<PersistentIdentifier>,
+        within interval: DateInterval?, subject: Subject?
+    ) -> [PersistentIdentifier: [Attempt]] {
+        var result: [PersistentIdentifier: [Attempt]] = [:]
+        for session in sessions {
+            for attempt in session.attempts {
+                guard let group = attempt.group,
+                      allowed.contains(group.persistentModelID) else { continue }
+                if let interval, !interval.contains(attempt.timestamp) { continue }
+                guard subjectMatch(attempt, subject) else { continue }
+                result[group.persistentModelID, default: []].append(attempt)
             }
+        }
+        return result
+    }
+
+    /// A skill's reps bucketed into the 4 credit TIERS (hit/decent/rough/miss),
+    /// regardless of how many distinct outcomes it has.
+    private static func outcomeCounts(_ attempts: [Attempt]) -> [Int] {
+        var counts = [0, 0, 0, 0]
+        for attempt in attempts {
+            counts[attempt.tierOutcome.rawValue] += 1
         }
         return counts
     }

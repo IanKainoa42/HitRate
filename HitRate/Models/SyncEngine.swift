@@ -23,7 +23,7 @@ enum SyncAttemptBatchPlanner {
 ///     member devices MIRROR it (remote → local upsert, honoring the `deletedAt`
 ///     tombstone). Only the owner ever writes roster docs, so there's no roster
 ///     merge conflict to resolve.
-///   • ATTEMPTS are append-only and keyed by their local UUID. A rep is never
+///   • ATTEMPTS are append-only and keyed by a stable cloud id. A rep is never
 ///     edited after logging, so syncing them is a plain set-union: every device
 ///     pushes its own new reps and pulls everyone else's. `loggerId` records who
 ///     threw it (attribution). Deleting a rep writes a `deletedAt` tombstone.
@@ -33,16 +33,11 @@ enum SyncAttemptBatchPlanner {
 ///   teams/{teamId}/subjects/{subjectId}    → FSubject
 ///   teams/{teamId}/groups/{groupId}        → FGroup
 ///   teams/{teamId}/templates/{templateId}  → FTemplate
+///   teams/{teamId}/sessions/{sessionId}    → FSession
 ///   teams/{teamId}/attempts/{attemptId}    → FAttempt
 ///
-/// Doc id === the local model's `id.uuidString`, so push/pull is a straight
-/// upsert. `startSyncing` is idempotent; it re-pushes on every local save
-/// (SwiftData `didSave` notification, debounced) and keeps live listeners open
-/// for the pull direction.
-///
-/// STATUS: build-verified only. Runtime behavior is UNVERIFIED until the Firebase
-/// backend is configured (auth providers enabled, Firestore database created,
-/// firestore.rules deployed) and it's exercised across two real accounts.
+/// `startSyncing` is idempotent; local saves enqueue only their changed records,
+/// while live listeners keep the pull direction current.
 @MainActor
 final class SyncEngine: ObservableObject {
     static let shared = SyncEngine()
@@ -56,9 +51,15 @@ final class SyncEngine: ObservableObject {
     private var teamListeners: [String: [ListenerRegistration]] = [:]
     private var modelContext: ModelContext?
     private var isRunning = false
-    /// A team's remote attempts must be indexed before local history is pushed.
-    /// Otherwise every launch blindly rewrites the folder's entire rep history.
+    /// A team is reconciled only after every listener has delivered an
+    /// acknowledged server snapshot. Cache snapshots still populate the UI and
+    /// fingerprints, but can be stale or incomplete.
     private var teamsReadyForAttemptPush: Set<String> = []
+    private var serverReadyCollections: [String: Set<String>] = [:]
+    private let requiredServerCollections: Set<String> = [
+        "team", "subjects", "groups", "templates", "sessions", "attempts"
+    ]
+    private var attemptImportTasks: [String: Task<Void, Never>] = [:]
 
     /// Last payload sent/received for each document this session. A plain id set
     /// cannot distinguish "already uploaded" from "edited since upload"; it also
@@ -66,6 +67,8 @@ final class SyncEngine: ObservableObject {
     /// old set was populated but never consulted. Fingerprints make the debounce
     /// genuinely incremental while still allowing later edits to sync.
     private var syncedFingerprints: [String: String] = [:]
+    private var inFlightFingerprints: [String: String] = [:]
+    private var knownAttemptIDsByTeam: [String: [String: PersistentIdentifier]] = [:]
 
     /// Debounce token for save-triggered pushes.
     private var pushWorkItem: DispatchWorkItem?
@@ -89,7 +92,7 @@ final class SyncEngine: ObservableObject {
 
         observeLocalSaves()
         attachListeners()
-        pushLocalData()
+        pushLocalBootstrap()
     }
 
     /// Tear down listeners + the save observer (called on sign-out).
@@ -104,7 +107,12 @@ final class SyncEngine: ObservableObject {
         }
         pushWorkItem?.cancel()
         syncedFingerprints.removeAll()
+        inFlightFingerprints.removeAll()
+        knownAttemptIDsByTeam.removeAll()
         teamsReadyForAttemptPush.removeAll()
+        serverReadyCollections.removeAll()
+        attemptImportTasks.values.forEach { $0.cancel() }
+        attemptImportTasks.removeAll()
         pendingPushIDs.removeAll()
         needsFullPush = false
         isRunning = false
@@ -129,17 +137,16 @@ final class SyncEngine: ObservableObject {
         let changedKeys: [ModelContext.NotificationKey] = [
             .insertedIdentifiers, .updatedIdentifiers
         ]
-        var foundIdentifiers = false
         for key in changedKeys {
             guard let ids = notification.userInfo?[key.rawValue] as? [PersistentIdentifier] else {
                 continue
             }
             pendingPushIDs.formUnion(ids)
-            foundIdentifiers = foundIdentifiers || !ids.isEmpty
         }
-        // Older/alternate SwiftData stores may omit the identifier payload.
-        // Preserve sync correctness with a full pass in that rare case.
-        if !foundIdentifiers { needsFullPush = true }
+        // Deleted models cannot be resolved after didSave. Attempt deletions are
+        // represented by PendingCloudDeletion insertions, so a delete-only save
+        // needs no fallback rescan.
+        guard !pendingPushIDs.isEmpty else { return }
         enqueuePush()
     }
 
@@ -169,6 +176,27 @@ final class SyncEngine: ObservableObject {
 
     // MARK: - Push (local → Firestore)
 
+    /// Publish only never-synced local folders at launch. Existing cloud teams
+    /// wait for their server snapshots so a second launch performs zero
+    /// redundant writes.
+    private func pushLocalBootstrap() {
+        guard let context = modelContext, let uid else { return }
+        do {
+            let teams = try context.fetch(FetchDescriptor<Team>())
+            for team in teams where team.ownerUID == nil {
+                team.ownerUID = uid
+                let teamID = team.id.uuidString
+                _ = pushTeamMeta(team)
+                for subject in team.subjects { _ = pushSubject(subject, teamID: teamID) }
+                for group in team.groups { _ = pushGroup(group, teamID: teamID) }
+                for template in team.outcomeTemplates { _ = pushTemplate(template, teamID: teamID) }
+            }
+            if context.hasChanges { try context.save() }
+        } catch {
+            lastError = "Sync bootstrap failed: \(error.localizedDescription)"
+        }
+    }
+
     /// Mirror every locally-owned team's roster + all local attempts up to
     /// Firestore. Owner pushes the roster; every device pushes its own reps.
     private func pushLocalData() {
@@ -194,18 +222,34 @@ final class SyncEngine: ObservableObject {
                         wroteDocument = pushTemplate(template, teamID: teamID) || wroteDocument
                     }
                 }
-                // Seed fingerprints from the remote snapshot before touching
-                // history. This prevents a full rewrite on every app launch.
-                if teamsReadyForAttemptPush.contains(teamID) {
-                    for group in team.groups {
-                        for attempt in group.attempts {
-                            wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
-                        }
-                    }
-                }
             }
-            if wroteDocument { lastPushedAt = .now }
-            lastError = nil
+
+            // Attempt.syncStateRaw is the durable outbox. A normal launch does
+            // not fault the complete history; only unsent/failed rows are read.
+            let pendingAttempts = try context.fetch(FetchDescriptor<Attempt>(
+                predicate: #Predicate { $0.syncStateRaw != "synced" }
+            ))
+            for attempt in pendingAttempts {
+                guard let team = attempt.group?.team else { continue }
+                let teamID = team.id.uuidString
+                guard teamsReadyForAttemptPush.contains(teamID) else { continue }
+                wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
+            }
+
+            let pendingSessions = try context.fetch(FetchDescriptor<PracticeSession>(
+                predicate: #Predicate { $0.syncStateRaw != "synced" }
+            ))
+            for session in pendingSessions {
+                guard let teamID = sessionTeamID(session),
+                      teamsReadyForAttemptPush.contains(teamID) else { continue }
+                wroteDocument = pushSession(session, teamID: teamID, uid: uid) || wroteDocument
+            }
+
+            let deletions = try context.fetch(FetchDescriptor<PendingCloudDeletion>())
+            for deletion in deletions where teamsReadyForAttemptPush.contains(deletion.teamID) {
+                wroteDocument = pushDeletion(deletion, uid: uid) || wroteDocument
+            }
+            if !wroteDocument { lastError = nil }
         } catch {
             lastError = "Sync push failed: \(error.localizedDescription)"
         }
@@ -248,13 +292,21 @@ final class SyncEngine: ObservableObject {
                 guard teamsReadyForAttemptPush.contains(teamID) else { continue }
                 wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
 
+            case let session as PracticeSession:
+                guard let teamID = sessionTeamID(session),
+                      teamsReadyForAttemptPush.contains(teamID) else { continue }
+                wroteDocument = pushSession(session, teamID: teamID, uid: uid) || wroteDocument
+
+            case let deletion as PendingCloudDeletion:
+                guard teamsReadyForAttemptPush.contains(deletion.teamID) else { continue }
+                wroteDocument = pushDeletion(deletion, uid: uid) || wroteDocument
+
             default:
                 continue
             }
         }
 
-        if wroteDocument { lastPushedAt = .now }
-        lastError = nil
+        if !wroteDocument { lastError = nil }
     }
 
     private func teamDoc(_ teamID: String) -> DocumentReference {
@@ -318,42 +370,214 @@ final class SyncEngine: ObservableObject {
     }
 
     @discardableResult
+    private func pushSession(_ session: PracticeSession, teamID: String, uid: String) -> Bool {
+        guard SyncAttemptOwnershipPolicy.canUpload(
+            storedLoggerID: session.loggerID,
+            currentUID: uid
+        ) else { return false }
+
+        let loggerID = SyncAttemptOwnershipPolicy.resolvedLoggerID(
+            storedLoggerID: session.loggerID,
+            currentUID: uid
+        )
+        if session.cloudID.isEmpty {
+            session.cloudID = "session-\(UUID().uuidString)"
+        }
+        if session.cloudTeamID != teamID { session.cloudTeamID = teamID }
+        if session.loggerID != loggerID { session.loggerID = loggerID }
+
+        let documentID = session.cloudID
+        let key = sessionKey(teamID, documentID)
+        let fingerprint = sessionFingerprint(session, teamID: teamID, loggerID: loggerID)
+        if syncedFingerprints[key] != fingerprint,
+           inFlightFingerprints[key] != fingerprint,
+           session.syncStateRaw != CloudSyncState.uploading.rawValue {
+            session.syncStateRaw = CloudSyncState.uploading.rawValue
+        }
+        if modelContext?.hasChanges == true { try? modelContext?.save() }
+
+        let doc = FSession(
+            id: documentID,
+            teamId: teamID,
+            startedAt: session.startedAt,
+            endedAt: session.endedAt,
+            loggerId: loggerID,
+            updatedAt: .now
+        )
+        return setDoc(
+            teamDoc(teamID).collection("sessions").document(documentID),
+            doc,
+            key: key,
+            fingerprint: fingerprint
+        ) { [weak self, weak session] result in
+            guard let self, let session else { return }
+            let state = result ? CloudSyncState.synced.rawValue : CloudSyncState.failed.rawValue
+            guard session.syncStateRaw != state else { return }
+            session.syncStateRaw = state
+            try? self.modelContext?.save()
+        }
+    }
+
+    @discardableResult
     private func pushAttempt(_ attempt: Attempt, teamID: String, uid: String) -> Bool {
         guard let groupID = attempt.group?.id.uuidString else { return false }
-        let docID = attemptDocID(attempt)
+        guard SyncAttemptOwnershipPolicy.canUpload(
+            storedLoggerID: attempt.loggerID,
+            currentUID: uid
+        ) else { return false }
+
+        let loggerID = SyncAttemptOwnershipPolicy.resolvedLoggerID(
+            storedLoggerID: attempt.loggerID,
+            currentUID: uid
+        )
+        if attempt.cloudID.isEmpty { attempt.cloudID = legacyAttemptDocID(attempt) }
+        if let session = attempt.session {
+            _ = pushSession(session, teamID: teamID, uid: uid)
+        }
+
+        if attempt.cloudTeamID != teamID { attempt.cloudTeamID = teamID }
+        if attempt.loggerID != loggerID { attempt.loggerID = loggerID }
+
+        let docID = attempt.cloudID
+        let key = attemptKey(teamID, docID)
+        let fingerprint = attemptFingerprint(attempt, teamID: teamID, loggerID: loggerID)
+        if syncedFingerprints[key] != fingerprint,
+           inFlightFingerprints[key] != fingerprint,
+           attempt.syncState != .uploading {
+            attempt.syncState = .uploading
+        }
+        if modelContext?.hasChanges == true { try? modelContext?.save() }
+
         let doc = FAttempt(
             id: docID, teamId: teamID, groupId: groupID,
             subjectId: attempt.subject?.id.uuidString,
             outcomeRaw: attempt.outcomeRaw, timestamp: attempt.timestamp,
             waveID: attempt.waveID?.uuidString,
+            sessionId: attempt.session.flatMap { $0.cloudID.isEmpty ? nil : $0.cloudID },
             executionScored: attempt.executionScored,
             lostDriversRaw: attempt.lostDriversRaw,
-            loggerId: uid, updatedAt: .now
+            loggerId: loggerID,
+            deletedAt: nil,
+            updatedAt: .now
         )
         return setDoc(teamDoc(teamID).collection("attempts").document(docID), doc,
-                      key: attemptKey(teamID, docID),
-                      fingerprint: attemptFingerprint(attempt, teamID: teamID, loggerID: uid))
+                      key: key,
+                      fingerprint: fingerprint) {
+            [weak self, weak attempt] result in
+            guard let self, let attempt else { return }
+            let state: CloudSyncState = result ? .synced : .failed
+            guard attempt.syncState != state else { return }
+            attempt.syncState = state
+            try? self.modelContext?.save()
+        }
     }
 
-    /// Attempt has no stored UUID id, so we derive a deterministic doc id from its
-    /// immutable fields (append-only reps are never edited, so this is stable).
-    private func attemptDocID(_ attempt: Attempt) -> String {
+    /// Pre-1.4 attempts had no cloud id. Preserve their deployed deterministic
+    /// document ids so migration never duplicates existing Firestore history.
+    private func legacyAttemptDocID(_ attempt: Attempt) -> String {
         let group = attempt.group?.id.uuidString ?? "nil"
         let subject = attempt.subject?.id.uuidString ?? "nil"
         let ts = Int(attempt.timestamp.timeIntervalSince1970 * 1000)
         return "\(group)-\(subject)-\(attempt.outcomeRaw)-\(ts)"
     }
 
+    private func sessionTeamID(_ session: PracticeSession) -> String? {
+        if !session.cloudTeamID.isEmpty { return session.cloudTeamID }
+        return session.attempts.compactMap { $0.group?.team?.id.uuidString }.first
+    }
+
+    /// Insert the durable tombstone in the same local save as the deletion.
+    /// Callers may then remove the Attempt without losing the remote operation.
+    func queueDeletion(of attempt: Attempt, in context: ModelContext) {
+        // A never-attempted local upload has no remote document to tombstone.
+        // `uploading` is included because Firestore preserves write ordering:
+        // its create is already queued ahead of this tombstone while offline.
+        guard attempt.syncState == .synced || attempt.syncState == .uploading else { return }
+        guard let currentUID = uid,
+              SyncAttemptOwnershipPolicy.canUpload(
+                storedLoggerID: attempt.loggerID,
+                currentUID: currentUID
+              ) else { return }
+        guard let teamID = attempt.group?.team?.id.uuidString else { return }
+        let documentID = attempt.cloudID.isEmpty ? legacyAttemptDocID(attempt) : attempt.cloudID
+        let loggerID = SyncAttemptOwnershipPolicy.resolvedLoggerID(
+            storedLoggerID: attempt.loggerID,
+            currentUID: currentUID
+        )
+        context.insert(PendingCloudDeletion(
+            teamID: teamID,
+            documentID: documentID,
+            loggerID: loggerID
+        ))
+    }
+
+    @discardableResult
+    private func pushDeletion(_ deletion: PendingCloudDeletion, uid: String) -> Bool {
+        guard deletion.loggerID.isEmpty || deletion.loggerID == uid else { return false }
+        let key = attemptKey(deletion.teamID, deletion.documentID)
+        let fingerprint = "deleted:\(deletion.documentID)"
+        if syncedFingerprints[key] == fingerprint {
+            modelContext?.delete(deletion)
+            try? modelContext?.save()
+            return false
+        }
+        guard inFlightFingerprints[key] != fingerprint else { return false }
+        inFlightFingerprints[key] = fingerprint
+
+        let ref = teamDoc(deletion.teamID).collection("attempts").document(deletion.documentID)
+        let deletionIdentifier = deletion.persistentModelID
+        ref.setData(["deletedAt": Timestamp(date: deletion.createdAt)], merge: true) {
+            [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                self.inFlightFingerprints.removeValue(forKey: key)
+                if let error {
+                    self.lastError = "Sync delete failed: \(error.localizedDescription)"
+                } else {
+                    self.syncedFingerprints[key] = fingerprint
+                    self.lastPushedAt = .now
+                    if let deletion = self.modelContext?.model(for: deletionIdentifier)
+                        as? PendingCloudDeletion {
+                        self.modelContext?.delete(deletion)
+                    }
+                    try? self.modelContext?.save()
+                }
+            }
+        }
+        return true
+    }
+
     @discardableResult
     private func setDoc<T: Encodable>(_ ref: DocumentReference, _ value: T,
-                                      key: String, fingerprint: String) -> Bool {
-        guard syncedFingerprints[key] != fingerprint else { return false }
+                                      key: String, fingerprint: String,
+                                      completion: ((Bool) -> Void)? = nil) -> Bool {
+        if syncedFingerprints[key] == fingerprint {
+            completion?(true)
+            return false
+        }
+        guard inFlightFingerprints[key] != fingerprint else { return false }
         do {
-            try ref.setData(from: value, merge: true)
-            syncedFingerprints[key] = fingerprint
+            inFlightFingerprints[key] = fingerprint
+            try ref.setData(from: value, merge: true) { [weak self] error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.inFlightFingerprints.removeValue(forKey: key)
+                    if let error {
+                        self.lastError = "Sync write failed: \(error.localizedDescription)"
+                        completion?(false)
+                    } else {
+                        self.syncedFingerprints[key] = fingerprint
+                        self.lastError = nil
+                        self.lastPushedAt = .now
+                        completion?(true)
+                    }
+                }
+            }
             return true
         } catch {
+            inFlightFingerprints.removeValue(forKey: key)
             lastError = "Encode failed: \(error.localizedDescription)"
+            completion?(false)
             return false
         }
     }
@@ -368,13 +592,30 @@ final class SyncEngine: ObservableObject {
         let owned = db.collection("teams").whereField("ownerUID", isEqualTo: uid)
         let member = db.collection("teams").whereField("memberIds", arrayContains: uid)
         for query in [owned, member] {
-            let reg = query.addSnapshotListener { [weak self] snap, _ in
-                guard let self, let snap else { return }
+            let reg = query.addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+                guard let self else { return }
+                if let error {
+                    self.lastError = "Team sync failed: \(error.localizedDescription)"
+                    return
+                }
+                guard let snap else { return }
                 for change in snap.documentChanges {
                     if let team = try? change.document.data(as: FTeam.self) {
-                        self.applyTeam(team)
-                        self.attachTeamSubcollections(teamID: team.id ?? change.document.documentID)
+                        let teamID = team.id ?? change.document.documentID
+                        self.applyTeam(
+                            team,
+                            acknowledged: !change.document.metadata.hasPendingWrites
+                        )
+                        self.attachTeamSubcollections(teamID: teamID)
+                        self.markServerReady(teamID: teamID, collection: "team",
+                                             metadata: snap.metadata)
                     }
+                }
+                // Metadata-only snapshots have no document changes. Mark every
+                // visible team represented by the snapshot in that case.
+                for document in snap.documents {
+                    self.markServerReady(teamID: document.documentID, collection: "team",
+                                         metadata: snap.metadata)
                 }
             }
             listeners.append(reg)
@@ -385,34 +626,87 @@ final class SyncEngine: ObservableObject {
         guard teamListeners[teamID] == nil else { return }
         let base = teamDoc(teamID)
         var registrations: [ListenerRegistration] = []
-        registrations.append(base.collection("subjects").addSnapshotListener { [weak self] snap, _ in
+        registrations.append(base.collection("subjects").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Subject sync failed: \(error.localizedDescription)"; return }
             snap?.documentChanges.forEach { c in
-                if let s = try? c.document.data(as: FSubject.self) { self?.applySubject(s) }
+                if let s = try? c.document.data(as: FSubject.self) {
+                    self.applySubject(s, acknowledged: !c.document.metadata.hasPendingWrites)
+                }
             }
+            if let snap { self.markServerReady(teamID: teamID, collection: "subjects", metadata: snap.metadata) }
         })
-        registrations.append(base.collection("groups").addSnapshotListener { [weak self] snap, _ in
+        registrations.append(base.collection("groups").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Skill sync failed: \(error.localizedDescription)"; return }
             snap?.documentChanges.forEach { c in
-                if let g = try? c.document.data(as: FGroup.self) { self?.applyGroup(g) }
+                if let g = try? c.document.data(as: FGroup.self) {
+                    self.applyGroup(g, acknowledged: !c.document.metadata.hasPendingWrites)
+                }
             }
+            if let snap { self.markServerReady(teamID: teamID, collection: "groups", metadata: snap.metadata) }
         })
-        registrations.append(base.collection("templates").addSnapshotListener { [weak self] snap, _ in
+        registrations.append(base.collection("templates").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Template sync failed: \(error.localizedDescription)"; return }
             snap?.documentChanges.forEach { c in
-                if let t = try? c.document.data(as: FTemplate.self) { self?.applyTemplate(t) }
+                if let t = try? c.document.data(as: FTemplate.self) {
+                    self.applyTemplate(t, acknowledged: !c.document.metadata.hasPendingWrites)
+                }
             }
+            if let snap { self.markServerReady(teamID: teamID, collection: "templates", metadata: snap.metadata) }
         })
-        registrations.append(base.collection("attempts").addSnapshotListener { [weak self] snap, _ in
-            guard let self, let snap else { return }
-            let attempts = snap.documentChanges.compactMap {
-                try? $0.document.data(as: FAttempt.self)
+        registrations.append(base.collection("sessions").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Session sync failed: \(error.localizedDescription)"; return }
+            snap?.documentChanges.forEach { change in
+                guard !change.document.metadata.hasPendingWrites else { return }
+                if let session = try? change.document.data(as: FSession.self) {
+                    self.applySession(session)
+                }
             }
-            self.applyAttempts(attempts)
-            if self.teamsReadyForAttemptPush.insert(teamID).inserted {
-                // One linear reconciliation uploads local-only history after
-                // the remote snapshot has populated the fingerprint cache.
-                self.scheduleFullPush()
+            if let snap { self.markServerReady(teamID: teamID, collection: "sessions", metadata: snap.metadata) }
+        })
+        registrations.append(base.collection("attempts").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Attempt sync failed: \(error.localizedDescription)"; return }
+            guard let snap else { return }
+            // A pending-write document is our own local Firestore echo, not a
+            // backend acknowledgement. The write completion owns its outbox
+            // transition; the listener imports only cache/server records.
+            let attempts = snap.documentChanges.compactMap { change -> FAttempt? in
+                guard !change.document.metadata.hasPendingWrites else { return nil }
+                return try? change.document.data(as: FAttempt.self)
             }
+            self.enqueueAttemptImport(attempts, teamID: teamID, metadata: snap.metadata)
         })
         teamListeners[teamID] = registrations
+    }
+
+    private func markServerReady(teamID: String, collection: String,
+                                 metadata: SnapshotMetadata) {
+        guard SyncSnapshotPolicy.isReady(
+            isFromCache: metadata.isFromCache,
+            hasPendingWrites: metadata.hasPendingWrites
+        ) else { return }
+        serverReadyCollections[teamID, default: []].insert(collection)
+        guard serverReadyCollections[teamID]?.isSuperset(of: requiredServerCollections) == true,
+              teamsReadyForAttemptPush.insert(teamID).inserted else { return }
+        scheduleFullPush()
+    }
+
+    /// Serialize imports per team. The importer builds its relationship indexes
+    /// once, then saves/yields every 250 records so a 10k-rep hydration cannot
+    /// monopolize the main actor long enough to block opening a folder.
+    private func enqueueAttemptImport(_ remotes: [FAttempt], teamID: String,
+                                      metadata: SnapshotMetadata) {
+        let previous = attemptImportTasks[teamID]
+        attemptImportTasks[teamID] = Task { @MainActor [weak self] in
+            _ = await previous?.value
+            guard let self, !Task.isCancelled else { return }
+            await self.applyAttempts(remotes, teamID: teamID)
+            self.markServerReady(teamID: teamID, collection: "attempts", metadata: metadata)
+        }
     }
 
     // MARK: - Apply remote docs into SwiftData
@@ -423,7 +717,7 @@ final class SyncEngine: ObservableObject {
             predicate: #Predicate { $0.id == uuid })).first
     }
 
-    private func applyTeam(_ remote: FTeam) {
+    private func applyTeam(_ remote: FTeam, acknowledged: Bool) {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr) else { return }
         let local = team(idStr)
@@ -447,13 +741,13 @@ final class SyncEngine: ObservableObject {
             context.insert(t)
             changed = true
         }
-        if let local = team(idStr) {
+        if acknowledged, let local = team(idStr) {
             syncedFingerprints[teamKey(idStr)] = teamFingerprint(local)
         }
         if changed { try? context.save() }
     }
 
-    private func applySubject(_ remote: FSubject) {
+    private func applySubject(_ remote: FSubject, acknowledged: Bool) {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
         let existing = try? context.fetch(FetchDescriptor<Subject>(
@@ -477,11 +771,13 @@ final class SyncEngine: ObservableObject {
             subject = s
             changed = true
         }
-        syncedFingerprints[subjectKey(remote.teamId, idStr)] = subjectFingerprint(subject, teamID: remote.teamId)
+        if acknowledged {
+            syncedFingerprints[subjectKey(remote.teamId, idStr)] = subjectFingerprint(subject, teamID: remote.teamId)
+        }
         if changed { try? context.save() }
     }
 
-    private func applyGroup(_ remote: FGroup) {
+    private func applyGroup(_ remote: FGroup, acknowledged: Bool) {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
         let existing = (try? context.fetch(FetchDescriptor<StuntGroup>(
@@ -504,11 +800,13 @@ final class SyncEngine: ObservableObject {
         if g.outcomeOverridesRaw != remote.outcomeOverridesRaw { g.outcomeOverridesRaw = remote.outcomeOverridesRaw; changed = true }
         if g.deletedAt != remote.deletedAt { g.deletedAt = remote.deletedAt; changed = true }
         if g.team?.id != team.id { g.team = team; changed = true }
-        syncedFingerprints[groupKey(remote.teamId, idStr)] = groupFingerprint(g, teamID: remote.teamId)
+        if acknowledged {
+            syncedFingerprints[groupKey(remote.teamId, idStr)] = groupFingerprint(g, teamID: remote.teamId)
+        }
         if changed { try? context.save() }
     }
 
-    private func applyTemplate(_ remote: FTemplate) {
+    private func applyTemplate(_ remote: FTemplate, acknowledged: Bool) {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
         let existing = (try? context.fetch(FetchDescriptor<OutcomeTemplate>(
@@ -520,7 +818,31 @@ final class SyncEngine: ObservableObject {
         if template.defsRaw != remote.defsRaw { template.defsRaw = remote.defsRaw; changed = true }
         if template.orderIndex != remote.orderIndex { template.orderIndex = remote.orderIndex; changed = true }
         if template.team?.id != team.id { template.team = team; changed = true }
-        syncedFingerprints[templateKey(remote.teamId, idStr)] = templateFingerprint(template, teamID: remote.teamId)
+        if acknowledged {
+            syncedFingerprints[templateKey(remote.teamId, idStr)] = templateFingerprint(template, teamID: remote.teamId)
+        }
+        if changed { try? context.save() }
+    }
+
+    private func applySession(_ remote: FSession) {
+        guard let context = modelContext, let id = remote.id else { return }
+        let descriptor = FetchDescriptor<PracticeSession>(
+            predicate: #Predicate { $0.cloudID == id }
+        )
+        let existing = (try? context.fetch(descriptor))?.first
+        let session = existing ?? PracticeSession(startedAt: remote.startedAt)
+        var changed = existing == nil
+        if existing == nil { context.insert(session) }
+        if session.cloudID != id { session.cloudID = id; changed = true }
+        if session.cloudTeamID != remote.teamId { session.cloudTeamID = remote.teamId; changed = true }
+        if session.loggerID != remote.loggerId { session.loggerID = remote.loggerId; changed = true }
+        if session.startedAt != remote.startedAt { session.startedAt = remote.startedAt; changed = true }
+        if session.endedAt != remote.endedAt { session.endedAt = remote.endedAt; changed = true }
+        if session.syncStateRaw != CloudSyncState.synced.rawValue {
+            session.syncStateRaw = CloudSyncState.synced.rawValue
+            changed = true
+        }
+        syncedFingerprints[sessionKey(remote.teamId, id)] = remoteSessionFingerprint(remote)
         if changed { try? context.save() }
     }
 
@@ -603,46 +925,126 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    private func applyAttempts(_ remotes: [FAttempt]) {
+    private func applyAttempts(_ remotes: [FAttempt], teamID: String) async {
         guard let context = modelContext, !remotes.isEmpty else { return }
 
         do {
             let groups = try context.fetch(FetchDescriptor<StuntGroup>())
             let subjects = try context.fetch(FetchDescriptor<Subject>())
+            let sessions = try context.fetch(FetchDescriptor<PracticeSession>())
             let groupsByID = groups.reduce(into: [UUID: StuntGroup]()) { result, group in
                 result[group.id] = result[group.id] ?? group
             }
             let subjectsByID = subjects.reduce(into: [UUID: Subject]()) { result, subject in
                 result[subject.id] = result[subject.id] ?? subject
             }
-            let existingDocumentIDs = groups.lazy.flatMap(\.attempts).map(attemptDocID)
-            let remoteDocumentIDs = remotes.compactMap(\.id)
-            var missingDocumentIDs = Set(SyncAttemptBatchPlanner.missingDocumentIDs(
-                remote: remoteDocumentIDs,
-                existing: existingDocumentIDs
-            ))
+            var sessionsByCloudID = sessions.reduce(into: [String: PracticeSession]()) { result, session in
+                guard !session.cloudID.isEmpty else { return }
+                result[session.cloudID] = result[session.cloudID] ?? session
+            }
+
+            if knownAttemptIDsByTeam[teamID] == nil {
+                let allAttempts = try context.fetch(FetchDescriptor<Attempt>())
+                knownAttemptIDsByTeam[teamID] = allAttempts.reduce(into: [:]) { result, attempt in
+                    let localTeamID = attempt.cloudTeamID.isEmpty
+                        ? attempt.group?.team?.id.uuidString
+                        : attempt.cloudTeamID
+                    guard localTeamID == teamID else { return }
+                    let documentID = attempt.cloudID.isEmpty
+                        ? legacyAttemptDocID(attempt)
+                        : attempt.cloudID
+                    result[documentID] = attempt.persistentModelID
+                }
+            }
+            var known = knownAttemptIDsByTeam[teamID, default: [:]]
             var changed = false
 
-            for remote in remotes {
+            for (index, remote) in remotes.enumerated() {
+                guard remote.teamId == teamID else { continue }
                 guard let idStr = remote.id,
                       let groupUUID = UUID(uuidString: remote.groupId),
                       let group = groupsByID[groupUUID] else { continue }
 
                 syncedFingerprints[attemptKey(remote.teamId, idStr)] = remoteAttemptFingerprint(remote)
-                guard missingDocumentIDs.remove(idStr) != nil else { continue }
+
+                let existing = known[idStr].flatMap { context.model(for: $0) as? Attempt }
+                if remote.deletedAt != nil {
+                    if let existing {
+                        context.delete(existing)
+                        known.removeValue(forKey: idStr)
+                        changed = true
+                    }
+                    continue
+                }
 
                 let subject = remote.subjectId
                     .flatMap(UUID.init(uuidString:))
                     .flatMap { subjectsByID[$0] }
-                let attempt = Attempt(slot: remote.outcomeRaw, group: group, session: nil,
+                let sessionID = SyncSessionIdentity.resolve(
+                    remoteSessionID: remote.sessionId,
+                    teamID: remote.teamId,
+                    timestamp: remote.timestamp
+                )
+                let session: PracticeSession
+                if let existingSession = sessionsByCloudID[sessionID] {
+                    session = existingSession
+                    if remote.sessionId == nil {
+                        session.startedAt = min(session.startedAt, remote.timestamp)
+                        session.endedAt = max(session.endedAt ?? remote.timestamp, remote.timestamp)
+                    }
+                } else {
+                    session = PracticeSession(startedAt: remote.timestamp)
+                    session.cloudID = sessionID
+                    session.cloudTeamID = remote.teamId
+                    session.loggerID = remote.loggerId
+                    session.syncStateRaw = CloudSyncState.synced.rawValue
+                    session.endedAt = remote.timestamp
+                    context.insert(session)
+                    sessionsByCloudID[sessionID] = session
+                    changed = true
+                }
+
+                let attempt: Attempt
+                if let existing {
+                    attempt = existing
+                } else {
+                    attempt = Attempt(slot: remote.outcomeRaw, group: group, session: session,
                                       subject: subject, timestamp: remote.timestamp,
                                       waveID: remote.waveID.flatMap(UUID.init(uuidString:)))
-                attempt.executionScored = remote.executionScored
-                attempt.lostDriversRaw = remote.lostDriversRaw
-                context.insert(attempt)
-                changed = true
+                    context.insert(attempt)
+                    known[idStr] = attempt.persistentModelID
+                    changed = true
+                }
+
+                if attempt.cloudID != idStr { attempt.cloudID = idStr; changed = true }
+                if attempt.cloudTeamID != remote.teamId { attempt.cloudTeamID = remote.teamId; changed = true }
+                if attempt.loggerID != remote.loggerId { attempt.loggerID = remote.loggerId; changed = true }
+                if attempt.syncState != .synced { attempt.syncState = .synced; changed = true }
+                if attempt.group !== group { attempt.group = group; changed = true }
+                if attempt.session !== session { attempt.session = session; changed = true }
+                if attempt.subject !== subject { attempt.subject = subject; changed = true }
+                if attempt.outcomeRaw != remote.outcomeRaw { attempt.outcomeRaw = remote.outcomeRaw; changed = true }
+                if attempt.timestamp != remote.timestamp { attempt.timestamp = remote.timestamp; changed = true }
+                let waveID = remote.waveID.flatMap(UUID.init(uuidString:))
+                if attempt.waveID != waveID { attempt.waveID = waveID; changed = true }
+                if attempt.executionScored != remote.executionScored {
+                    attempt.executionScored = remote.executionScored
+                    changed = true
+                }
+                if attempt.lostDriversRaw != remote.lostDriversRaw {
+                    attempt.lostDriversRaw = remote.lostDriversRaw
+                    changed = true
+                }
+
+                if (index + 1).isMultiple(of: 250) {
+                    knownAttemptIDsByTeam[teamID] = known
+                    if changed { try context.save(); changed = false }
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                }
             }
 
+            knownAttemptIDsByTeam[teamID] = known
             if changed { try context.save() }
         } catch {
             lastError = "Sync pull failed: \(error.localizedDescription)"
@@ -666,6 +1068,7 @@ final class SyncEngine: ObservableObject {
     private func subjectKey(_ teamID: String, _ id: String) -> String { "\(teamID):subject:\(id)" }
     private func groupKey(_ teamID: String, _ id: String) -> String { "\(teamID):group:\(id)" }
     private func templateKey(_ teamID: String, _ id: String) -> String { "\(teamID):template:\(id)" }
+    private func sessionKey(_ teamID: String, _ id: String) -> String { "\(teamID):session:\(id)" }
     private func attemptKey(_ teamID: String, _ id: String) -> String { "\(teamID):attempt:\(id)" }
 
     private func teamFingerprint(_ team: Team) -> String {
@@ -687,15 +1090,27 @@ final class SyncEngine: ObservableObject {
         stamp(teamID, template.name, template.defsRaw, template.orderIndex)
     }
 
+    private func sessionFingerprint(_ session: PracticeSession, teamID: String,
+                                    loggerID: String) -> String {
+        stamp(teamID, session.startedAt, session.endedAt, loggerID)
+    }
+
+    private func remoteSessionFingerprint(_ session: FSession) -> String {
+        stamp(session.teamId, session.startedAt, session.endedAt, session.loggerId)
+    }
+
     private func attemptFingerprint(_ attempt: Attempt, teamID: String, loggerID: String) -> String {
         stamp(teamID, attempt.group?.id.uuidString, attempt.subject?.id.uuidString,
               attempt.outcomeRaw, attempt.timestamp, attempt.waveID?.uuidString,
-              attempt.executionScored, attempt.lostDriversRaw, loggerID)
+              attempt.session?.cloudID,
+              attempt.executionScored, attempt.lostDriversRaw, loggerID,
+              Optional<Date>.none)
     }
 
     private func remoteAttemptFingerprint(_ attempt: FAttempt) -> String {
         stamp(attempt.teamId, attempt.groupId, attempt.subjectId, attempt.outcomeRaw,
-              attempt.timestamp, attempt.waveID, attempt.executionScored,
-              attempt.lostDriversRaw, attempt.loggerId)
+              attempt.timestamp, attempt.waveID, attempt.sessionId,
+              attempt.executionScored, attempt.lostDriversRaw, attempt.loggerId,
+              attempt.deletedAt)
     }
 }

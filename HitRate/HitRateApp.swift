@@ -13,7 +13,7 @@ struct HitRateApp: App {
             QuickClinicTests.runAndExit()
         }
         do {
-            let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, Subject.self, OutcomeTemplate.self])
+            let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, PendingCloudDeletion.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, Subject.self, OutcomeTemplate.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             container = try ModelContainer(for: schema, configurations: [configuration])
         } catch {
@@ -23,7 +23,7 @@ struct HitRateApp: App {
             
             // Attempt in-memory fallback for development
             do {
-                let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, Subject.self, OutcomeTemplate.self])
+                let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, PendingCloudDeletion.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, Subject.self, OutcomeTemplate.self])
                 let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
                 container = try ModelContainer(for: schema, configurations: [configuration])
                 print("⚠️ Using in-memory store as fallback")

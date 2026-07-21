@@ -654,6 +654,13 @@ final class StuntGroup {
 final class PracticeSession {
     var startedAt: Date
     var endedAt: Date?
+    /// Stable Firestore identity. Empty means a pre-sync local session and is
+    /// filled once, immediately before its first upload. These additive defaulted
+    /// fields keep existing SwiftData stores on a lightweight migration path.
+    var cloudID: String = ""
+    var cloudTeamID: String = ""
+    var loggerID: String = ""
+    var syncStateRaw: String = CloudSyncState.pending.rawValue
     @Relationship(deleteRule: .cascade, inverse: \Attempt.session)
     var attempts: [Attempt] = []
     @Relationship(deleteRule: .cascade, inverse: \CustomTally.session)
@@ -661,6 +668,7 @@ final class PracticeSession {
 
     init(startedAt: Date = .now) {
         self.startedAt = startedAt
+        self.cloudID = "session-\(UUID().uuidString)"
     }
 
     var isActive: Bool { endedAt == nil }
@@ -674,6 +682,14 @@ final class PracticeSession {
 final class Attempt {
     var timestamp: Date
     var outcomeRaw: Int
+    /// Persistent cloud identity and ownership. Imported attempts retain the
+    /// original logger so an owner's device can never rewrite a member's rep as
+    /// its own. Existing attempts start pending and adopt their legacy
+    /// deterministic document id during the first acknowledged reconciliation.
+    var cloudID: String = ""
+    var cloudTeamID: String = ""
+    var loggerID: String = ""
+    var syncStateRaw: String = CloudSyncState.pending.rawValue
     var group: StuntGroup?
     var session: PracticeSession?
     /// Who threw this rep — the recording ROW (athlete or group). Optional so
@@ -702,6 +718,7 @@ final class Attempt {
         self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
+        self.cloudID = UUID().uuidString
     }
 
     /// Log a rep by its outcome SLOT index into the skill's flexible list — the
@@ -713,6 +730,7 @@ final class Attempt {
         self.subject = subject
         self.timestamp = timestamp
         self.waveID = waveID
+        self.cloudID = UUID().uuidString
     }
 
     var outcome: Outcome { Outcome(rawValue: outcomeRaw) ?? .hit }
@@ -727,6 +745,11 @@ final class Attempt {
     /// A landing — stayed up (credit ≥ 50%). This is what streaks count, so a
     /// landed-but-not-clean rep keeps a streak going; a fall/miss/balk breaks it.
     var isLandingRep: Bool { creditValue >= OutcomeCredit.landingThreshold }
+
+    var syncState: CloudSyncState {
+        get { CloudSyncState(rawValue: syncStateRaw) ?? .pending }
+        set { syncStateRaw = newValue.rawValue }
+    }
 
     // MARK: Execution (Feature B — optional binary held/lost tags)
 
@@ -752,6 +775,36 @@ final class Attempt {
     /// crash-safe regardless of how many outcomes the skill defines.
     var tierOutcome: Outcome {
         Outcome(rawValue: outcomeDef?.creditTier.tierIndex ?? OutcomeCredit.miss.tierIndex) ?? .majorFall
+    }
+}
+
+/// A tiny durable upload state embedded in append-only cloud records. It is the
+/// outbox for reps/sessions: the app retries pending or failed records after a
+/// server snapshot and marks them synced only from Firestore's completion.
+enum CloudSyncState: String, Codable {
+    case pending
+    case uploading
+    case synced
+    case failed
+}
+
+/// Deleting a local rep removes it from SwiftData immediately but leaves this
+/// durable operation behind until Firestore acknowledges the tombstone. This
+/// closes the deletion hole in `ModelContext.didSave`, whose deleted model can
+/// no longer be resolved after the save.
+@Model
+final class PendingCloudDeletion {
+    var id: UUID = UUID()
+    var teamID: String
+    var documentID: String
+    var loggerID: String
+    var createdAt: Date
+
+    init(teamID: String, documentID: String, loggerID: String, createdAt: Date = .now) {
+        self.teamID = teamID
+        self.documentID = documentID
+        self.loggerID = loggerID
+        self.createdAt = createdAt
     }
 }
 

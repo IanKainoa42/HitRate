@@ -7,6 +7,7 @@ rules_version = '2';
 //   teams/{teamId}/subjects/{id}            FSubject   (owner writes, members read)
 //   teams/{teamId}/groups/{id}              FGroup     (owner writes, members read)
 //   teams/{teamId}/templates/{id}           FTemplate  (owner writes, members read)
+//   teams/{teamId}/sessions/{id}            FSession   (logger-owned)
 //   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps)
 //   joinCodes/{code}                        { teamId } — public code→team lookup
 //
@@ -60,11 +61,23 @@ service cloud.firestore {
         allow read:  if inTeam(teamId);
         allow write: if ownsTeam(teamId);
       }
+      match /sessions/{docId} {
+        allow read:   if inTeam(teamId);
+        allow create: if inTeam(teamId) && request.resource.data.loggerId == uid();
+        allow update: if inTeam(teamId)
+          && resource.data.loggerId == uid()
+          && request.resource.data.loggerId == resource.data.loggerId;
+        allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
+      }
       match /attempts/{docId} {
         allow read:   if inTeam(teamId);
         allow create: if inTeam(teamId) && request.resource.data.loggerId == uid();
-        allow update, delete: if signedIn()
-          && (resource.data.loggerId == uid() || ownsTeam(teamId));
+        // Attribution is immutable. Only the original logger can edit or
+        // tombstone a rep; a folder owner cannot rewrite a member's history.
+        allow update: if inTeam(teamId)
+          && resource.data.loggerId == uid()
+          && request.resource.data.loggerId == resource.data.loggerId;
+        allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
       }
     }
 
