@@ -1,5 +1,5 @@
-Folder sharing now stays fast and responsive.
+Folders now open quickly and stay responsive, even with a long practice history.
 
-• Fixed a sync issue that could make the app slow after sharing a folder.
-• Added a Roster screen with per-athlete reps, hit rate, trends, and skill breakdowns.
-• Reliability and polish improvements throughout.
+• Rebuilt folder sync to prevent repeated Firebase work and safely retry interrupted uploads.
+• Improved shared-session reliability while preserving who logged each rep.
+• Reduced dashboard and folder-loading work for large histories.
