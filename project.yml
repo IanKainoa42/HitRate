@@ -90,6 +90,17 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIRequiresFullScreen: true
+  HitRateTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HitRateTests
+    dependencies:
+      - target: HitRate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ianrichardson.HitRateTests
+        GENERATE_INFOPLIST_FILE: YES
   HitRateWatch:
     type: application
     platform: watchOS

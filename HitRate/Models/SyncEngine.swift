@@ -3,6 +3,17 @@ import SwiftData
 import FirebaseFirestore
 import FirebaseAuth
 
+/// Builds the import plan once per Firestore snapshot. The old implementation
+/// called `contains` on a group's complete SwiftData history for every remote
+/// document, turning a large folder refresh into quadratic main-thread work.
+enum SyncAttemptBatchPlanner {
+    static func missingDocumentIDs<S: Sequence>(remote: [String], existing: S) -> [String]
+    where S.Element == String {
+        var known = Set(existing)
+        return remote.filter { known.insert($0).inserted }
+    }
+}
+
 /// Cloud sync coordinator (Firebase Firestore) for multi-user team sharing.
 ///
 /// SYNC MODEL — deliberately simple so it's correct without an `updatedAt` on
@@ -45,6 +56,9 @@ final class SyncEngine: ObservableObject {
     private var teamListeners: [String: [ListenerRegistration]] = [:]
     private var modelContext: ModelContext?
     private var isRunning = false
+    /// A team's remote attempts must be indexed before local history is pushed.
+    /// Otherwise every launch blindly rewrites the folder's entire rep history.
+    private var teamsReadyForAttemptPush: Set<String> = []
 
     /// Last payload sent/received for each document this session. A plain id set
     /// cannot distinguish "already uploaded" from "edited since upload"; it also
@@ -56,6 +70,8 @@ final class SyncEngine: ObservableObject {
     /// Debounce token for save-triggered pushes.
     private var pushWorkItem: DispatchWorkItem?
     private var saveObserver: NSObjectProtocol?
+    private var pendingPushIDs: Set<PersistentIdentifier> = []
+    private var needsFullPush = false
 
     private init() {}
 
@@ -72,8 +88,8 @@ final class SyncEngine: ObservableObject {
         isRunning = true
 
         observeLocalSaves()
-        pushLocalData()
         attachListeners()
+        pushLocalData()
     }
 
     /// Tear down listeners + the save observer (called on sign-out).
@@ -88,6 +104,9 @@ final class SyncEngine: ObservableObject {
         }
         pushWorkItem?.cancel()
         syncedFingerprints.removeAll()
+        teamsReadyForAttemptPush.removeAll()
+        pendingPushIDs.removeAll()
+        needsFullPush = false
         isRunning = false
     }
 
@@ -96,19 +115,56 @@ final class SyncEngine: ObservableObject {
     /// SwiftData posts `ModelContext.didSave` after every persisted mutation.
     /// We debounce and re-push; the pushed-id sets keep it to just the deltas.
     private func observeLocalSaves() {
-        guard saveObserver == nil else { return }
+        guard saveObserver == nil, let modelContext else { return }
         saveObserver = NotificationCenter.default.addObserver(
-            forName: ModelContext.didSave, object: nil, queue: .main
-        ) { [weak self] _ in
-            self?.schedulePush()
+            forName: ModelContext.didSave, object: modelContext, queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.schedulePush(for: notification)
+            }
         }
     }
 
-    private func schedulePush() {
+    private func schedulePush(for notification: Notification) {
+        let changedKeys: [ModelContext.NotificationKey] = [
+            .insertedIdentifiers, .updatedIdentifiers
+        ]
+        var foundIdentifiers = false
+        for key in changedKeys {
+            guard let ids = notification.userInfo?[key.rawValue] as? [PersistentIdentifier] else {
+                continue
+            }
+            pendingPushIDs.formUnion(ids)
+            foundIdentifiers = foundIdentifiers || !ids.isEmpty
+        }
+        // Older/alternate SwiftData stores may omit the identifier payload.
+        // Preserve sync correctness with a full pass in that rare case.
+        if !foundIdentifiers { needsFullPush = true }
+        enqueuePush()
+    }
+
+    private func scheduleFullPush() {
+        needsFullPush = true
+        enqueuePush()
+    }
+
+    private func enqueuePush() {
         pushWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.pushLocalData() }
+        let work = DispatchWorkItem { [weak self] in self?.flushScheduledPush() }
         pushWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
+    }
+
+    private func flushScheduledPush() {
+        let fullPush = needsFullPush
+        let changedIDs = pendingPushIDs
+        needsFullPush = false
+        pendingPushIDs.removeAll()
+        if fullPush {
+            pushLocalData()
+        } else if !changedIDs.isEmpty {
+            pushLocalChanges(changedIDs)
+        }
     }
 
     // MARK: - Push (local → Firestore)
@@ -138,10 +194,13 @@ final class SyncEngine: ObservableObject {
                         wroteDocument = pushTemplate(template, teamID: teamID) || wroteDocument
                     }
                 }
-                // Attempts: everyone pushes their own new reps (append-only).
-                for group in team.groups {
-                    for attempt in group.attempts {
-                        wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
+                // Seed fingerprints from the remote snapshot before touching
+                // history. This prevents a full rewrite on every app launch.
+                if teamsReadyForAttemptPush.contains(teamID) {
+                    for group in team.groups {
+                        for attempt in group.attempts {
+                            wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
+                        }
                     }
                 }
             }
@@ -150,6 +209,52 @@ final class SyncEngine: ObservableObject {
         } catch {
             lastError = "Sync push failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Push only the models reported by SwiftData's save notification. Logging
+    /// one rep must not re-walk every rep in every folder.
+    private func pushLocalChanges(_ identifiers: Set<PersistentIdentifier>) {
+        guard let context = modelContext, let uid else { return }
+        var wroteDocument = false
+
+        for identifier in identifiers {
+            let model = context.model(for: identifier)
+            switch model {
+            case let team as Team:
+                let isOwner = team.ownerUID == nil || team.ownerUID == uid
+                if team.ownerUID == nil { team.ownerUID = uid }
+                if isOwner {
+                    wroteDocument = pushTeamMeta(team) || wroteDocument
+                }
+
+            case let subject as Subject:
+                guard let team = subject.team,
+                      team.ownerUID == nil || team.ownerUID == uid else { continue }
+                wroteDocument = pushSubject(subject, teamID: team.id.uuidString) || wroteDocument
+
+            case let group as StuntGroup:
+                guard let team = group.team,
+                      team.ownerUID == nil || team.ownerUID == uid else { continue }
+                wroteDocument = pushGroup(group, teamID: team.id.uuidString) || wroteDocument
+
+            case let template as OutcomeTemplate:
+                guard let team = template.team,
+                      team.ownerUID == nil || team.ownerUID == uid else { continue }
+                wroteDocument = pushTemplate(template, teamID: team.id.uuidString) || wroteDocument
+
+            case let attempt as Attempt:
+                guard let team = attempt.group?.team else { continue }
+                let teamID = team.id.uuidString
+                guard teamsReadyForAttemptPush.contains(teamID) else { continue }
+                wroteDocument = pushAttempt(attempt, teamID: teamID, uid: uid) || wroteDocument
+
+            default:
+                continue
+            }
+        }
+
+        if wroteDocument { lastPushedAt = .now }
+        lastError = nil
     }
 
     private func teamDoc(_ teamID: String) -> DocumentReference {
@@ -296,8 +401,15 @@ final class SyncEngine: ObservableObject {
             }
         })
         registrations.append(base.collection("attempts").addSnapshotListener { [weak self] snap, _ in
-            snap?.documentChanges.forEach { c in
-                if let a = try? c.document.data(as: FAttempt.self) { self?.applyAttempt(a) }
+            guard let self, let snap else { return }
+            let attempts = snap.documentChanges.compactMap {
+                try? $0.document.data(as: FAttempt.self)
+            }
+            self.applyAttempts(attempts)
+            if self.teamsReadyForAttemptPush.insert(teamID).inserted {
+                // One linear reconciliation uploads local-only history after
+                // the remote snapshot has populated the fingerprint cache.
+                self.scheduleFullPush()
             }
         })
         teamListeners[teamID] = registrations
@@ -491,32 +603,50 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    private func applyAttempt(_ remote: FAttempt) {
-        guard let context = modelContext, let idStr = remote.id,
-              let groupUUID = UUID(uuidString: remote.groupId) else { return }
-        // Dedup by the same deterministic doc id we push with.
-        let group = (try? context.fetch(FetchDescriptor<StuntGroup>(
-            predicate: #Predicate { $0.id == groupUUID })))?.first
-        guard let group else { return }
-        let alreadyHave = group.attempts.contains { attemptDocID($0) == idStr }
-        let key = attemptKey(remote.teamId, idStr)
-        if alreadyHave {
-            syncedFingerprints[key] = remoteAttemptFingerprint(remote)
-            return
+    private func applyAttempts(_ remotes: [FAttempt]) {
+        guard let context = modelContext, !remotes.isEmpty else { return }
+
+        do {
+            let groups = try context.fetch(FetchDescriptor<StuntGroup>())
+            let subjects = try context.fetch(FetchDescriptor<Subject>())
+            let groupsByID = groups.reduce(into: [UUID: StuntGroup]()) { result, group in
+                result[group.id] = result[group.id] ?? group
+            }
+            let subjectsByID = subjects.reduce(into: [UUID: Subject]()) { result, subject in
+                result[subject.id] = result[subject.id] ?? subject
+            }
+            let existingDocumentIDs = groups.lazy.flatMap(\.attempts).map(attemptDocID)
+            let remoteDocumentIDs = remotes.compactMap(\.id)
+            var missingDocumentIDs = Set(SyncAttemptBatchPlanner.missingDocumentIDs(
+                remote: remoteDocumentIDs,
+                existing: existingDocumentIDs
+            ))
+            var changed = false
+
+            for remote in remotes {
+                guard let idStr = remote.id,
+                      let groupUUID = UUID(uuidString: remote.groupId),
+                      let group = groupsByID[groupUUID] else { continue }
+
+                syncedFingerprints[attemptKey(remote.teamId, idStr)] = remoteAttemptFingerprint(remote)
+                guard missingDocumentIDs.remove(idStr) != nil else { continue }
+
+                let subject = remote.subjectId
+                    .flatMap(UUID.init(uuidString:))
+                    .flatMap { subjectsByID[$0] }
+                let attempt = Attempt(slot: remote.outcomeRaw, group: group, session: nil,
+                                      subject: subject, timestamp: remote.timestamp,
+                                      waveID: remote.waveID.flatMap(UUID.init(uuidString:)))
+                attempt.executionScored = remote.executionScored
+                attempt.lostDriversRaw = remote.lostDriversRaw
+                context.insert(attempt)
+                changed = true
+            }
+
+            if changed { try context.save() }
+        } catch {
+            lastError = "Sync pull failed: \(error.localizedDescription)"
         }
-        let subject: Subject? = remote.subjectId.flatMap { sid in
-            guard let su = UUID(uuidString: sid) else { return nil }
-            return (try? context.fetch(FetchDescriptor<Subject>(
-                predicate: #Predicate { $0.id == su })))?.first
-        }
-        let attempt = Attempt(slot: remote.outcomeRaw, group: group, session: nil,
-                              subject: subject, timestamp: remote.timestamp,
-                              waveID: remote.waveID.flatMap { UUID(uuidString: $0) })
-        attempt.executionScored = remote.executionScored
-        attempt.lostDriversRaw = remote.lostDriversRaw
-        context.insert(attempt)
-        syncedFingerprints[key] = remoteAttemptFingerprint(remote)
-        try? context.save()
     }
 
     // MARK: - Sync fingerprints

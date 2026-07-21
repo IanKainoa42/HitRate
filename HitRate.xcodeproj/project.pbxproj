@@ -70,12 +70,20 @@
 		EB6588569EC4390ACB99857E /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FB278FBC6D4DE260073658 /* AuthView.swift */; };
 		EC00C955A569AD7AA035AD1A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0A32BDE8F4EA8761F39A65B /* GoogleSignInSwift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
+		F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */; };
 		FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296943D1F64367EB72E3C679 /* DemoData.swift */; };
 		FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */; };
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		229FD5990F75D0580E3D6D74 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC2F2365CD63E505D88A5A30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CEC6694572E5FFFE2F6AB38B;
+			remoteInfo = HitRate;
+		};
 		408A56F4773C5C975FFE9E38 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BC2F2365CD63E505D88A5A30 /* Project object */;
@@ -155,8 +163,10 @@
 		BC4A053415866660A35A4745 /* SummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryCard.swift; sourceTree = "<group>"; };
 		BCD1AA942B68F4E661CF6471 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		C1D5351887DF8EBB491B3E2F /* RosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterView.swift; sourceTree = "<group>"; };
+		C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncAttemptBatchPlannerTests.swift; sourceTree = "<group>"; };
 		CA8E6F0EF3500932ED680415 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HitRateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -256,6 +266,7 @@
 			isa = PBXGroup;
 			children = (
 				9CBF43E65D81D52A8C010E7C /* HitRate */,
+				D1E2326231807F8A6765157B /* HitRateTests */,
 				D61303D10F0D3692EF85FFBE /* HitRateWatch */,
 				4A7A28A205380C1E2B04A9DC /* Packages */,
 				F668D95A08DD886D33B73867 /* Products */,
@@ -347,6 +358,14 @@
 			path = Theme;
 			sourceTree = "<group>";
 		};
+		D1E2326231807F8A6765157B /* HitRateTests */ = {
+			isa = PBXGroup;
+			children = (
+				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
+			);
+			path = HitRateTests;
+			sourceTree = "<group>";
+		};
 		D5B083AB163031D018ECF5AA /* WatchSync */ = {
 			isa = PBXGroup;
 			children = (
@@ -403,6 +422,7 @@
 			isa = PBXGroup;
 			children = (
 				E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */,
+				D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */,
 				49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */,
 			);
 			name = Products;
@@ -428,6 +448,24 @@
 			productName = HitRateWatch;
 			productReference = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */;
 			productType = "com.apple.product-type.application";
+		};
+		9443CF6401BC7D64AF31AE31 /* HitRateTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 136EEDC37437E8D895770A42 /* Build configuration list for PBXNativeTarget "HitRateTests" */;
+			buildPhases = (
+				66737BB5A18F108361FAD6A0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				624EE7B85FEC85ACF8932396 /* PBXTargetDependency */,
+			);
+			name = HitRateTests;
+			packageProductDependencies = (
+			);
+			productName = HitRateTests;
+			productReference = D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		CEC6694572E5FFFE2F6AB38B /* HitRate */ = {
 			isa = PBXNativeTarget;
@@ -494,6 +532,7 @@
 			projectRoot = "";
 			targets = (
 				CEC6694572E5FFFE2F6AB38B /* HitRate */,
+				9443CF6401BC7D64AF31AE31 /* HitRateTests */,
 				0F8C1A10770E28C7B23F8162 /* HitRateWatch */,
 			);
 		};
@@ -579,6 +618,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		66737BB5A18F108361FAD6A0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6F541C21A03BF478B7D7B28A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -594,6 +641,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		624EE7B85FEC85ACF8932396 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CEC6694572E5FFFE2F6AB38B /* HitRate */;
+			targetProxy = 229FD5990F75D0580E3D6D74 /* PBXContainerItemProxy */;
+		};
 		8DAB4B4163E3C863972BCFD0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 0F8C1A10770E28C7B23F8162 /* HitRateWatch */;
@@ -781,6 +833,40 @@
 			};
 			name = Debug;
 		};
+		AD5A6302569AC7754BD8FCBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRateTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HitRate.app/HitRate";
+			};
+			name = Release;
+		};
+		B2EA3235571580B7BAA9865D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRateTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HitRate.app/HitRate";
+			};
+			name = Debug;
+		};
 		E0F981D0EA6D69B7C27B3C26 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -808,6 +894,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		136EEDC37437E8D895770A42 /* Build configuration list for PBXNativeTarget "HitRateTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2EA3235571580B7BAA9865D /* Debug */,
+				AD5A6302569AC7754BD8FCBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		3E1648D6C75FE462382A7324 /* Build configuration list for PBXProject "HitRate" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
