@@ -76,6 +76,16 @@ final class SyncEngine: ObservableObject {
     private var pendingPushIDs: Set<PersistentIdentifier> = []
     private var needsFullPush = false
 
+    /// A rejected attempt/session push (e.g. a quota rejection) flips
+    /// `syncState` to `.failed` via its own completion handler, which saves
+    /// the model — and that save re-triggers `didSave`, queuing another push
+    /// attempt of the very same record moments later. Without a cooldown this
+    /// is an unbounded retry loop bound only by the debounce interval, and it
+    /// replays every failed record again on every relaunch too. 5 minutes is
+    /// long enough to stop hammering a systemic outage, short enough that a
+    /// transient blip recovers within a session.
+    private static let retryCooldown: TimeInterval = 300
+
     private init() {}
 
     private var uid: String? { Auth.auth().currentUser?.uid }
@@ -375,6 +385,11 @@ final class SyncEngine: ObservableObject {
             storedLoggerID: session.loggerID,
             currentUID: uid
         ) else { return false }
+        if session.syncStateRaw == CloudSyncState.failed.rawValue,
+           let last = session.lastSyncAttemptAt,
+           Date.now.timeIntervalSince(last) < SyncEngine.retryCooldown {
+            return false
+        }
 
         let loggerID = SyncAttemptOwnershipPolicy.resolvedLoggerID(
             storedLoggerID: session.loggerID,
@@ -393,6 +408,7 @@ final class SyncEngine: ObservableObject {
            inFlightFingerprints[key] != fingerprint,
            session.syncStateRaw != CloudSyncState.uploading.rawValue {
             session.syncStateRaw = CloudSyncState.uploading.rawValue
+            session.lastSyncAttemptAt = .now
         }
         if modelContext?.hasChanges == true { try? modelContext?.save() }
 
@@ -425,6 +441,11 @@ final class SyncEngine: ObservableObject {
             storedLoggerID: attempt.loggerID,
             currentUID: uid
         ) else { return false }
+        if attempt.syncState == .failed,
+           let last = attempt.lastSyncAttemptAt,
+           Date.now.timeIntervalSince(last) < SyncEngine.retryCooldown {
+            return false
+        }
 
         let loggerID = SyncAttemptOwnershipPolicy.resolvedLoggerID(
             storedLoggerID: attempt.loggerID,
@@ -445,6 +466,7 @@ final class SyncEngine: ObservableObject {
            inFlightFingerprints[key] != fingerprint,
            attempt.syncState != .uploading {
             attempt.syncState = .uploading
+            attempt.lastSyncAttemptAt = .now
         }
         if modelContext?.hasChanges == true { try? modelContext?.save() }
 
@@ -856,6 +878,50 @@ final class SyncEngine: ObservableObject {
         case failed(String)  // network / permission error
     }
 
+    private struct TimedOutError: LocalizedError {
+        var errorDescription: String? { "Timed out — check your connection and try again." }
+    }
+
+    /// Resumes a continuation at most once. A `withThrowingTaskGroup` race
+    /// doesn't work here: the group can't return until every child finishes,
+    /// even a cancelled one, and a Firestore continuation that's silently
+    /// dropped (e.g. a quota rejection the SDK retries instead of throwing)
+    /// never finishes — so the "timeout" would hang right alongside it. An
+    /// unstructured `Task` per side lets the loser keep running detached
+    /// while this function returns as soon as either side resumes.
+    private actor ResumeOnce {
+        private var done = false
+        func claim() -> Bool {
+            guard !done else { return false }
+            done = true
+            return true
+        }
+    }
+
+    /// Bounds a single Firestore await so a stuck request fails the UI
+    /// instead of spinning forever. Share/join are user-initiated, one-shot
+    /// calls — a hung continuation here has no other way to surface.
+    private func withTimeout<T: Sendable>(
+        seconds: TimeInterval = 12,
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let guardian = ResumeOnce()
+        return try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                    let value = try await operation()
+                    if await guardian.claim() { continuation.resume(returning: value) }
+                } catch {
+                    if await guardian.claim() { continuation.resume(throwing: error) }
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                if await guardian.claim() { continuation.resume(throwing: TimedOutError()) }
+            }
+        }
+    }
+
     /// Human-friendly code alphabet — no 0/O, 1/I/L, so a shared code can't be
     /// misread. 6 chars over 31 symbols ≈ 887M combos; collisions are vanishing.
     private static let codeAlphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
@@ -879,13 +945,15 @@ final class SyncEngine: ObservableObject {
             let code = generateCode()
             let ref = db.collection("joinCodes").document(code)
             do {
-                let snap = try await ref.getDocument()
+                let snap = try await withTimeout { try await ref.getDocument() }
                 if snap.exists { continue }   // extremely unlikely; try another
-                try await ref.setData([
-                    "teamId": teamID,
-                    "ownerUID": uid,
-                    "createdAt": FieldValue.serverTimestamp()
-                ])
+                try await withTimeout {
+                    try await ref.setData([
+                        "teamId": teamID,
+                        "ownerUID": uid,
+                        "createdAt": FieldValue.serverTimestamp()
+                    ])
+                }
                 team.joinCode = code
                 try? modelContext?.save()
                 pushTeamMeta(team)   // propagate the code onto the team doc
@@ -908,14 +976,18 @@ final class SyncEngine: ObservableObject {
         let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !code.isEmpty else { return .invalidCode }
         do {
-            let snap = try await db.collection("joinCodes").document(code).getDocument()
+            let ref = db.collection("joinCodes").document(code)
+            let snap = try await withTimeout { try await ref.getDocument() }
             guard snap.exists, let teamID = snap.data()?["teamId"] as? String else {
                 return .invalidCode
             }
-            try await db.collection("teams").document(teamID).updateData([
-                "memberIds": FieldValue.arrayUnion([uid]),
-                "updatedAt": FieldValue.serverTimestamp()
-            ])
+            let teamRef = db.collection("teams").document(teamID)
+            try await withTimeout {
+                try await teamRef.updateData([
+                    "memberIds": FieldValue.arrayUnion([uid]),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ])
+            }
             // Ensure the pull listeners are live so the joined roster lands.
             if let modelContext, !isRunning { startSyncing(context: modelContext) }
             lastError = nil

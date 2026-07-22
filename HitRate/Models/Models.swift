@@ -661,6 +661,10 @@ final class PracticeSession {
     var cloudTeamID: String = ""
     var loggerID: String = ""
     var syncStateRaw: String = CloudSyncState.pending.rawValue
+    /// When a push was last attempted (success or failure) — lets SyncEngine
+    /// cool down a `.failed` push instead of retrying it on every relaunch or
+    /// every debounce cycle. Optional → additive lightweight migration.
+    var lastSyncAttemptAt: Date?
     @Relationship(deleteRule: .cascade, inverse: \Attempt.session)
     var attempts: [Attempt] = []
     @Relationship(deleteRule: .cascade, inverse: \CustomTally.session)
@@ -690,6 +694,10 @@ final class Attempt {
     var cloudTeamID: String = ""
     var loggerID: String = ""
     var syncStateRaw: String = CloudSyncState.pending.rawValue
+    /// When a push was last attempted (success or failure) — lets SyncEngine
+    /// cool down a `.failed` push instead of retrying it on every relaunch or
+    /// every debounce cycle. Optional → additive lightweight migration.
+    var lastSyncAttemptAt: Date?
     var group: StuntGroup?
     var session: PracticeSession?
     /// Who threw this rep — the recording ROW (athlete or group). Optional so
