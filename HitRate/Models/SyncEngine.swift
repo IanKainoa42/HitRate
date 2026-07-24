@@ -945,15 +945,21 @@ final class SyncEngine: ObservableObject {
             let code = generateCode()
             let ref = db.collection("joinCodes").document(code)
             do {
-                let snap = try await withTimeout { try await ref.getDocument() }
-                if snap.exists { continue }   // extremely unlikely; try another
-                try await withTimeout {
+                // Both round trips share ONE timeout window — two stacked 12s
+                // waits (lookup, then write) made a single attempt take up to
+                // 24s before the user saw anything, which read as "spins
+                // forever" even though it eventually failed.
+                let claimed = try await withTimeout(seconds: 10) { () async throws -> Bool in
+                    let snap = try await ref.getDocument()
+                    if snap.exists { return false }   // extremely unlikely; try another
                     try await ref.setData([
                         "teamId": teamID,
                         "ownerUID": uid,
                         "createdAt": FieldValue.serverTimestamp()
                     ])
+                    return true
                 }
+                guard claimed else { continue }
                 team.joinCode = code
                 try? modelContext?.save()
                 pushTeamMeta(team)   // propagate the code onto the team doc
@@ -976,18 +982,24 @@ final class SyncEngine: ObservableObject {
         let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !code.isEmpty else { return .invalidCode }
         do {
-            let ref = db.collection("joinCodes").document(code)
-            let snap = try await withTimeout { try await ref.getDocument() }
-            guard snap.exists, let teamID = snap.data()?["teamId"] as? String else {
-                return .invalidCode
-            }
-            let teamRef = db.collection("teams").document(teamID)
-            try await withTimeout {
+            let firestore = db
+            let ref = firestore.collection("joinCodes").document(code)
+            // One timeout window for both round trips (code lookup, then the
+            // membership write) — see shareTeam for why stacking two 12s
+            // waits made a single join attempt feel like it hung.
+            let outcome = try await withTimeout(seconds: 10) { () async throws -> Bool in
+                let snap = try await ref.getDocument()
+                guard snap.exists, let teamID = snap.data()?["teamId"] as? String else {
+                    return false
+                }
+                let teamRef = firestore.collection("teams").document(teamID)
                 try await teamRef.updateData([
                     "memberIds": FieldValue.arrayUnion([uid]),
                     "updatedAt": FieldValue.serverTimestamp()
                 ])
+                return true
             }
+            guard outcome else { return .invalidCode }
             // Ensure the pull listeners are live so the joined roster lands.
             if let modelContext, !isRunning { startSyncing(context: modelContext) }
             lastError = nil
