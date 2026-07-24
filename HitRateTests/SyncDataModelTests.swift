@@ -39,6 +39,31 @@ final class SyncDataModelTests: XCTestCase {
         XCTAssertEqual(stats.rate, 100)
     }
 
+    func testCurrentTeamNeverSubstitutesADifferentFolder() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let maya = Team(name: "Maya", orderIndex: 0)
+        let lucy = Team(name: "Lucy", orderIndex: 1)
+        context.insert(maya)
+        context.insert(lucy)
+        try context.save()
+
+        let teams = [maya, lucy]
+
+        // A valid id resolves to the matching team, not just "the first one".
+        XCTAssertEqual(teams.current(id: lucy.id.uuidString)?.name, "Lucy")
+
+        // Regression for "tap Maya's folder, see Lucy's data": a stale/
+        // dangling id (e.g. dedupeSyncIDs reassigned the selected team's id
+        // and currentTeamID still names the old one) must return nil, never
+        // silently substitute a different folder's full data.
+        XCTAssertNil(teams.current(id: UUID().uuidString))
+
+        // Empty id (nothing ever selected — fresh install) is the one
+        // legitimate case that defaults to the first active team.
+        XCTAssertEqual(teams.current(id: "")?.name, "Maya")
+    }
+
     func testNewAttemptsReceiveStableUniqueCloudIDs() {
         let first = Attempt(outcome: .hit, group: nil, session: nil)
         let second = Attempt(outcome: .hit, group: nil, session: nil)
