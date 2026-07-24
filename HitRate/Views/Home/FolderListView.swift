@@ -332,8 +332,9 @@ private struct ShareFolderSheet: View {
     let team: Team
     @Environment(\.dismiss) private var dismiss
     @State private var code: String?
-    @State private var failed = false
+    @State private var failedMessage: String?
     @State private var copied = false
+    @State private var attempt = 0
     private let sync = SyncEngine.shared
 
     var body: some View {
@@ -386,12 +387,27 @@ private struct ShareFolderSheet: View {
                     .foregroundStyle(Theme.label2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if failed {
-                Text("Couldn’t create a code. Check your connection and try again.")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.label2)
-                    .multilineTextAlignment(.center)
-                    .padding(.vertical, 24)
+            } else if let failedMessage {
+                VStack(spacing: 14) {
+                    Text(failedMessage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.label2)
+                        .multilineTextAlignment(.center)
+
+                    Button {
+                        self.failedMessage = nil
+                        attempt += 1
+                    } label: {
+                        Text("Try again")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .wellBackground()
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 12)
             } else {
                 ProgressView().tint(Theme.accent).padding(.vertical, 30)
             }
@@ -401,8 +417,12 @@ private struct ShareFolderSheet: View {
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(FloorBackdrop().ignoresSafeArea())
-        .task {
-            if let c = await sync.shareTeam(team) { code = c } else { failed = true }
+        .task(id: attempt) {
+            if let c = await sync.shareTeam(team) {
+                code = c
+            } else {
+                failedMessage = sync.lastError ?? "Couldn’t create a code. Check your connection and try again."
+            }
         }
     }
 }
