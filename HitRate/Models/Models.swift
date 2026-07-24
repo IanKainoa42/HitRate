@@ -997,7 +997,7 @@ extension Array where Element == Team {
         }
         let fallback = live.first
         if !id.isEmpty {
-            Logger.teamResolve.fault("current(id:) miss — requested=\(id, privacy: .public) resolvedFallback=\(fallback?.id.uuidString ?? "nil", privacy: .public) fallbackName=\(fallback?.name ?? "nil", privacy: .public) liveIDs=\(live.map(\.id.uuidString).joined(separator: ","), privacy: .public)")
+            Logger.teamResolve.fault("current(id:) miss — requested=\(id, privacy: .public) resolvedFallback=\(fallback?.id.uuidString ?? "nil", privacy: .public) fallbackName=\(fallback?.name ?? "nil", privacy: .private) liveIDs=\(live.map(\.id.uuidString).joined(separator: ","), privacy: .public)")
         }
         return fallback
     }
