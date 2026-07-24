@@ -223,12 +223,20 @@ struct RootView: View {
     /// rendered the first group on every row, so tapping one cell visibly
     /// logged/staged "for everybody". Reassign fresh ids to duplicates once;
     /// runs before the team-pinning migration in case a team id changes.
+    ///
+    /// Root cause of "tap Maya's folder, see Lucy's data": this reassigned a
+    /// duplicate team's id without ever checking whether `currentTeamID`
+    /// pointed at it. `currentTeamID` then named a team that no longer
+    /// existed, and `current(id:)` silently fell back to `live.first` —
+    /// whichever folder sorts first, shown as if it were the tapped one.
     private func dedupeSyncIDs() {
         var seen = Set<UUID>()
         var dirty = false
         for t in teams where !seen.insert(t.id).inserted {
+            let oldID = t.id.uuidString
             t.id = UUID()
             dirty = true
+            if currentTeamID == oldID { currentTeamID = t.id.uuidString }
         }
         seen.removeAll()
         for g in groups where !seen.insert(g.id).inserted {
