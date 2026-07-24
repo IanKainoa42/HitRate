@@ -988,18 +988,26 @@ extension Array where Element == Team {
     /// Folders currently in the Trash, most-recently-deleted first.
     var trashed: [Team] { filter { $0.deletedAt != nil }.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) } }
 
-    /// The active team for a stored `currentTeamID` (uuidString), falling back
-    /// to the first ACTIVE team. Never resolves to a trashed folder.
+    /// The active team for a stored `currentTeamID` (uuidString). An empty id
+    /// (nothing ever selected — fresh install/onboarding) falls back to the
+    /// first ACTIVE team, a harmless default. A NON-empty id that doesn't
+    /// match any live team returns nil instead of substituting a different
+    /// folder's data — every call site already treats this as `Team?` and
+    /// handles nil (HomeView/LogView's "My Skills" fallback, Onboarding's own
+    /// `?? teams.first`). Silently serving `live.first` here was the mechanism
+    /// behind "tap Maya's folder, see Lucy's data": a stale/dangling
+    /// currentTeamID rendered as if the wrong folder were the right one, with
+    /// no error. Never resolves to a trashed folder.
     func current(id: String) -> Team? {
         let live = active
         if let match = live.first(where: { $0.id.uuidString == id }) {
             return match
         }
-        let fallback = live.first
-        if !id.isEmpty {
-            Logger.teamResolve.fault("current(id:) miss — requested=\(id, privacy: .public) resolvedFallback=\(fallback?.id.uuidString ?? "nil", privacy: .public) fallbackName=\(fallback?.name ?? "nil", privacy: .private) liveIDs=\(live.map(\.id.uuidString).joined(separator: ","), privacy: .public)")
+        if id.isEmpty {
+            return live.first
         }
-        return fallback
+        Logger.teamResolve.fault("current(id:) miss — requested=\(id, privacy: .public) liveIDs=\(live.map(\.id.uuidString).joined(separator: ","), privacy: .public)")
+        return nil
     }
 }
 
