@@ -1,8 +1,16 @@
 import Foundation
 import Observation
+import os
 import SwiftData
 import SwiftUI
 import CheerRulesKit
+
+extension Logger {
+    /// Diagnostic-only channel for the "tap folder A, see folder B" report.
+    /// Pull via Console.app / `log show` filtered on subsystem
+    /// "com.ianrichardson.HitRate", category "team-resolve".
+    static let teamResolve = Logger(subsystem: "com.ianrichardson.HitRate", category: "team-resolve")
+}
 
 // MARK: - App mode (athlete-first vs coach)
 
@@ -984,7 +992,14 @@ extension Array where Element == Team {
     /// to the first ACTIVE team. Never resolves to a trashed folder.
     func current(id: String) -> Team? {
         let live = active
-        return live.first { $0.id.uuidString == id } ?? live.first
+        if let match = live.first(where: { $0.id.uuidString == id }) {
+            return match
+        }
+        let fallback = live.first
+        if !id.isEmpty {
+            Logger.teamResolve.fault("current(id:) miss — requested=\(id, privacy: .public) resolvedFallback=\(fallback?.id.uuidString ?? "nil", privacy: .public) fallbackName=\(fallback?.name ?? "nil", privacy: .public) liveIDs=\(live.map(\.id.uuidString).joined(separator: ","), privacy: .public)")
+        }
+        return fallback
     }
 }
 
