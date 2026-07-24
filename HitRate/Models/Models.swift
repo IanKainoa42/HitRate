@@ -1000,7 +1000,17 @@ extension Array where Element == Team {
     /// no error. Never resolves to a trashed folder.
     func current(id: String) -> Team? {
         let live = active
-        if let match = live.first(where: { $0.id.uuidString == id }) {
+        let matches = live.filter { $0.id.uuidString == id }
+        if let match = matches.first {
+            if matches.count > 1 {
+                // Two live folders sharing one id — the historical migration
+                // collision this same file's dedupeSyncIDs exists to clean up.
+                // A miss (below) means the id is simply stale; a collision
+                // means it's ambiguous RIGHT NOW and whichever sorts first in
+                // THIS caller's query wins — a different call site's own query
+                // order could resolve the same id to a different team.
+                Logger.teamResolve.fault("current(id:) collision — id=\(id, privacy: .public) matchCount=\(matches.count, privacy: .public)")
+            }
             return match
         }
         if id.isEmpty {
