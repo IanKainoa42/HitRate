@@ -31,6 +31,7 @@ enum DemoData {
             team = Team(name: "My Team", orderIndex: 0)
             context.insert(team)
         }
+        team.isDemo = true
 
         let allGroups = (try? context.fetch(FetchDescriptor<StuntGroup>())) ?? []
         for g in allGroups where g.team?.id == team.id { context.delete(g) }

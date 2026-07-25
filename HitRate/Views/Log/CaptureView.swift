@@ -867,6 +867,10 @@ struct CaptureView: View {
     /// Log one rep: subject × skill × outcome slot. No confirm.
     private func log(slot: Int, group: StuntGroup, subject: Subject, def: OutcomeDef) {
         context.insert(Attempt(slot: slot, group: group, session: session, subject: subject))
+        // A real logged rep means the team has moved past "Load demo data"
+        // preview content — resume sync so this genuine usage isn't silently
+        // dropped by the isDemo guard.
+        group.team?.isDemo = false
         try? context.save()
         selectedGroupIDRaw = group.id.uuidString
         selectedSubjectIDRaw = subject.id.uuidString

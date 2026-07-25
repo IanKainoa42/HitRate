@@ -193,7 +193,7 @@ final class SyncEngine: ObservableObject {
         guard let context = modelContext, let uid else { return }
         do {
             let teams = try context.fetch(FetchDescriptor<Team>())
-            for team in teams where team.ownerUID == nil {
+            for team in teams where team.ownerUID == nil && !team.isDemo {
                 team.ownerUID = uid
                 let teamID = team.id.uuidString
                 _ = pushTeamMeta(team)
@@ -215,6 +215,7 @@ final class SyncEngine: ObservableObject {
             let teams = try context.fetch(FetchDescriptor<Team>())
             var wroteDocument = false
             for team in teams {
+                guard !team.isDemo else { continue }
                 let teamID = team.id.uuidString
                 let isOwner = (team.ownerUID == nil) || (team.ownerUID == uid)
                 // Claim ownership of a pre-cloud team the first time we sync it.
@@ -275,6 +276,7 @@ final class SyncEngine: ObservableObject {
             let model = context.model(for: identifier)
             switch model {
             case let team as Team:
+                guard !team.isDemo else { continue }
                 let isOwner = team.ownerUID == nil || team.ownerUID == uid
                 if team.ownerUID == nil { team.ownerUID = uid }
                 if isOwner {
@@ -282,17 +284,17 @@ final class SyncEngine: ObservableObject {
                 }
 
             case let subject as Subject:
-                guard let team = subject.team,
+                guard let team = subject.team, !team.isDemo,
                       team.ownerUID == nil || team.ownerUID == uid else { continue }
                 wroteDocument = pushSubject(subject, teamID: team.id.uuidString) || wroteDocument
 
             case let group as StuntGroup:
-                guard let team = group.team,
+                guard let team = group.team, !team.isDemo,
                       team.ownerUID == nil || team.ownerUID == uid else { continue }
                 wroteDocument = pushGroup(group, teamID: team.id.uuidString) || wroteDocument
 
             case let template as OutcomeTemplate:
-                guard let team = template.team,
+                guard let team = template.team, !team.isDemo,
                       team.ownerUID == nil || team.ownerUID == uid else { continue }
                 wroteDocument = pushTemplate(template, teamID: team.id.uuidString) || wroteDocument
 

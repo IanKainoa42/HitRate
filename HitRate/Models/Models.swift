@@ -407,6 +407,15 @@ final class Team {
     /// until first pushed). Both additive with defaults → lightweight migration.
     var ownerUID: String? = nil
     var joinCode: String? = nil
+    /// True while this team's roster is sample data from "Load demo data"
+    /// (`DemoData.seed`), not something the user actually built. Sync must
+    /// never push it — the demo set is ~1,571 Attempt rows, and the button
+    /// is live in production (any coach with an empty team sees it), not
+    /// debug-gated, so an unguarded push silently burns real Firestore
+    /// write quota with zero user awareness. Cleared the moment the user
+    /// takes any real roster-building action, so switching from demo to
+    /// real use resumes sync automatically.
+    var isDemo: Bool = false
     /// Firebase uids of everyone who has joined this shared folder (besides the
     /// owner). Owner-authoritative: the owner's device writes this list; members
     /// mirror it. Stored as a plain [String] (SwiftData handles Codable arrays).
