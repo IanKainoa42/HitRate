@@ -45,6 +45,7 @@
 		93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */; };
 		977B508665FEF8C1BF9C2188 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D10E02645FF41504749C81 /* CaptureView.swift */; };
 		A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */; };
+		A23C5536F6A93FD23AF8201F /* SeededRNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = D047AEE6F79270EE4548869F /* SeededRNG.swift */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
 		A6B063D90E22AE3A3D79C92D /* PremiumPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A534562CEDB6CC6C852F51B /* PremiumPaywallSheet.swift */; };
 		A945591D0A1989368FC3D909 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D2EBDF727517B7CF1CB8A6AA /* FirebaseAuth */; };
@@ -74,7 +75,6 @@
 		EC00C955A569AD7AA035AD1A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0A32BDE8F4EA8761F39A65B /* GoogleSignInSwift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
 		F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */; };
-		FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296943D1F64367EB72E3C679 /* DemoData.swift */; };
 		FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */; };
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
 /* End PBXBuildFile section */
@@ -122,7 +122,6 @@
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
-		296943D1F64367EB72E3C679 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLoggingSheet.swift; sourceTree = "<group>"; };
 		2DD703A6A661621DEEE37E48 /* QuickClinicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickClinicTests.swift; sourceTree = "<group>"; };
 		341C704BF36D8A9731D5A827 /* SyncPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPolicies.swift; sourceTree = "<group>"; };
@@ -172,6 +171,7 @@
 		C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncAttemptBatchPlannerTests.swift; sourceTree = "<group>"; };
 		CA8E6F0EF3500932ED680415 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		D047AEE6F79270EE4548869F /* SeededRNG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeededRNG.swift; sourceTree = "<group>"; };
 		D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HitRateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
@@ -413,7 +413,7 @@
 			children = (
 				077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */,
 				EDD99E08D7FCE2602733C7EF /* CSVExport.swift */,
-				296943D1F64367EB72E3C679 /* DemoData.swift */,
+				D047AEE6F79270EE4548869F /* SeededRNG.swift */,
 				138B89E3489E75197EA700F8 /* Sounds.swift */,
 			);
 			path = Utilities;
@@ -585,7 +585,6 @@
 				E033839C9325BA8B73DF9AA4 /* CardCatalogRenderer.swift in Sources */,
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
-				FB0BA43EC534DC61218E314D /* DemoData.swift in Sources */,
 				4A2264B0343EFAB8B8AA10D2 /* ExecutionCard.swift in Sources */,
 				14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */,
 				D61621AB7AEAF64DC2C31BFE /* FirestoreModels.swift in Sources */,
@@ -608,6 +607,7 @@
 				5CD6AE7AA709FEFA6BF343B0 /* QuickClinicSummaryView.swift in Sources */,
 				ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */,
 				226DD6B7AC3D3E7DCA340B3F /* RosterView.swift in Sources */,
+				A23C5536F6A93FD23AF8201F /* SeededRNG.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,
 				380E5C95F1D845A0CB19B736 /* SkillInsightsCard.swift in Sources */,

@@ -35,7 +35,7 @@ struct RosterView: View {
         return withData + empty
     }
 
-    private var title: String { subjectKind == .person ? "ROSTER" : "GROUPS" }
+    private var title: String { subjectKind == .person ? "ROSTER" : "STUNT GROUPS" }
 
     var body: some View {
         VStack(spacing: 9) {

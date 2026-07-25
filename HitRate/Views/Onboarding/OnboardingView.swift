@@ -63,6 +63,13 @@ struct OnboardingView: View {
     @State private var focus: OnboardingFocus = .stunts
     @State private var pending: [(name: String, focus: OnboardingFocus)] = []   // skills created on finish
 
+    // Step 3 — a real, hands-on first rep before landing on the (now
+    // populated) dashboard. Only shown if the user actually added a skill.
+    @State private var practiceStep = false
+    @State private var practiceGroup: StuntGroup?
+    @State private var practiceSession: PracticeSession?
+    @State private var practiceTaps = 0
+
     /// Names already on the current roster — on an intro replay the chips
     /// shouldn't offer buckets the user already has.
     private var existingNames: Set<String> {
@@ -78,13 +85,16 @@ struct OnboardingView: View {
         ZStack {
             CourtBackdrop()
                 .ignoresSafeArea()
-            if let mode {
+            if practiceStep, let group = practiceGroup, let session = practiceSession {
+                practicePreview(group: group, session: session)
+            } else if let mode {
                 setup(mode)
             } else {
                 chooser
             }
         }
         .animation(.easeOut(duration: 0.25), value: mode)
+        .animation(.easeOut(duration: 0.25), value: practiceStep)
     }
 
     // MARK: Step 1 — who's counting
@@ -288,7 +298,7 @@ struct OnboardingView: View {
             .scrollIndicators(.hidden)
 
             Button {
-                finish(mode)
+                startCounting(mode)
             } label: {
                 HStack(spacing: 9) {
                     BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
@@ -368,7 +378,10 @@ struct OnboardingView: View {
         draft = ""
     }
 
-    private func finish(_ mode: AppMode) {
+    /// Commits the team + chosen skills, then either drops into a real
+    /// first-rep practice step (if any skill was added) or completes
+    /// onboarding outright.
+    private func startCounting(_ mode: AppMode) {
         // Every bucket lives under a team. First launch creates it; an intro
         // REPLAY (Manage Data → Replay intro) keeps the existing roster and
         // tops it up instead — replaying must never fork a duplicate team.
@@ -383,6 +396,7 @@ struct OnboardingView: View {
             context.insert(team)
         }
         let base = allGroups.filter { $0.team?.id == team.id }.count
+        var created: [StuntGroup] = []
         for (i, item) in pending.enumerated() {
             let g = StuntGroup(name: item.name, number: base + i + 1,
                                orderIndex: base + i)
@@ -391,12 +405,120 @@ struct OnboardingView: View {
             // and carries the execution drivers (the issues you tag a rep with).
             g.category = item.focus.category
             context.insert(g)
+            created.append(g)
         }
         try? context.save()
         currentTeamID = team.id.uuidString
+
+        if let first = created.first {
+            let s = PracticeSession()
+            context.insert(s)
+            try? context.save()
+            practiceGroup = first
+            practiceSession = s
+            practiceStep = true
+        } else {
+            completeOnboarding(mode)
+        }
+    }
+
+    private func completeOnboarding(_ mode: AppMode) {
         appModeRaw = mode.rawValue
         replayingIntro = false
         didOnboard = true
+    }
+
+    // MARK: Step 3 — try a real rep
+
+    private func practicePreview(group: StuntGroup, session: PracticeSession) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            IconWordmark(size: 15, rateFill: Theme.navy, dotSize: 7)
+                .padding(.top, 8)
+
+            Text("Try logging a rep")
+                .font(Theme.grotesk(22))
+                .foregroundStyle(.white)
+            Text(practiceTaps == 0
+                 ? "This is exactly how practice works — tap what happens on \(group.name)."
+                 : "Tap it again, or continue whenever you're ready.")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.6))
+
+            HStack(spacing: 10) {
+                Text("\(group.number)")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(group.color)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                Text(group.name)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .padding(.top, 6)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(Array(group.outcomeDefs.enumerated()), id: \.offset) { slot, def in
+                    Button {
+                        logPracticeTap(slot: slot, def: def, group: group, session: session)
+                    } label: {
+                        Text(def.label)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(def.color.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 8)
+
+            Spacer()
+
+            if practiceTaps > 0 {
+                Text("\(practiceTaps) rep\(practiceTaps == 1 ? "" : "s") logged — that's the whole app.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(.bottom, 2)
+            }
+
+            Button {
+                finishPractice()
+            } label: {
+                HStack(spacing: 9) {
+                    BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
+                    Text(practiceTaps > 0 ? "Continue" : "Skip for now")
+                        .font(Theme.grotesk(16))
+                }
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(.white.opacity(0.24), lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 12)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private func logPracticeTap(slot: Int, def: OutcomeDef, group: StuntGroup, session: PracticeSession) {
+        context.insert(Attempt(slot: slot, group: group, session: session))
+        try? context.save()
+        Sounds.shared.play(.outcome(def.soundOutcome))
+        withAnimation { practiceTaps += 1 }
+    }
+
+    private func finishPractice() {
+        practiceSession?.endedAt = .now
+        try? context.save()
+        guard let mode else { return }
+        completeOnboarding(mode)
     }
 }
 

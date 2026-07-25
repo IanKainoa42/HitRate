@@ -17,6 +17,7 @@ struct HomeView: View {
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
     @AppStorage("currentTeamID") private var currentTeamID = ""
+    @AppStorage("hasSeenHomeIconGuide") private var hasSeenHomeIconGuide = false
 
     @State private var timeframe: Timeframe = .today
     /// Cross-cutting review filters (Phase 4). nil = everyone / all skills.
@@ -29,6 +30,7 @@ struct HomeView: View {
     @State private var rosterOpen = false
     @State private var addTeamOpen = false
     @State private var newTeamName = ""
+    @State private var showIconGuide = false
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
 
@@ -271,10 +273,85 @@ struct HomeView: View {
                     }
                 }
         )
+        .sheet(isPresented: $showIconGuide) {
+            iconGuideSheet
+                .presentationDetents([.medium])
+                .presentationBackground(Theme.appBGBottom)
+        }
         .onAppear {
             syncMilestones()
+            if !hasSeenHomeIconGuide { showIconGuide = true }
         }
         .onChange(of: sessions) { _, _ in syncMilestones() }
+    }
+
+    // MARK: First-visit icon guide (no tab bar — these icons are the whole nav)
+
+    private var iconGuideSheet: some View {
+        VStack(spacing: 18) {
+            Text("YOUR DASHBOARD")
+                .font(.system(size: 11, weight: .heavy)).tracking(2)
+                .foregroundStyle(Theme.label3)
+                .padding(.top, 22)
+
+            VStack(alignment: .leading, spacing: 16) {
+                iconGuideRow(icon: "slider.horizontal.3", title: "Skills",
+                             detail: "Manage what you're tracking and folder settings.")
+                iconGuideRow(icon: "applewatch", title: "Watch",
+                             detail: "Log reps right from your wrist mid-practice.")
+                iconGuideRow(icon: "trophy", title: "Trophy Room",
+                             detail: "Cups, streaks, and cards you've earned.")
+                if !subjects.isEmpty {
+                    iconGuideRow(icon: "person.2",
+                                 title: subjectKind == .person ? "Roster" : "Stunt Groups",
+                                 detail: "Everyone ranked by hit rate.")
+                }
+                iconGuideRow(icon: "square.and.arrow.up", title: "Share",
+                             detail: "Turn your stats into a card to post or send.")
+            }
+            .padding(.horizontal, 20)
+
+            Spacer(minLength: 0)
+
+            Button {
+                hasSeenHomeIconGuide = true
+                showIconGuide = false
+            } label: {
+                Text("Got it")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.accentText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(FloorBackdrop().ignoresSafeArea())
+    }
+
+    private func iconGuideRow(icon: String, title: String, detail: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 34, height: 34)
+                .background(Theme.iconTile)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.label)
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.label2)
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     private func syncMilestones() {
@@ -543,7 +620,7 @@ struct HomeView: View {
 
     // MARK: Review filters (person / skill)
 
-    private var everyoneLabel: String { subjectKind == .person ? "Everyone" : "All groups" }
+    private var everyoneLabel: String { subjectKind == .person ? "Everyone" : "All stunt groups" }
 
     private var reviewFilterBar: some View {
         HStack(spacing: 6) {
@@ -718,23 +795,6 @@ struct HomeView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.label2)
                     .multilineTextAlignment(.center)
-
-                // Demo data mirrors the handoff's coach dataset — coach mode only.
-                if mode == .coach {
-                    Button {
-                        DemoData.seed(context: context)
-                    } label: {
-                        Text("Load demo data")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.accentText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Theme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 26)
@@ -771,22 +831,13 @@ struct HomeView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-
-                if mode == .coach {
-                    Button { DemoData.seed(context: context) } label: {
-                        Text("Load demo data")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.label2)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 26)
         }
         .padding(.top, 40)
     }
-    
+
     private func startClinic(matCount: Int, goalRate: Int) {
         let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, OutcomeTemplate.self])
         guard let container = try? ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {

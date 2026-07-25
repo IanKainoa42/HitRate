@@ -288,7 +288,7 @@ struct CaptureView: View {
                     }
                 case .subject:
                     if subjects.isEmpty {
-                        Text("Add \(subjectNoun == "athlete" ? "an athlete" : "a group") to pin")
+                        Text("Add \(subjectNoun == "athlete" ? "an athlete" : "a stunt group") to pin")
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.label3)
                             .padding(.vertical, 8)
@@ -712,7 +712,7 @@ struct CaptureView: View {
     private var unnamedRowHint: some View {
         VStack(spacing: 8) {
             Spacer()
-            Text("Add \(subjectNoun == "athlete" ? "an athlete" : "a group") to start logging")
+            Text("Add \(subjectNoun == "athlete" ? "an athlete" : "a stunt group") to start logging")
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.label2)
             Button { addSubject() } label: {

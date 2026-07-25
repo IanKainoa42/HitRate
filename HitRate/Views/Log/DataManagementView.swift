@@ -12,19 +12,28 @@ import SwiftData
 /// underneath reconciles its roster off-screen with no animation race. The user
 /// taps Back when ready, by which point the delete has fully settled.
 struct DataManagementView: View {
+    /// The folder this screen was opened from — scopes the "this folder only"
+    /// actions. Nil only if presented without a current team (shouldn't happen
+    /// in practice; the folder-scoped section just hides itself).
+    let team: Team?
+
     @Environment(\.modelContext) private var context
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var sessions: [PracticeSession]
     @Query private var attempts: [Attempt]
+    @Query private var customTallies: [CustomTally]
 
     @AppStorage("didOnboard") private var didOnboard = false
     @AppStorage("replayingIntro") private var replayingIntro = false
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
-    private enum Confirm { case clearHistory, eraseAll }
+    private enum Confirm { case clearFolderHistory, clearHistory, eraseAll }
     @State private var confirm: Confirm?
+    /// Trash-row "Delete permanently" awaiting confirmation (name shown + the
+    /// hard-delete to run if the user confirms).
+    @State private var pendingPurge: (name: String, action: () -> Void)?
 
     private var glassRow: Color { Theme.well }
     private var hasReps: Bool { !attempts.isEmpty }
@@ -33,6 +42,10 @@ struct DataManagementView: View {
     private var trashedTeams: [Team] { teams.trashed }
     private var trashedGroups: [StuntGroup] { groups.trashed }
     private var hasTrash: Bool { !trashedTeams.isEmpty || !trashedGroups.isEmpty }
+
+    private var folderName: String { team?.name ?? "this folder" }
+    private var folderAttempts: [Attempt] { attempts.filter { $0.group?.team?.id == team?.id } }
+    private var hasFolderReps: Bool { !folderAttempts.isEmpty }
 
     var body: some View {
         List {
@@ -99,15 +112,33 @@ struct DataManagementView: View {
                 .listRowBackground(glassRow)
             }
 
+            if team != nil {
+                Section {
+                    Button(role: .destructive) {
+                        confirm = .clearFolderHistory
+                    } label: {
+                        Label("Clear history in \(folderName)", systemImage: "clock.arrow.circlepath")
+                    }
+                    .disabled(!hasFolderReps)
+                } header: {
+                    Text("This folder")
+                } footer: {
+                    Text("Deletes only \(folderName)'s logged reps and sessions. Its \(mode.nounPlural) stay, and your other folders aren't touched.")
+                }
+                .listRowBackground(glassRow)
+            }
+
             Section {
                 Button(role: .destructive) {
                     confirm = .clearHistory
                 } label: {
-                    Label("Clear practice history", systemImage: "clock.arrow.circlepath")
+                    Label("Clear history in every folder", systemImage: "clock.arrow.circlepath")
                 }
                 .disabled(!hasReps)
+            } header: {
+                Text("All folders")
             } footer: {
-                Text("Deletes every logged rep and session but keeps your \(mode.nounPlural). Stats reset to zero.")
+                Text("Deletes every logged rep and session across ALL your folders — not just \(folderName). Your \(mode.nounPlural) stay everywhere. Stats reset to zero.")
             }
             .listRowBackground(glassRow)
 
@@ -115,13 +146,13 @@ struct DataManagementView: View {
                 Button(role: .destructive) {
                     confirm = .eraseAll
                 } label: {
-                    Label("Erase all data", systemImage: "trash")
+                    Label("Erase every folder", systemImage: "trash")
                 }
                 .disabled(!hasAnything)
             } header: {
-                Text("Danger zone")
+                Text("Danger zone — all folders")
             } footer: {
-                Text("Deletes your \(mode.nounPlural), reps, and sessions — a clean slate. Your name and custom outcome labels stay.")
+                Text("Deletes every folder on this device (including \(folderName)), every skill, rep, and session — a clean slate. Your name and custom outcome labels stay.")
             }
             .listRowBackground(glassRow)
         }
@@ -130,7 +161,18 @@ struct DataManagementView: View {
         .navigationTitle("Manage Data")
         .navigationBarTitleDisplayMode(.inline)
         .alert(
-            "Clear practice history?",
+            "Clear history in \(folderName)?",
+            isPresented: Binding(
+                get: { confirm == .clearFolderHistory },
+                set: { if !$0 { confirm = nil } })
+        ) {
+            Button("Clear history", role: .destructive) { clearFolderHistory() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(folderAttempts.count) rep\(folderAttempts.count == 1 ? "" : "s") in \(folderName) will be deleted. Its \(mode.nounPlural) stay, and your other folders aren't touched. This can't be undone.")
+        }
+        .alert(
+            "Clear history in every folder?",
             isPresented: Binding(
                 get: { confirm == .clearHistory },
                 set: { if !$0 { confirm = nil } })
@@ -138,10 +180,10 @@ struct DataManagementView: View {
             Button("Clear history", role: .destructive) { clearHistory() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All \(attempts.count) reps and \(sessions.count) sessions will be deleted. Your \(mode.nounPlural) stay. This can't be undone.")
+            Text("All \(attempts.count) reps and \(sessions.count) sessions across every folder — not just \(folderName) — will be deleted. Your \(mode.nounPlural) stay. This can't be undone.")
         }
         .alert(
-            "Erase all data?",
+            "Erase every folder?",
             isPresented: Binding(
                 get: { confirm == .eraseAll },
                 set: { if !$0 { confirm = nil } })
@@ -149,7 +191,18 @@ struct DataManagementView: View {
             Button("Erase everything", role: .destructive) { eraseAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your \(groups.count) \(mode.nounPlural), \(attempts.count) reps, and \(sessions.count) sessions will be permanently deleted.")
+            Text("Every folder on this device (including \(folderName)) — \(groups.count) \(mode.nounPlural), \(attempts.count) reps, and \(sessions.count) sessions — will be permanently deleted.")
+        }
+        .alert(
+            "Delete \(pendingPurge?.name ?? "") permanently?",
+            isPresented: Binding(
+                get: { pendingPurge != nil },
+                set: { if !$0 { pendingPurge = nil } })
+        ) {
+            Button("Delete permanently", role: .destructive) { pendingPurge?.action() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
@@ -175,7 +228,9 @@ struct DataManagementView: View {
             Button("Restore") { withAnimation { restore() } }.tint(Theme.accent)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button("Delete permanently", role: .destructive) { withAnimation { purge() } }
+            Button("Delete permanently", role: .destructive) {
+                pendingPurge = (name, { withAnimation { purge() } })
+            }
         }
     }
 
@@ -206,6 +261,28 @@ struct DataManagementView: View {
     /// tracker), so the loop cost is irrelevant.
     private func all<T: PersistentModel>(_ type: T.Type) -> [T] {
         (try? context.fetch(FetchDescriptor<T>())) ?? []
+    }
+
+    /// Scoped version of `clearHistory()` — only this folder's reps (and any
+    /// custom-outcome tallies tied to its skills) are deleted. A touched
+    /// session is only removed once nothing from any folder remains in it, so
+    /// a session that also holds another folder's reps survives.
+    private func clearFolderHistory() {
+        guard let team else { return }
+        let scoped = folderAttempts
+        let touchedSessionIDs = Set(scoped.compactMap { $0.session?.cloudID }.filter { !$0.isEmpty })
+        for a in scoped {
+            SyncEngine.shared.queueDeletion(of: a, in: context)
+            context.delete(a)
+        }
+        for t in customTallies where t.group?.team?.id == team.id {
+            context.delete(t)
+        }
+        for s in sessions where touchedSessionIDs.contains(s.cloudID)
+            && s.attempts.isEmpty && s.customTallies.isEmpty {
+            context.delete(s)
+        }
+        try? context.save()
     }
 
     /// Keep the roster, wipe the record of practice. Deleting the sessions

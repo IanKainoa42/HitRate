@@ -59,7 +59,7 @@ enum SubjectKind: String, CaseIterable, Identifiable, Codable {
     case person, group
 
     var id: String { rawValue }
-    var label: String { self == .person ? "Athlete" : "Group" }
+    var label: String { self == .person ? "Athlete" : "Stunt Group" }
     var icon: String { self == .person ? "person.fill" : "person.3.fill" }
 }
 

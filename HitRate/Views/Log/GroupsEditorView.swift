@@ -28,7 +28,6 @@ struct GroupsEditorView: View {
 
     // Swipe-deleted group/team awaiting confirmation (only when it has reps).
     @State private var pendingDelete: StuntGroup?
-    @State private var pendingTeamDelete: Team?
     @State private var editingOutcomesFor: StuntGroup?
     @State private var editingTemplate: OutcomeTemplate?
 
@@ -220,7 +219,7 @@ struct GroupsEditorView: View {
 
                 Section {
                     NavigationLink {
-                        DataManagementView()
+                        DataManagementView(team: currentTeam)
                     } label: {
                         Label("Manage data", systemImage: "externaldrive")
                     }
@@ -240,7 +239,7 @@ struct GroupsEditorView: View {
             }
             .scrollContentBackground(.hidden)
             .background(FloorBackdrop().ignoresSafeArea())
-            .navigationTitle(mode == .athlete ? "My Skills" : "Groups")
+            .navigationTitle(mode == .athlete ? "My \(nounPluralTitle)" : nounPluralTitle)
             .navigationBarTitleDisplayMode(.inline)
             .alert(
                 "Delete \(pendingDelete?.name ?? "")?",
@@ -256,18 +255,6 @@ struct GroupsEditorView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { g in
                 Text("This \(noun) and its \(g.attempts.count) logged reps move to the Trash. Restore them anytime from Data Management.")
-            }
-            .alert(
-                "Delete \(pendingTeamDelete?.name ?? "")?",
-                isPresented: Binding(
-                    get: { pendingTeamDelete != nil },
-                    set: { if !$0 { pendingTeamDelete = nil } }),
-                presenting: pendingTeamDelete
-            ) { t in
-                Button("Move to Trash", role: .destructive) { withAnimation { removeTeam(t) } }
-                Button("Cancel", role: .cancel) {}
-            } message: { t in
-                Text("This folder, its \(groupCount(t)) \(t.nounPlural(for: mode)), and all their reps move to the Trash. Restore anytime from Data Management.")
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
@@ -457,102 +444,6 @@ struct GroupsEditorView: View {
         }
     }
 
-    // MARK: Teams
-
-    @ViewBuilder
-    private var teamsSection: some View {
-        Section {
-            ForEach(teams.active) { t in
-                HStack(spacing: 10) {
-                    Button {
-                        currentTeamID = t.id.uuidString
-                    } label: {
-                        Image(systemName: t.id == currentTeam?.id ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 18))
-                            .foregroundStyle(t.id == currentTeam?.id ? Theme.accent : Theme.label3)
-                    }
-                    .buttonStyle(.plain)
-                    RenameField(prompt: "Folder name", value: t.name) { new in
-                        let trimmed = new.trimmingCharacters(in: .whitespaces)
-                        guard !trimmed.isEmpty else { return }
-                        t.name = trimmed
-                        try? context.save()
-                    }
-                    Spacer(minLength: 6)
-                    Text("\(groupCount(t))")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                // Same no-snap-back treatment as the skills rows — see there.
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    if teams.active.count > 1 {
-                        Button("Delete") { requestTeamDelete(t) }.tint(.red)
-                    }
-                }
-                // The only folder can't be deleted (reps need a home). Disable
-                // the edit-mode minus too, or it animates the row away and then
-                // pops back when the guard blocks the delete.
-                .deleteDisabled(teams.active.count <= 1)
-            }
-            .onDelete { idx in   // edit-mode minus button path
-                guard let i = idx.first else { return }
-                requestTeamDelete(teams.active[i])
-            }
-            .onMove(perform: moveTeams)
-
-            Button {
-                addTeam()
-            } label: {
-                Label("Add folder", systemImage: "plus")
-            }
-        } header: {
-            Text("Folders")
-        } footer: {
-            Text("Each folder keeps its own roster and stats — call it a team, an athlete, a private lesson, whatever you track separately. Switch folders from the home screen (the back arrow), or tap a circle here.")
-        }
-        .listRowBackground(glassRow)
-    }
-
-    private func groupCount(_ t: Team) -> Int {
-        allGroups.filter { $0.team?.id == t.id && $0.deletedAt == nil }.count
-    }
-
-    private func addTeam() {
-        let t = Team(name: "Folder \(teams.active.count + 1)", orderIndex: teams.count)
-        context.insert(t)
-        try? context.save()
-        currentTeamID = t.id.uuidString
-    }
-
-    private func requestTeamDelete(_ t: Team) {
-        // Always keep at least one active folder — reps need a live home.
-        guard teams.active.count > 1 else { return }
-        if allGroups.contains(where: { $0.team?.id == t.id && $0.deletedAt == nil && !$0.attempts.isEmpty }) {
-            pendingTeamDelete = t   // has logged reps — confirm before trashing
-        } else {
-            withAnimation { removeTeam(t) }
-        }
-    }
-
-    /// Soft-delete: the folder (and its skills + reps) move to the Trash, kept
-    /// and restorable. Nothing is hard-deleted here.
-    private func removeTeam(_ t: Team) {
-        let wasCurrent = t.id == currentTeam?.id
-        t.deletedAt = .now
-        let remaining = teams.active.filter { $0.id != t.id }.sorted { $0.orderIndex < $1.orderIndex }
-        for (i, team) in remaining.enumerated() { team.orderIndex = i }
-        try? context.save()
-        if wasCurrent, let first = remaining.first {
-            currentTeamID = first.id.uuidString
-        }
-    }
-
-    private func moveTeams(_ from: IndexSet, _ to: Int) {
-        var arr = teams
-        arr.move(fromOffsets: from, toOffset: to)
-        for (i, t) in arr.enumerated() { t.orderIndex = i }
-        try? context.save()
-    }
 }
 
 /// Per-skill outcome editor — the flexible outcome list. Each outcome is a
