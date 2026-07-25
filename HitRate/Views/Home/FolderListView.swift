@@ -30,6 +30,7 @@ struct FolderListView: View {
     @State private var renameText = ""
     @State private var sharing: Team?
     @State private var joinOpen = false
+    @State private var pendingTrash: Team?
 
     /// You own a folder if it's never been claimed (local-only) or its cloud
     /// owner is you. A folder you JOINED carries someone else's ownerUID.
@@ -107,6 +108,21 @@ struct FolderListView: View {
             JoinFolderSheet()
                 .presentationDetents([.height(300)])
                 .presentationBackground(Theme.appBGBottom)
+        }
+        .alert(
+            "Move “\(pendingTrash?.name ?? "")” to Trash?",
+            isPresented: Binding(
+                get: { pendingTrash != nil },
+                set: { if !$0 { pendingTrash = nil } }),
+            presenting: pendingTrash
+        ) { t in
+            Button("Move to Trash", role: .destructive) {
+                withAnimation { trashFolder(t) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { t in
+            let s = folderSummaries[t.id.uuidString] ?? .init()
+            Text("This folder, its \(s.skillCount) skill\(s.skillCount == 1 ? "" : "s"), and \(s.repCount) rep\(s.repCount == 1 ? "" : "s") move to the Trash. Restore anytime from Data Management.")
         }
     }
 
@@ -228,7 +244,7 @@ struct FolderListView: View {
             }
             if teams.active.count > 1 {
                 Button(role: .destructive) {
-                    withAnimation { trashFolder(t) }
+                    pendingTrash = t
                 } label: { Label("Move to Trash", systemImage: "trash") }
             }
         }
