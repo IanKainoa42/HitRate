@@ -17,7 +17,11 @@ enum DemoData {
     ]
 
     // Floor-rate targets for prior sessions (prototype trend: ...60→71, today 74).
-    private static let priorRates = [57, 60, 62, 60, 66, 63, 70, 69, 72, 71]
+    // Trimmed from the original 10-session trend to keep the whole demo set
+    // (prior sessions + today's fixed 171) around ~300 attempts — the full
+    // history pushed ~1,536 Attempt writes per tap once synced (see
+    // .learnings/LEARNINGS.md 2026-07-24).
+    private static let priorRates = [70, 69, 72, 71]
 
     static func seed(context: ModelContext) {
         // The demo dataset belongs to the active team — resolve (or create) it,
@@ -53,7 +57,7 @@ enum DemoData {
             let day = cal.date(byAdding: .day, value: -daysBack, to: .now)!
             let start = cal.date(bySettingHour: 18, minute: 41, second: 0, of: day)!
             seedSession(context: context, groups: groups, start: start,
-                        totalReps: Int.random(in: 120...160, using: &rng),
+                        totalReps: Int.random(in: 30...42, using: &rng),
                         targetRate: rate, rng: &rng)
             daysBack -= 3
         }
