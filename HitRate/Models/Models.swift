@@ -628,6 +628,30 @@ final class StuntGroup {
         return slot >= 0 && slot < defs.count ? defs[slot] : nil
     }
 
+    /// This skill's live `outcomeDefs` (label + color, whatever the skill
+    /// actually taps in practice), collapsed onto the 4 stat tiers the same
+    /// way `Attempt.tierOutcome` does — the FIRST def at each credit tier
+    /// represents it. A tier neither this skill's list nor its category
+    /// default covers (e.g. the 2-outcome "Other" type has nothing at
+    /// decent/rough; tumbling's preset has nothing at rough) falls back to
+    /// the legacy generic label/color for that tier — it always counts 0
+    /// reps for that skill anyway, so it just needs to not collide visually
+    /// with a real, populated chip. Cards should read THIS, not
+    /// `outcomeWords` (word-only, pre-dates the flexible label+color+credit
+    /// system and stays behind for QuickClinic).
+    var tierOutcomeDefs: [OutcomeDef] {
+        let defs = outcomeDefs
+        let presetDefaults = category.defaultOutcomeDefs
+        return (0..<4).map { tier in
+            if let d = defs.first(where: { $0.creditTier.tierIndex == tier }) { return d }
+            if let d = presetDefaults.first(where: { $0.creditTier.tierIndex == tier }) { return d }
+            let o = Outcome(rawValue: tier) ?? .majorFall
+            let legacyColors: [OutcomeColor] = [.green, .yellow, .orange, .red]
+            let credit = OutcomeCredit.allCases.first { $0.tierIndex == tier } ?? .miss
+            return OutcomeDef(label: o.defaultLabel(kind), colorRaw: legacyColors[tier].rawValue, credit: credit.rawValue)
+        }
+    }
+
     // MARK: Per-skill outcome words (the good→bad scale)
 
     /// This skill's four outcome words, slot 0 (good/clean) → slot 3 (bad).

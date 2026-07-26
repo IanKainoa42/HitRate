@@ -1,4 +1,5 @@
 import SwiftUI
+import CheerRulesKit
 
 // MARK: - Design tokens (from design handoff)
 
@@ -159,18 +160,23 @@ struct Rarity {
     /// `seed` picks between voice variants in bands that have more than one
     /// line — derived from the card name (stable), NEVER a live RNG: snapshots
     /// re-render and the line must not change between the sheet and the export.
-    static func stats(rate: Int, noun: String = "group", stunt: Bool = true,
-                      seed: Int = 0) -> Rarity {
+    /// `category`/`dominantIssue` let the line name-check THIS skill's actual
+    /// discipline and pattern instead of reading like a generic rate lookup;
+    /// both are nil for the aggregate "ALL SKILLS" card, which keeps the
+    /// original generic ladder.
+    static func stats(rate: Int, noun: String = "group", category: SkillCategory? = nil,
+                      dominantIssue: String? = nil, seed: Int = 0) -> Rarity {
         Rarity(tier: "STATS", stars: 0, tag: Color.white.opacity(0.55),
                edgeColors: navyEdge, foil: .none,
-               flavor: statFlavor(rate: rate, noun: noun, stunt: stunt, seed: seed))
+               flavor: statFlavor(rate: rate, noun: noun, category: category,
+                                  dominantIssue: dominantIssue, seed: seed))
     }
 
     /// The stat-card narrative ladder (Ian's voice — sarcastic by default).
     /// Bands: 99 / 95 / 90 / 80 / 60 / floor. (78 was a leftover from the
     /// retired rate-derived rarity bands; rounded to 80 on 2026-06-11.)
-    private static func statFlavor(rate: Int, noun: String, stunt: Bool,
-                                   seed: Int) -> String {
+    private static func statFlavor(rate: Int, noun: String, category: SkillCategory?,
+                                   dominantIssue: String?, seed: Int) -> String {
         if rate >= 99 {
             return "You actually know what you're doing, and I respect that… or you're a liar and I hate you."
         }
@@ -179,6 +185,9 @@ struct Rarity {
             return "You're probably not the problem — spread good energy to the rest of the team. PS: you're not perfect."
         }
         if rate >= 80 {
+            if let issue = dominantIssue {
+                return "You're staying up — go fix the \(issue.lowercased()) and this is a whole different card."
+            }
             return seed.isMultiple(of: 2)
                 ? "Just because you can stay up doesn't mean you didn't lose any points."
                 : "You could still do better."
@@ -186,11 +195,21 @@ struct Rarity {
         if rate >= 60 {
             return "You are so close. Keep pushing — you've almost had your breakthrough. You almost understand what you're doing."
         }
-        // Kind-specific call-outs rotate with the universal pouting line.
+        // Category-specific call-outs rotate with the universal pouting line.
         if seed.isMultiple(of: 2) {
-            return stunt
-                ? "If you're blaming the flyer, it's probably you that's the problem."
-                : "And you threw this at tryouts? Did you land it?"
+            switch category {
+            case .tosses:
+                return "Bases catch what bases catch — height and set are on you."
+            case .jumps:
+                return "Legs bent, arms flailing — pick one to fix first."
+            case .standingTumbling, .runningTumbling:
+                return "And you threw this at tryouts? Did you land it?"
+            case .stunts, .pyramid, nil:
+                return "If you're blaming the flyer, it's probably you that's the problem."
+            }
+        }
+        if let issue = dominantIssue {
+            return "Same story every rep: \(issue.lowercased()). Pouting never helped nobody."
         }
         return "Pouting never helped nobody."
     }

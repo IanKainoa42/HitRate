@@ -26,6 +26,8 @@ struct GroupStat: Identifiable {
     let number: Int
     let colorIndex: Int
     let kind: SkillKind    // picks the outcome wording for this bucket
+    let category: SkillCategory        // this skill's real United category — drives the card icon
+    let tierDefs: [OutcomeDef]         // this skill's own outcome label+color per tier — drives the card chips
     let counts: [Int]      // indexed by Outcome.rawValue
     let total: Int
     let hits: Int
@@ -226,7 +228,7 @@ enum StatsEngine {
                 id: PersistentIdentifierBox(raw: "\(g.persistentModelID)"),
                 name: g.name, number: g.number,
                 colorIndex: (g.number - 1) % Theme.groupRainbow.count,
-                kind: g.kind,
+                kind: g.kind, category: g.category, tierDefs: g.tierOutcomeDefs,
                 counts: counts, total: total, hits: hits, rate: rate, delta: delta))
         }
 

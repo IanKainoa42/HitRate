@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CheerRulesKit
 
 /// DEBUG REVIEW HARNESS — renders every share-card variant (stat cards across
 /// flavor bands, all 13 milestones earned+locked, pucks) to Documents/card-catalog/
@@ -19,6 +20,17 @@ enum CardCatalogRenderer {
 
     // MARK: Catalog
 
+    /// A category's default outcome words, paired with the legacy tier
+    /// colors, as a 4-slot tier-aligned `[OutcomeDef]` — mirrors what
+    /// `StuntGroup.tierOutcomeDefs` resolves for a real skill, so these
+    /// preview cards exercise the same per-category icon + chip rendering.
+    private static func tierDefs(_ category: SkillCategory) -> [OutcomeDef] {
+        let words = category.defaultOutcomeWords
+        let colors: [OutcomeColor] = [.green, .yellow, .orange, .red]
+        let credits = [100, 67, 33, 0]
+        return (0..<4).map { OutcomeDef(label: words[$0], colorRaw: colors[$0].rawValue, credit: credits[$0]) }
+    }
+
     private static var statCards: [(slug: String, spec: CardSpec)] {
         [
             // 99 band — "Untouchable"
@@ -31,46 +43,52 @@ enum CardCatalogRenderer {
                 id: 0, kicker: "FULL FLOOR", name: "CheerForce Black", badge: "★",
                 color: Theme.electric, rate: 96, counts: [115, 3, 1, 1],
                 total: 120, delta: -1, flavorNoun: "group", kind: .stunt)),
-            // 90 band — "not the problem / PS"
+            // 90 band — "not the problem / PS" — Stunts category icon + words
             ("stat-skill-92", CardSpec(
                 id: 1, kicker: "SKILL 1", name: "Lib Heel Stretch", badge: "1",
                 color: Theme.groupColor(0), rate: 92, counts: [23, 1, 1, 0],
-                total: 25, delta: 2, flavorNoun: "skill", kind: .stunt)),
-            // 80 band, even seed — "stay up / lost points"
+                total: 25, delta: 2, flavorNoun: "skill", kind: .stunt,
+                category: .stunts, outcomeDefs: tierDefs(.stunts))),
+            // 80 band, even seed — dominant-issue line (bobbles > falls) — Pyramid
             ("stat-group-84-stayup", CardSpec(
                 id: 2, kicker: "GROUP 1", name: "Group 1", badge: "1",
                 color: Theme.groupColor(1), rate: 84, counts: [21, 2, 1, 1],
-                total: 25, delta: 6, flavorNoun: "group", kind: .stunt)),
-            // 80 band, odd seed — "could still do better"
+                total: 25, delta: 6, flavorNoun: "group", kind: .stunt,
+                category: .pyramid, outcomeDefs: tierDefs(.pyramid))),
+            // 80 band, odd seed — "could still do better" — Tosses
             ("stat-group-84-better", CardSpec(
                 id: 3, kicker: "GROUP 2", name: "Group 2", badge: "2",
                 color: Theme.groupColor(2), rate: 84, counts: [21, 2, 1, 1],
-                total: 25, delta: nil, flavorNoun: "group", kind: .stunt)),
-            // 60 band — "so close / breakthrough"
+                total: 25, delta: nil, flavorNoun: "group", kind: .stunt,
+                category: .tosses, outcomeDefs: tierDefs(.tosses))),
+            // 60 band — "so close / breakthrough" — Running Tumbling
             ("stat-skill-tumbling-67", CardSpec(
                 id: 4, kicker: "SKILL 3", name: "Full", badge: "3",
                 color: Theme.groupColor(3), rate: 67, counts: [12, 3, 2, 1],
-                total: 18, delta: nil, flavorNoun: "skill", kind: .tumbling)),
+                total: 18, delta: nil, flavorNoun: "skill", kind: .tumbling,
+                category: .runningTumbling, outcomeDefs: tierDefs(.runningTumbling))),
             // floor band, stunt + even seed — flyer line
             ("stat-group-48-flyer", CardSpec(
                 id: 5, kicker: "GROUP 5", name: "Group 5", badge: "5",
                 color: Theme.groupColor(4), rate: 48, counts: [10, 4, 4, 3],
                 total: 21, delta: -9, flavorNoun: "group", kind: .stunt)),
-            // floor band, stunt + odd seed — pouting line
+            // floor band, jumps + odd seed — dominant-issue pouting line
             ("stat-group-52-pouting", CardSpec(
                 id: 6, kicker: "GROUP 4", name: "Group 4", badge: "4",
                 color: Theme.groupColor(5), rate: 52, counts: [11, 4, 3, 3],
-                total: 21, delta: -2, flavorNoun: "group", kind: .stunt)),
+                total: 21, delta: -2, flavorNoun: "group", kind: .stunt,
+                category: .jumps, outcomeDefs: tierDefs(.jumps))),
             // floor band, tumbling + odd seed — pouting line
             ("stat-skill-tumbling-40-pouting", CardSpec(
                 id: 7, kicker: "SKILL 6", name: "Standing Full", badge: "6",
                 color: Theme.groupColor(6), rate: 40, counts: [6, 4, 3, 2],
                 total: 15, delta: nil, flavorNoun: "skill", kind: .tumbling)),
-            // floor band, tumbling + even seed — tryouts line
+            // floor band, tumbling + even seed — tryouts line — Standing Tumbling
             ("stat-skill-tumbling-45-tryouts", CardSpec(
                 id: 8, kicker: "SKILL 7", name: "Back Tuck", badge: "7",
                 color: Theme.groupColor(7), rate: 45, counts: [9, 5, 4, 2],
-                total: 20, delta: -4, flavorNoun: "skill", kind: .tumbling)),
+                total: 20, delta: -4, flavorNoun: "skill", kind: .tumbling,
+                category: .standingTumbling, outcomeDefs: tierDefs(.standingTumbling))),
         ]
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import CheerRulesKit
 
 /// One stat card's worth of data, derived from FloorStats.
 struct CardSpec: Identifiable {
@@ -13,6 +14,19 @@ struct CardSpec: Identifiable {
     let delta: Int?
     var flavorNoun = "group"   // word used in stat flavor text
     var kind: SkillKind = .stunt   // outcome wording on the energy chips
+    // Real per-skill identity — nil on the aggregate "ALL SKILLS"/"FULL FLOOR"
+    // card, which spans every skill and stays generic on purpose.
+    var category: SkillCategory? = nil
+    var outcomeDefs: [OutcomeDef]? = nil
+
+    /// The single non-hit outcome this card logged the most of, by its own
+    /// word (or the generic one on the aggregate card) — nil if it's a clean
+    /// sweep or there's no data. Lets the flavor line name the actual problem.
+    var dominantIssueLabel: String? {
+        let issues = (1..<4).map { (slot: $0, count: counts[$0]) }
+        guard let worst = issues.max(by: { $0.count < $1.count }), worst.count > 0 else { return nil }
+        return outcomeDefs?[worst.slot].label ?? Outcome(rawValue: worst.slot)?.label(kind)
+    }
 
     static func deck(from stats: FloorStats, teamName: String, mode: AppMode) -> [CardSpec] {
         var cards: [CardSpec] = [
@@ -27,7 +41,8 @@ struct CardSpec: Identifiable {
                 id: i + 1, kicker: "\(mode.nounTitle.uppercased()) \(g.number)",
                 name: g.name, badge: "\(g.number)",
                 color: Theme.groupColor(g.colorIndex), rate: g.rate, counts: g.counts,
-                total: g.total, delta: g.delta, flavorNoun: mode.noun, kind: g.kind))
+                total: g.total, delta: g.delta, flavorNoun: mode.noun, kind: g.kind,
+                category: g.category, outcomeDefs: g.tierDefs))
         }
         return cards
     }
@@ -85,7 +100,7 @@ struct HoloCardView: View {
     private var rarity: Rarity {
         switch card.content {
         case .stats(let s): Rarity.stats(rate: s.rate, noun: s.flavorNoun,
-                                         stunt: s.kind == .stunt,
+                                         category: s.category, dominantIssue: s.dominantIssueLabel,
                                          seed: s.name.unicodeScalars.reduce(0) { $0 + Int($1.value) })
         case .milestone(let m): Rarity.of(tier: m.tier)
         }
@@ -210,7 +225,7 @@ struct HoloCardView: View {
             VStack(spacing: 0) {
                 header(badge: Text(spec.badge), color: spec.color,
                        kicker: spec.kicker, name: spec.name,
-                       kind: spec.kind)
+                       kind: spec.kind, iconOverride: spec.category?.icon)
                 gauge(spec)
                 powerBar(spec)
                 energyChips(spec)
@@ -265,22 +280,29 @@ struct HoloCardView: View {
     private func energyChips(_ spec: CardSpec) -> some View {
         HStack(spacing: 6) {
             ForEach(Outcome.allCases) { o in
+                // This skill's own outcome word/color when known (a real
+                // skill/group card); the aggregate "ALL SKILLS" card has no
+                // single skill's vocabulary to show, so it keeps the generic
+                // app-wide word.
+                let def = spec.outcomeDefs?[o.rawValue]
+                let label = def?.short ?? o.short(spec.kind)
+                let color = def?.color ?? o.color
                 VStack(spacing: 2) {
                     Text("\(spec.counts[o.rawValue])")
                         .font(Theme.grotesk(16))
                         .monospacedDigit()
                         .foregroundStyle(.white)
-                    Text(o.short(spec.kind))
+                    Text(label)
                         .font(Theme.grotesk(8))
                         .tracking(0.48)
-                        .foregroundStyle(o.color)
+                        .foregroundStyle(color)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
-                .background(o.color.opacity(0.10))
+                .background(color.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(o.color.opacity(0.25), lineWidth: 1))
+                    .stroke(color.opacity(0.25), lineWidth: 1))
             }
         }
         .padding(.horizontal, 13)
@@ -361,7 +383,8 @@ struct HoloCardView: View {
 
     private func header(badge: some View, color: Color,
                         kicker: String, name: String,
-                        hp: Int? = nil, kind: SkillKind? = nil) -> some View {
+                        hp: Int? = nil, kind: SkillKind? = nil,
+                        iconOverride: String? = nil) -> some View {
         HStack(alignment: .top, spacing: 9) {
             badge
                 .font(Theme.grotesk(14))
@@ -393,8 +416,8 @@ struct HoloCardView: View {
                             .foregroundStyle(.white)
                     }
                 }
-                if let kind = kind {
-                    Image(systemName: kind == .stunt ? "figure.gymnastics" : "figure.run")
+                if let icon = iconOverride ?? kind.map({ $0 == .stunt ? "figure.gymnastics" : "figure.run" }) {
+                    Image(systemName: icon)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(width: 26, height: 26)
