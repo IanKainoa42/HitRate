@@ -40,13 +40,13 @@ struct LogView: View {
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
 
-    // Wave/Routine staging (grid only): stage any number of reps per bucket
-    // (tap +1, hold −1), then commit the whole batch at once. A group can
-    // carry several outcomes in one pass (2 hits + a bobble), so staging is
-    // a 4-slot count array per group, NOT one outcome — and commit is manual
-    // only (with multi-staging there is no "everyone staged" finish line).
-    // `waveMode` persists; `lastWave` is the just-committed batch for Undo.
-    @AppStorage("waveMode") private var waveMode = false
+    // Wave/Routine staging (grid only, the ONLY way the grid logs): stage any
+    // number of reps per bucket (tap +1, hold −1), then commit the whole
+    // batch at once. A group can carry several outcomes in one pass (2 hits +
+    // a bobble), so staging is a 4-slot count array per group, NOT one
+    // outcome — and commit is manual only (with multi-staging there is no
+    // "everyone staged" finish line). `lastWave` is the just-committed batch
+    // for Undo.
     @State private var staged: [PersistentIdentifier: [Int]] = [:]
     @State private var lastWave: [Attempt] = []
 
@@ -88,8 +88,8 @@ struct LogView: View {
                 })
     }
 
-    /// Wave staging is grid-only; the switch is offered whenever the grid is.
-    private var waveActive: Bool { useGrid && waveMode }
+    /// Wave staging is grid-only, and it's the grid's only input mode.
+    private var waveActive: Bool { useGrid }
     /// Total staged reps among the CURRENT roster — a deleted group's stale
     /// key never counts.
     private var stagedReps: Int {
@@ -242,10 +242,8 @@ struct LogView: View {
             .padding(.top, 4)
 
             // Layout toggle — grid is offered only for single-kind rosters.
-            // The Wave/Routine switch rides alongside it, but only in Grid.
             if gridAvailable {
                 HStack(spacing: 10) {
-                    if useGrid { waveToggle }
                     Spacer()
                     MiniSeg(options: ["Grid", "Pad"], selection: layoutBinding)
                 }
@@ -254,7 +252,7 @@ struct LogView: View {
 
             if useGrid {
                 logGrid(attempts)
-                if waveActive { waveBar }
+                waveBar
             } else {
             // Group picker
             ScrollView(.horizontal, showsIndicators: false) {
@@ -410,7 +408,7 @@ struct LogView: View {
     @ViewBuilder
     private func logGrid(_ attempts: [Attempt]) -> some View {
         VStack(spacing: 8) {
-            Text(waveActive ? "TAP TO STAGE \(waveNoun.uppercased()) REPS · HOLD TO REMOVE ONE" : "TAP A CELL TO LOG A REP")
+            Text("TAP TO STAGE \(waveNoun.uppercased()) REPS · HOLD TO REMOVE ONE")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.6)
                 .foregroundStyle(Theme.label3)
@@ -465,31 +463,16 @@ struct LogView: View {
 
                             ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                 let v = slot < c.count ? c[slot] : 0
-                                let stagedN = waveActive ? stagedCount(g, slot) : 0
-                                let cell = gridCellLabel(v, def: def, stagedN: stagedN)
-                                Group {
-                                    if waveActive {
-                                        // NOT a Button: a Button fires its action on
-                                        // release even after a hold, so a long-press
-                                        // decrement would be re-incremented on lift.
-                                        cell
-                                            .onTapGesture { stage(g, slot) }
-                                            .onLongPressGesture(minimumDuration: 0.4) { unstage(g, slot) }
-                                    } else {
-                                        Button {
-                                            context.insert(Attempt(slot: slot, group: g, session: session))
-                                            try? context.save()
-                                            hapticTrigger += 1
-                                            Sounds.shared.play(.outcome(def.soundOutcome))
-                                        } label: {
-                                            cell
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(def.label) for \(g.name)")
-                                .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
-                                .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
+                                let stagedN = stagedCount(g, slot)
+                                // NOT a Button: a Button fires its action on
+                                // release even after a hold, so a long-press
+                                // decrement would be re-incremented on lift.
+                                gridCellLabel(v, def: def, stagedN: stagedN)
+                                    .onTapGesture { stage(g, slot) }
+                                    .onLongPressGesture(minimumDuration: 0.4) { unstage(g, slot) }
+                                    .accessibilityLabel("Stage \(def.label) for \(g.name)")
+                                    .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
+                                    .accessibilityHint("Tap to stage one more, hold to remove one")
                             }
                         }
                         .frame(maxHeight: 50)
@@ -555,33 +538,6 @@ struct LogView: View {
     }
 
     // MARK: Wave / Routine staging
-
-    /// Compact caps pill that arms staging. Green-filled when on, chalk
-    /// outline when off — one accent, no candy. Word adapts: WAVE / ROUTINE.
-    private var waveToggle: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) { waveMode.toggle() }
-            if !waveMode { staged = [:]; lastWave = [] }   // leaving wave drops pending + undo
-            hapticTrigger += 1
-        } label: {
-            Text(waveNoun.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.2)
-                .foregroundStyle(waveMode ? Theme.well : Theme.label2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(waveMode ? Theme.accent : Theme.well)
-                        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .stroke(Color.white.opacity(waveMode ? 0 : 0.1), lineWidth: 1))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(waveNoun) logging")
-        .accessibilityValue(waveMode ? "on" : "off")
-    }
 
     /// Docked under the matrix in wave mode. While staging: rep count + Clear +
     /// Submit. After a commit (nothing staged): Undo. Commit is ALWAYS manual —

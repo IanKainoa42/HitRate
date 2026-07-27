@@ -38,13 +38,13 @@ struct CaptureView: View {
     /// recent chip on a United-category skill sets this and presents the sheet.
     @State private var scoringAttempt: Attempt?
 
-    // Wave/Routine staging: stage any number of reps per (skill, subject) CELL
-    // (tap +1, hold −1), then commit the whole batch at once. A cell can carry
-    // several outcomes in one pass, so staging is a slot-count array per cell and
-    // commit is MANUAL only — with multi-rep staging there's no "everyone staged"
-    // finish line. Works in either pivot: the pinned axis is fixed, the row axis
-    // varies, but the key always names both skill and subject.
-    @AppStorage("waveMode") private var waveMode = false
+    // Wave/Routine staging: the ONLY way reps get logged. Stage any number of
+    // reps per (skill, subject) CELL (tap +1, hold −1), then commit the whole
+    // batch at once. A cell can carry several outcomes in one pass, so staging
+    // is a slot-count array per cell and commit is MANUAL only — with
+    // multi-rep staging there's no "everyone staged" finish line. Works in
+    // either pivot: the pinned axis is fixed, the row axis varies, but the key
+    // always names both skill and subject.
     @State private var staged: [StageKey: [Int]] = [:]
     @State private var lastWave: [Attempt] = []
 
@@ -73,10 +73,7 @@ struct CaptureView: View {
     private var subjectKind: SubjectKind { mode == .coach ? .group : .person }
     private var subjectNoun: String { subjectKind.label.lowercased() }
 
-    /// Wave staging armed. `waveActive` gates the cells between tap-to-log and
-    /// tap-to-stage. Coach mental model is a wave of stunt groups; athlete a
-    /// routine pass.
-    private var waveActive: Bool { waveMode }
+    /// Coach mental model is a wave of stunt groups; athlete a routine pass.
     private var waveNoun: String { mode == .coach ? "wave" : "routine" }
     /// Total staged reps across every cell (a stale key can't over-count — nil rows
     /// contribute nothing).
@@ -133,7 +130,7 @@ struct CaptureView: View {
                 if pivot == .skill, !customOutcomes.isEmpty, let skill = pinnedSkill {
                     customOutcomePad(group: skill)
                 }
-                if waveActive { waveBar }
+                waveBar
                 recentTicker(attempts)
             }
         }
@@ -226,7 +223,6 @@ struct CaptureView: View {
                             hapticTrigger += 1
                         }))
             Spacer()
-            waveToggle
             // The + adds an item of the PINNED axis — the same list the pin picker
             // shows. Pinned on Skill → new skill; pinned on the subject axis → new
             // subject. To add the other kind, flip the pin. (Ian: "on the skill tab
@@ -243,33 +239,6 @@ struct CaptureView: View {
             .accessibilityLabel(pivot == .skill ? "Add skill" : "Add \(subjectNoun)")
         }
         .padding(.horizontal, 16)
-    }
-
-    /// Compact caps pill that arms staging — green-filled on, chalk outline off.
-    /// Word adapts WAVE / ROUTINE.
-    private var waveToggle: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) { waveMode.toggle() }
-            if !waveMode { staged = [:]; lastWave = [] }   // leaving wave drops pending + undo
-            hapticTrigger += 1
-        } label: {
-            Text(waveNoun.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.2)
-                .foregroundStyle(waveMode ? Theme.well : Theme.label2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(waveMode ? Theme.accent : Theme.well)
-                        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .stroke(Color.white.opacity(waveMode ? 0 : 0.1), lineWidth: 1))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(waveNoun) logging")
-        .accessibilityValue(waveMode ? "on" : "off")
     }
 
     // MARK: Pin picker (chips for whichever axis is pinned)
@@ -574,33 +543,26 @@ struct CaptureView: View {
         .frame(maxHeight: .infinity)
     }
 
-    /// One matrix cell — logs immediately, or STAGES a rep in wave mode. In wave
-    /// mode the cell is a gesture view, NOT a Button: a Button fires on release
-    /// even after a hold, so a long-press decrement would re-increment on lift.
+    /// One matrix cell — STAGES a rep. The cell is a gesture view, NOT a Button:
+    /// a Button fires on release even after a hold, so a long-press decrement
+    /// would re-increment on lift.
     @ViewBuilder
     private func matrixCell(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef, v: Int) -> some View {
-        let stagedN = waveActive ? stagedCount(group, subject, slot) : 0
+        let stagedN = stagedCount(group, subject, slot)
         let visual = cellVisual(v: v, def: def, stagedN: stagedN)
-        Group {
-            if waveActive {
-                // Long-press decrements, tap stages. highPriorityGesture lets a
-                // genuine hold win over the tap so it reliably removes one (a plain
-                // onLongPressGesture alongside onTapGesture let the tap steal ~0.5s
-                // holds and re-increment — QA IAN-516).
-                visual
-                    .highPriorityGesture(
-                        LongPressGesture(minimumDuration: 0.3)
-                            .onEnded { _ in unstage(group, subject, slot) }
-                    )
-                    .onTapGesture { stage(group, subject, slot) }
-            } else {
-                Button { log(slot: slot, group: group, subject: subject, def: def) } label: { visual }
-                    .buttonStyle(.plain)
-            }
-        }
-        .accessibilityLabel("\(waveActive ? "Stage" : "Log") \(def.label)")
-        .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
-        .accessibilityHint(waveActive ? "Tap to stage one more, hold to remove one" : "")
+        // Long-press decrements, tap stages. highPriorityGesture lets a genuine
+        // hold win over the tap so it reliably removes one (a plain
+        // onLongPressGesture alongside onTapGesture let the tap steal ~0.5s
+        // holds and re-increment — QA IAN-516).
+        visual
+            .highPriorityGesture(
+                LongPressGesture(minimumDuration: 0.3)
+                    .onEnded { _ in unstage(group, subject, slot) }
+            )
+            .onTapGesture { stage(group, subject, slot) }
+            .accessibilityLabel("Stage \(def.label)")
+            .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
+            .accessibilityHint("Tap to stage one more, hold to remove one")
     }
 
     /// The engraved cell face — count in chalk Barlow, outcome color in the edge.
@@ -862,22 +824,6 @@ struct CaptureView: View {
         }
     }
 
-    // MARK: Actions
-
-    /// Log one rep: subject × skill × outcome slot. No confirm.
-    private func log(slot: Int, group: StuntGroup, subject: Subject, def: OutcomeDef) {
-        context.insert(Attempt(slot: slot, group: group, session: session, subject: subject))
-        // A real logged rep means the team has moved past "Load demo data"
-        // preview content — resume sync so this genuine usage isn't silently
-        // dropped by the isDemo guard.
-        group.team?.isDemo = false
-        try? context.save()
-        selectedGroupIDRaw = group.id.uuidString
-        selectedSubjectIDRaw = subject.id.uuidString
-        hapticTrigger += 1
-        Sounds.shared.play(.outcome(def.soundOutcome))
-    }
-
     // MARK: Wave / Routine staging
 
     private func stagedCount(_ g: StuntGroup, _ s: Subject, _ slot: Int) -> Int {
@@ -926,6 +872,10 @@ struct CaptureView: View {
             }
         }
         guard !committed.isEmpty else { return }
+        // A real logged rep means the team has moved past "Load demo data"
+        // preview content — resume sync so this genuine usage isn't silently
+        // dropped by the isDemo guard.
+        currentTeam?.isDemo = false
         try? context.save()
         lastWave = committed
         staged = [:]
