@@ -98,9 +98,10 @@ Key invariants:
 - `HitRateApp.swift` — entry; `RootView` shows `OnboardingView` until
   `didOnboard`, then `HomeView` as the ONLY root — the tab bar was retired
   2026-06-06 (practice is occasional; the dashboard is the app). The counter
-  is `LogView(session:)` in a fullScreenCover off Home's floating practice
+  is `CaptureView(session:)` in a fullScreenCover off Home's floating practice
   pill; the pill resumes a live session or creates one (the ONLY place
-  sessions are created). "End" returns to Home; an empty session is left live
+  sessions are created for normal practice — Quick Clinic sessions are a
+  separate flow, below). "End" returns to Home; an empty session is left live
   and swept in Home's cover `onDismiss` (deleting a model the cover still
   renders crashes mid-dismiss). The stale-session/orphan sweeps hang off
   RootView's root `Group` — keep them attached when touching RootView. NO
@@ -249,30 +250,39 @@ Key invariants:
   `SkillInsightsCard` ("SKILL REPORT") ranks best/worst/cleanest/
   most-consistent skill (de-duped: one row per skill), centered on clean hits;
   it replaced the old floor-narrative Takeaways card on Home (TakeawaysCard.swift
-  is retained only because `InsightRow` lives there). `Views/Log/*` — the
-  counter; outcome pad buttons are engraved wells (outcome color lives in the
-  bottom inner edge + caps label, count in chalk Barlow), NOT colored candy
-  buttons. LogView has TWO layouts: **Pad** (pick one group from the horizontal
-  scroll, then hammer the 4 outcome wells — per-skill kind labels) and **Grid**
-  (`logGrid` — the whole roster as a groups×4-outcomes matrix, every cell a
-  tap-to-`+1` button into the session; no group selection — tap "Bobble" on
-  Group 1 and it adds a bobble to Group 1). A single header row of outcome
-  labels means the Grid is offered ONLY for single-kind rosters (`gridAvailable`
-  = all groups one kind); coach is always all-stunt so it always qualifies, a
-  single-kind athlete also does, mixed-kind athletes get Pad only (no toggle).
-  The `MiniSeg` Grid⇄Pad toggle (persisted in `practiceLayout`) shows whenever
-  `gridAvailable`; `useGrid` defaults coach→Grid, athlete→Pad. Cells reuse the
-  engraved-well style and `countsFor` per-session counts; column headers/cell
-  a11y route outcome words through `OutcomeNames` via `o.short/label(gridKind)`.
-  WAVE/ROUTINE staging (grid-only, `waveMode`; "wave" coach / "routine"
-  athlete): staging is a 4-slot COUNT array per group (`staged`), NOT one
-  outcome per group — a group can carry several outcomes in one pass (2 hits
-  + a bobble). Tap stages +1, LONG-PRESS removes one; commit is MANUAL only
-  (Submit in `waveBar`) — never auto-commit on "all groups staged", that
-  finish line doesn't exist with multi-rep staging. In wave mode cells are
-  gesture views, not Buttons (a Button fires on release after a hold, so a
-  long-press decrement would re-increment on lift). Committed batches share
-  a `waveID` and render as one container/cluster in the recent log.
+  is retained only because `InsightRow` lives there).
+  `Views/Log/CaptureView.swift` is the PRIMARY logger (replaced the old
+  Pad/Grid split for normal practice; opened from Home's floating practice
+  pill). An attempt is subject × skill × outcome: outcomes are ALWAYS the tap
+  columns, a PIN toggle (`pivot`: skill/subject) decides what's pinned at the
+  top vs. what varies row-by-row (pin a skill → rows are subjects; pin a
+  subject → rows are skills). Subjects/skills can be added unnamed
+  (capture-first, name-later via suggestion chips or inline `RenameField`).
+  **Wave/routine staging is the ONLY way reps get logged** (as of
+  2026-07-27 — the earlier immediate tap-to-log path and its WAVE/ROUTINE
+  toggle button were removed; there is no non-staged mode and no toggle to
+  find). Every cell always STAGES a rep: tap +1, long-press −1 (`staged`, a
+  per-cell 4-slot count array — one cell can carry several outcomes in a
+  single pass, e.g. 2 hits + a bobble); commit is MANUAL only via Submit in
+  `waveBar` — it never auto-commits, since multi-rep staging has no "everyone
+  staged" finish line. Committed batches share a `waveID` and render as one
+  cluster in the recent ticker; `commitWave()` also clears the active team's
+  `isDemo` flag (moved there from the old immediate-log function) so real
+  usage still resumes sync off a demo team. Cells are gesture views, not
+  Buttons (a Button fires its action on release even after a hold, so a
+  long-press decrement would re-increment on lift). The custom "issues" pad
+  (skill pivot only, user-created outcomes) is a separate, still-immediate
+  tap-to-add-one/hold-to-remove-one tally, NOT part of wave staging.
+  `Views/Log/LogView.swift` is now CLINIC-ONLY (`isClinic: true`, reached via
+  Home's Quick Clinic setup sheet into its own ephemeral SwiftData container —
+  never the normal practice pill). It keeps its own TWO layouts: **Pad**
+  (pick one group from the horizontal scroll, then hammer the 4 outcome wells
+  — per-skill kind labels, still immediate tap-to-log) and **Grid** (`logGrid`
+  — the whole roster as a groups×outcomes matrix; single-kind rosters only,
+  `gridAvailable`, via the `MiniSeg` Grid⇄Pad toggle persisted in
+  `practiceLayout`). Grid, like CaptureView's matrix, is wave-staging-only
+  (no toggle, same stage/commit/`waveBar` mechanics) — Pad is the one place
+  in the app that still logs immediately, since Pad isn't "the grid."
   **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
