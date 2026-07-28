@@ -1,5 +1,5 @@
-Folders now open quickly and stay responsive, even with a long practice history.
+Skill and Group naming is clearer throughout, with a new hands-on walkthrough to help you set up your first skills.
 
-• Rebuilt folder sync to prevent repeated Firebase work and safely retry interrupted uploads.
-• Improved shared-session reliability while preserving who logged each rep.
-• Reduced dashboard and folder-loading work for large histories.
+• Manage Data deletion is now scoped to the folder you're in, not your whole account.
+• Stat cards show smarter, category-aware outcome breakdowns and call out your most common issue.
+• Practice logging is simpler — every rep stages in a batch you review before submitting, so there's no more accidental instant tap.
