@@ -37,8 +37,9 @@ struct HitRateApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark) // whole app lives in the brand register now
-                // Google Sign-In hands control back through a custom URL scheme.
-                .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
+                // URL handling lives in RootView — it has to route `hitrate://join`
+                // into the join sheet, and two `onOpenURL` handlers on one
+                // hierarchy is not a delivery order worth relying on.
         }
         .modelContainer(container)
     }
@@ -70,6 +71,10 @@ struct RootView: View {
     /// root). Deliberately @State, not persisted: every cold launch lands on the
     /// folder list, per the "open straight to folders" design.
     @State private var openFolderID: String?
+
+    /// A join code that arrived from a scanned QR / tapped invite link
+    /// (`hitrate://join?code=…`). Non-nil presents the join sheet, prefilled.
+    @State private var pendingJoinCode: String?
 
     // Cloud sync (Firebase). Anonymous-FIRST: the app never blocks on a login —
     // a wrist-free anonymous session is created on launch so everything works
@@ -125,6 +130,22 @@ struct RootView: View {
             }
         }
         .environmentObject(auth)
+        // Our own scheme first (`hitrate://join?code=…` — the shared-folder QR);
+        // anything else is the Google Sign-In callback coming home.
+        .onOpenURL { url in
+            if let code = DeepLink.joinCode(from: url) {
+                pendingJoinCode = code
+            } else {
+                GIDSignIn.sharedInstance.handle(url)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingJoinCode != nil },
+            set: { if !$0 { pendingJoinCode = nil } })) {
+            JoinFolderSheet(prefilledCode: pendingJoinCode ?? "")
+                .presentationDetents([.height(300)])
+                .presentationBackground(Theme.appBGBottom)
+        }
         .onChange(of: watchSnapshot) { _, snapshot in
             WatchSessionBridge.shared.publishSnapshot(snapshot)
         }
@@ -190,11 +211,16 @@ struct RootView: View {
             context.insert(session)
         }
 
-        context.insert(Attempt(outcome: outcome,
-                               group: group,
-                               session: session,
-                               subject: watchLogSubject,
-                               timestamp: request.timestamp))
+        let attempt = Attempt(outcome: outcome,
+                              group: group,
+                              session: session,
+                              subject: watchLogSubject,
+                              timestamp: request.timestamp)
+        // The wrist is this phone's user logging — stamp the attribution now so
+        // co-logged folders read right before anything syncs (same rule as
+        // CaptureView's commit).
+        attempt.loggerID = auth.uid ?? ""
+        context.insert(attempt)
         try? context.save()
         return watchSnapshot
     }

@@ -90,6 +90,12 @@ final class SyncEngine: ObservableObject {
 
     private var uid: String? { Auth.auth().currentUser?.uid }
 
+    /// The signed-in Firebase uid, or nil when there's no session yet. Exposed so
+    /// the loggers can stamp `Attempt.loggerID` AT CREATION instead of leaving it
+    /// blank until the first push — co-logging attribution (coach vs athlete) has
+    /// to read right on the floor, before anything has synced.
+    var currentUID: String? { uid }
+
     // MARK: - Lifecycle
 
     /// Begin syncing for the signed-in user. Idempotent — safe to call on every

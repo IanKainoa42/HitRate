@@ -13,6 +13,9 @@ struct HomeView: View {
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var unlockedMilestones: [UnlockedMilestone]
 
+    /// Co-logging: needed to tell the folder owner's reps from a member's.
+    @EnvironmentObject private var auth: AuthViewModel
+
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
@@ -23,6 +26,9 @@ struct HomeView: View {
     /// Cross-cutting review filters (Phase 4). nil = everyone / all skills.
     @State private var personFilter: Subject?
     @State private var skillFilter: StuntGroup?
+    /// Co-logging SOURCE filter — all reps / coach-logged (privates) /
+    /// self-logged (open gym). Only offered on a co-logged folder.
+    @State private var loggerScope: LoggerFilter.Scope = .all
     @State private var shareOpen = false
     @State private var trophyOpen = false
     @State private var editorOpen = false
@@ -67,7 +73,31 @@ struct HomeView: View {
     private var filteredGroups: [StuntGroup] {
         activeSkill.map { [$0] } ?? groups
     }
-    private var isFiltered: Bool { activePerson != nil || activeSkill != nil }
+    private var isFiltered: Bool {
+        activePerson != nil || activeSkill != nil || loggerScope != .all
+    }
+
+    // MARK: Co-logging source filter
+
+    /// A folder MORE THAN ONE PERSON logs into. Ownership alone isn't the test —
+    /// SyncEngine claims an `ownerUID` for every local folder on first sign-in,
+    /// so a solo user would otherwise get a filter that can only ever say
+    /// "everything" or "nothing".
+    private var isCoLogged: Bool {
+        guard let team = currentTeam else { return false }
+        if !team.memberIds.isEmpty { return true }                       // others joined yours
+        if let owner = team.ownerUID, owner != auth.uid { return true }  // you joined theirs
+        return false
+    }
+
+    /// The live source filter. Inert (`.unfiltered`) on a solo folder so the
+    /// dashboard behaves exactly as it did before this existed.
+    private var loggerFilter: LoggerFilter {
+        guard isCoLogged else { return .unfiltered }
+        return LoggerFilter(scope: loggerScope,
+                            ownerUID: currentTeam?.ownerUID,
+                            currentUID: auth.uid)
+    }
 
     /// The stunt/tumbling split only makes sense in athlete mode once BOTH
     /// kinds have logged reps (coach is all-stunt; a single-kind athlete has
@@ -87,7 +117,8 @@ struct HomeView: View {
         StatsEngine.compute(sessions: sessions,
                             groups: filteredGroups.filter { $0.kind == kind },
                             timeframe: timeframe,
-                            subject: activePerson)
+                            subject: activePerson,
+                            logger: loggerFilter)
     }
 
     /// A live session survives the app being killed mid-practice — the pill
@@ -115,7 +146,8 @@ struct HomeView: View {
 
     private var stats: FloorStats {
         StatsEngine.compute(sessions: sessions, groups: filteredGroups,
-                            timeframe: timeframe, subject: activePerson)
+                            timeframe: timeframe, subject: activePerson,
+                            logger: loggerFilter)
     }
 
     /// Show the review filter bar only when there's something worth slicing:
@@ -145,6 +177,9 @@ struct HomeView: View {
             // Cross-cutting review filters (person / skill), scaling every number
             // below just like the timeframe does.
             if showsFilterBar { reviewFilterBar }
+
+            // Who logged it — privates vs open gym. Only on a co-logged folder.
+            if showsSourceFilter { sourceFilterBar }
 
             ScrollView {
                 VStack(spacing: 9) {
@@ -646,7 +681,7 @@ struct HomeView: View {
             if isFiltered {
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) {
-                        personFilter = nil; skillFilter = nil
+                        personFilter = nil; skillFilter = nil; loggerScope = .all
                     }
                     hapticTrigger += 1
                 } label: {
@@ -663,6 +698,51 @@ struct HomeView: View {
         .padding(5)
         .wellBackground()
         .padding(.horizontal, 16)
+    }
+
+    /// Only worth showing once the folder is genuinely co-logged AND has reps to
+    /// slice — otherwise it's a control with one possible answer.
+    private var showsSourceFilter: Bool { isCoLogged && lifetimeHasData }
+
+    /// Same well/segment treatment as the timeframe tabs — this is the second
+    /// global filter, and it should read as a peer of the first, not as a
+    /// system segmented control dropped onto the training floor.
+    private var sourceFilterBar: some View {
+        HStack(spacing: 8) {
+            Text("SOURCE")
+                .font(.system(size: 9, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Theme.label3)
+                .padding(.leading, 5)
+
+            HStack(spacing: 4) {
+                ForEach(LoggerFilter.Scope.allCases) { scope in
+                    let on = loggerScope == scope
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { loggerScope = scope }
+                        hapticTrigger += 1
+                    } label: {
+                        Text(scope.label)
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.1)
+                            .foregroundStyle(on ? Theme.well : Theme.label2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(on ? Theme.label : .clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(5)
+        .wellBackground()
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Rep source")
     }
 
     @ViewBuilder
