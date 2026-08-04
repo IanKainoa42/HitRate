@@ -18,6 +18,62 @@ enum Timeframe: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Logger source filter (co-logged folders)
+
+/// Slices a shared folder's reps by WHO logged them — the coach running a
+/// private lesson vs the athlete logging their own open-gym work.
+///
+/// Only meaningful on a co-logged folder. A folder nobody else has joined has
+/// no owner/member split to draw, so `ownerUID` nil collapses every scope to
+/// "everything" rather than silently zeroing the dashboard — HomeView also
+/// hides the control there.
+struct LoggerFilter: Equatable {
+    enum Scope: String, CaseIterable, Identifiable, Equatable {
+        /// Every rep, however it was logged.
+        case all
+        /// Logged by the folder owner — coach-run reps ("privates").
+        case coach
+        /// Logged by anyone else — the athlete's own reps ("open gym").
+        case selfLogged
+
+        var id: String { rawValue }
+
+        /// Segmented-control wording — the coach's mental model, not the
+        /// plumbing's ("who logged it" reads as an audit trail; "privates vs
+        /// open gym" reads as the two kinds of practice it actually describes).
+        var label: String {
+            switch self {
+            case .all: "ALL"
+            case .coach: "PRIVATES"
+            case .selfLogged: "OPEN GYM"
+            }
+        }
+    }
+
+    var scope: Scope = .all
+    /// The folder's cloud owner (the coach). nil = not a shared folder.
+    var ownerUID: String? = nil
+    /// This device's signed-in uid — an unstamped local rep resolves to it, the
+    /// same claim SyncEngine makes on upload.
+    var currentUID: String? = nil
+
+    static let unfiltered = LoggerFilter()
+
+    /// True when the filter can actually split anything: a scope other than
+    /// `.all`, on a folder that has a cloud owner to compare against.
+    var isActive: Bool {
+        guard scope != .all else { return false }
+        guard let owner = ownerUID, !owner.isEmpty else { return false }
+        return true
+    }
+
+    func matches(_ attempt: Attempt) -> Bool {
+        guard isActive else { return true }
+        let byCoach = attempt.isCoachLogged(teamOwnerUID: ownerUID, currentUID: currentUID)
+        return scope == .coach ? byCoach : !byCoach
+    }
+}
+
 // MARK: - Derived stat shapes (mirrors buildData() in the handoff prototype)
 
 struct GroupStat: Identifiable {
@@ -145,9 +201,14 @@ enum StatsEngine {
     /// `subject` is the cross-cutting PERSON filter (Phase 4 review): non-nil
     /// confines every number to that athlete/group's reps, on top of the group
     /// (skill) confinement the caller already applies via `groups`. nil = everyone.
+    ///
+    /// `logger` is the co-logging SOURCE filter: on a shared folder it confines
+    /// every number to coach-logged reps (privates) or athlete-logged reps (open
+    /// gym). Default is unfiltered, so every existing call site is unchanged.
     static func compute(sessions: [PracticeSession], groups: [StuntGroup],
                         timeframe: Timeframe, now: Date = .now,
-                        subject: Subject? = nil) -> FloorStats {
+                        subject: Subject? = nil,
+                        logger: LoggerFilter = .unfiltered) -> FloorStats {
         let cal = Calendar.current
         let sorted = sessions.sorted { $0.startedAt < $1.startedAt }
         // Every derived number is confined to the passed groups — so a
@@ -202,10 +263,12 @@ enum StatsEngine {
         // Per-group stats in the current and previous periods.
         let ordered = groups.sorted { $0.orderIndex < $1.orderIndex }
         let currentAttempts = attemptsByGroup(
-            in: current, allowed: allowed, within: currentInterval, subject: subject
+            in: current, allowed: allowed, within: currentInterval,
+            subject: subject, logger: logger
         )
         let previousAttempts = attemptsByGroup(
-            in: previous, allowed: allowed, within: previousInterval, subject: subject
+            in: previous, allowed: allowed, within: previousInterval,
+            subject: subject, logger: logger
         )
         var groupStats: [GroupStat] = []
         var prevOverall = [0, 0, 0, 0]
@@ -259,8 +322,10 @@ enum StatsEngine {
                 + groupStats.filter { $0.total == 0 },
             overall: overall, total: total, hits: hits, rate: rate,
             delta: delta, deltaNote: deltaNote, rangeNote: rangeNote,
-            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe, now: now, subject: subject),
-            latest: latestSnapshot(sorted: sorted, allowed: allowed, subject: subject),
+            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe,
+                               now: now, subject: subject, logger: logger),
+            latest: latestSnapshot(sorted: sorted, allowed: allowed,
+                                   subject: subject, logger: logger),
             execution: execution, executionScoredReps: executionScoredReps)
     }
 
@@ -313,7 +378,8 @@ enum StatsEngine {
     // MARK: Trend series
 
     private static func trendSeries(sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
-                                    timeframe: Timeframe, now: Date, subject: Subject? = nil) -> [Int] {
+                                    timeframe: Timeframe, now: Date, subject: Subject? = nil,
+                                    logger: LoggerFilter = .unfiltered) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
             var hits = 0, total = 0
@@ -321,7 +387,7 @@ enum StatsEngine {
                 for a in s.attempts
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     if let interval, !interval.contains(a.timestamp) { continue }
-                    guard subjectMatch(a, subject) else { continue }
+                    guard subjectMatch(a, subject), logger.matches(a) else { continue }
                     total += 1
                     if a.isHitRep { hits += 1 }   // clean-hit rate: a bobble is NOT a hit
                 }
@@ -362,13 +428,15 @@ enum StatsEngine {
 
     private static func latestSnapshot(sorted: [PracticeSession],
                                        allowed: Set<PersistentIdentifier>,
-                                       subject: Subject? = nil) -> SessionSnapshot? {
+                                       subject: Subject? = nil,
+                                       logger: LoggerFilter = .unfiltered) -> SessionSnapshot? {
         // Latest session that has reps of an allowed kind — and only those reps
         // (a mixed session viewed under a kind filter shows just that kind's tape).
         func inKind(_ s: PracticeSession) -> [Attempt] {
             s.sortedAttempts.filter {
                 ($0.group.map { allowed.contains($0.persistentModelID) } ?? false)
                     && subjectMatch($0, subject)
+                    && logger.matches($0)
             }
         }
         guard let last = sorted.last(where: { !inKind($0).isEmpty }) else { return nil }
@@ -401,7 +469,8 @@ enum StatsEngine {
     /// every session for every skill, making dashboard entry O(skills × reps).
     private static func attemptsByGroup(
         in sessions: [PracticeSession], allowed: Set<PersistentIdentifier>,
-        within interval: DateInterval?, subject: Subject?
+        within interval: DateInterval?, subject: Subject?,
+        logger: LoggerFilter = .unfiltered
     ) -> [PersistentIdentifier: [Attempt]] {
         var result: [PersistentIdentifier: [Attempt]] = [:]
         for session in sessions {
@@ -409,7 +478,7 @@ enum StatsEngine {
                 guard let group = attempt.group,
                       allowed.contains(group.persistentModelID) else { continue }
                 if let interval, !interval.contains(attempt.timestamp) { continue }
-                guard subjectMatch(attempt, subject) else { continue }
+                guard subjectMatch(attempt, subject), logger.matches(attempt) else { continue }
                 result[group.persistentModelID, default: []].append(attempt)
             }
         }

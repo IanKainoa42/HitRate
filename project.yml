@@ -82,10 +82,16 @@ targets:
         NSPhotoLibraryAddUsageDescription: HitRate saves your stunt cards to Photos so you can post them.
         LSApplicationQueriesSchemes:
           - instagram
-        # Google Sign-In callback (REVERSED_CLIENT_ID from GoogleService-Info.plist).
+        # Google Sign-In callback (REVERSED_CLIENT_ID from GoogleService-Info.plist),
+        # plus the app's own `hitrate://` scheme — the shared-folder join QR
+        # encodes `hitrate://join?code=…` (see Utilities/DeepLink.swift). Run
+        # `xcodegen generate` after touching this or the link stops resolving.
         CFBundleURLTypes:
           - CFBundleURLSchemes:
             - com.googleusercontent.apps.602780812787-1s7rtbkvf29sqgrbm9jv3ajrm5sai36s
+          - CFBundleURLName: com.ianrichardson.HitRate.deeplink
+            CFBundleURLSchemes:
+            - hitrate
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

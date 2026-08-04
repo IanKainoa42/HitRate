@@ -827,6 +827,28 @@ final class Attempt {
     }
 }
 
+// MARK: - Co-logging attribution (who logged this rep)
+
+extension Attempt {
+    /// Who logged this rep, resolved. A locally-created rep can still carry an
+    /// empty `loggerID` (nothing has pushed it yet, or the device was signed
+    /// out), and SyncEngine claims those for the current account on upload — so
+    /// "empty" means "this device's user" here too. Same rule, one place.
+    func resolvedLoggerID(currentUID: String?) -> String {
+        SyncAttemptOwnershipPolicy.resolvedLoggerID(
+            storedLoggerID: loggerID, currentUID: currentUID ?? "")
+    }
+
+    /// True when the folder OWNER logged this rep — a coach-run private lesson
+    /// rather than the athlete's own open-gym logging. False on a folder nobody
+    /// owns in the cloud (`teamOwnerUID` nil/blank): with no owner there's no
+    /// coach/athlete split to draw, and everything would read as "coach".
+    func isCoachLogged(teamOwnerUID: String?, currentUID: String?) -> Bool {
+        guard let ownerUID = teamOwnerUID, !ownerUID.isEmpty else { return false }
+        return resolvedLoggerID(currentUID: currentUID) == ownerUID
+    }
+}
+
 /// A tiny durable upload state embedded in append-only cloud records. It is the
 /// outbox for reps/sessions: the app retries pending or failed records after a
 /// server snapshot and marks them synced only from Firestore's completion.

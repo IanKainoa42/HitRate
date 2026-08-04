@@ -1,4 +1,7 @@
 import SwiftUI
+import UIKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 // MARK: - Court backdrop (the brand register's "court at night")
 
@@ -360,3 +363,55 @@ struct RenameField: View {
     }
 }
 
+
+// MARK: - QR code
+
+/// A scannable QR for a short string — the shared-folder join link.
+///
+/// Deliberately rendered on a WHITE tile rather than the floor's graphite:
+/// scanners need the light-module/dark-module contrast the spec assumes, and an
+/// inverted or low-contrast code is one many cameras simply won't lock onto.
+/// This is the one sanctioned white surface in the training-floor register.
+///
+/// `interpolation(.none)` keeps the modules crisp — CoreImage emits a tiny
+/// image (roughly one pixel per module) and smoothing it blurs the edges into
+/// something a scanner reads slowly or not at all.
+struct QRCodeView: View {
+    let string: String
+    var side: CGFloat = 160
+
+    private static let context = CIContext()
+
+    var body: some View {
+        Group {
+            if let image = Self.render(string) {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+            } else {
+                // Generation can't realistically fail for a short ASCII link,
+                // but never leave a silent hole where the code should be.
+                Image(systemName: "qrcode")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(24)
+                    .foregroundStyle(.black.opacity(0.25))
+            }
+        }
+        .frame(width: side, height: side)
+        .padding(12)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityLabel("QR code to join this folder")
+    }
+
+    private static func render(_ text: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage,
+              let cgImage = context.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+}

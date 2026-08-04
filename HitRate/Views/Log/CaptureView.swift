@@ -22,11 +22,18 @@ struct CaptureView: View {
     @Query(sort: \Subject.orderIndex) private var allSubjects: [Subject]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
 
+    /// Co-logging: who's logging. Every rep is stamped with this uid at creation
+    /// so the coach/athlete split reads right on the floor, before any sync.
+    @EnvironmentObject private var auth: AuthViewModel
+
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("currentTeamID") private var currentTeamID = ""
 
     /// What's pinned at the top: "skill" (rows = subjects) or "subject" (rows = skills).
     @AppStorage("capturePivot") private var pivotRaw = "skill"
+    /// The pivot the user picked before a 1-on-1 lock borrowed `capturePivot`.
+    /// Blank = no lock is holding it. Restored when the lock releases.
+    @AppStorage("capturePivotBeforeLock") private var pivotBeforeLockRaw = ""
     /// Pinned skill (skill pivot) / pinned subject (subject pivot). Persisted so the
     /// watch can mirror the pulled-up skill and the screen remembers between practices.
     @AppStorage("selectedGroupID") private var selectedGroupIDRaw = ""
@@ -55,8 +62,31 @@ struct CaptureView: View {
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
     private var subjects: [Subject] { allSubjects.inTeam(currentTeam) }
 
+    /// A folder MORE THAN ONE PERSON logs into — the only place the coach vs
+    /// athlete split means anything. Ownership alone is not the test: SyncEngine
+    /// claims an `ownerUID` for every local folder on first sign-in, so a solo
+    /// user would otherwise see a "COACH" badge on every rep they ever logged.
+    private var isCoLogged: Bool {
+        guard let team = currentTeam else { return false }
+        if !team.memberIds.isEmpty { return true }          // you own it, others joined
+        if let owner = team.ownerUID, owner != auth.uid { return true }   // you joined it
+        return false
+    }
+
     private enum Pivot: String { case skill, subject }
-    private var pivot: Pivot { Pivot(rawValue: pivotRaw) ?? .skill }
+
+    /// A 1-on-1 folder — exactly one subject on the roster ("Maya — Privates").
+    /// There is nothing to pivot and nothing to pick: every rep belongs to that
+    /// one athlete, so the pivot toggle and the pin picker are pure friction.
+    private var isSingleAthleteFolder: Bool { subjects.count == 1 }
+
+    /// What's pinned. A 1-on-1 folder is LOCKED to its single subject (rows =
+    /// skills) regardless of the stored pivot — the controls that would change
+    /// it are hidden, so the derived value has to be the honest one.
+    private var pivot: Pivot {
+        if isSingleAthleteFolder { return .subject }
+        return Pivot(rawValue: pivotRaw) ?? .skill
+    }
 
     /// The pinned skill (skill pivot). Resolves the persisted id against the CURRENT
     /// roster so a deleted selection can't receive reps.
@@ -92,7 +122,11 @@ struct CaptureView: View {
                 }
                 .sheet(isPresented: $showGroupsEditor) { GroupsEditorView() }
                 .sheet(item: $scoringAttempt) { ExecutionSheet(attempt: $0) }
-                .onAppear { seedFirstSubjectIfNeeded() }
+                .onAppear {
+                    seedFirstSubjectIfNeeded()
+                    syncSingleSubjectLock()
+                }
+                .onChange(of: subjects.count) { _, _ in syncSingleSubjectLock() }
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
     }
@@ -108,6 +142,40 @@ struct CaptureView: View {
         context.insert(s)
         try? context.save()
         selectedSubjectIDRaw = s.id.uuidString
+    }
+
+    /// Mirror the 1-on-1 lock into the PERSISTED pivot/selection, and undo that
+    /// mirroring when the lock releases.
+    ///
+    /// The mirroring is load-bearing: the watch bridge attributes wrist taps off
+    /// `capturePivot` + `selectedSubjectID` (AppStorage, read in RootView), so a
+    /// lock that lived only in the derived `pivot` would leave watch reps
+    /// un-attributed on exactly the folders that have one obvious athlete to
+    /// attribute them to.
+    ///
+    /// But the write must be BORROWED, not permanent — the user's own pivot
+    /// choice is stashed on the way in and handed back once the roster grows past
+    /// one, otherwise a deliberate "pin skill" preference is silently eaten by a
+    /// folder that briefly had a single subject.
+    private func syncSingleSubjectLock() {
+        guard isSingleAthleteFolder, let only = subjects.first else {
+            releaseSubjectLock()
+            return
+        }
+        if pivotRaw != Pivot.subject.rawValue {
+            pivotBeforeLockRaw = pivotRaw          // stash what the user chose
+            pivotRaw = Pivot.subject.rawValue
+        }
+        if selectedSubjectIDRaw != only.id.uuidString {
+            selectedSubjectIDRaw = only.id.uuidString
+        }
+    }
+
+    /// Hand the borrowed pivot back. No-op unless a lock actually took it.
+    private func releaseSubjectLock() {
+        guard !pivotBeforeLockRaw.isEmpty else { return }
+        pivotRaw = pivotBeforeLockRaw
+        pivotBeforeLockRaw = ""
     }
 
     // MARK: Screen
@@ -126,9 +194,15 @@ struct CaptureView: View {
                 pinPicker
                 nameSuggestionBar
                 matrix(attempts)
-                // Issues tie to a single skill; only the skill pivot pins one.
-                if pivot == .skill, !customOutcomes.isEmpty, let skill = pinnedSkill {
-                    customOutcomePad(group: skill)
+                // Issues tie to a single skill, and normally only the skill pivot
+                // pins one. The 1-on-1 lock forces the SUBJECT pivot and hides the
+                // picker, which would strand the pad on every single-subject
+                // folder — and one subject is the DEFAULT state
+                // (`seedFirstSubjectIfNeeded`), not an exotic one. Under the lock
+                // the pad therefore carries its own skill chips.
+                if !customOutcomes.isEmpty, let skill = pinnedSkill,
+                   pivot == .skill || isSingleAthleteFolder {
+                    customOutcomePad(group: skill, showsSkillPicker: isSingleAthleteFolder)
                 }
                 waveBar
                 recentTicker(attempts)
@@ -204,9 +278,68 @@ struct CaptureView: View {
 
     // MARK: Pivot control
 
+    /// The pivot row. On a 1-on-1 folder there is no pivot to offer — the screen
+    /// is locked to the one athlete — so the control is replaced by a banner
+    /// naming who's being logged.
+    @ViewBuilder
+    private var pivotBar: some View {
+        if isSingleAthleteFolder, let only = subjects.first {
+            singleAthleteBar(only)
+        } else {
+            standardPivotBar
+        }
+    }
+
+    /// 1-on-1 banner: who this whole screen is logging for, plus the two things
+    /// still worth doing here — add a skill (the rows), or break out of the lock
+    /// by adding a second subject. Without that second button a folder that
+    /// auto-seeded its first subject could never grow a roster.
+    private func singleAthleteBar(_ subject: Subject) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: subject.kind == .person ? "person.circle.fill" : "person.3.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.accent)
+            // A freshly seeded subject has no name yet, and `displayName`'s
+            // "Unnamed athlete" placeholder is fine as a small chip but shouts as
+            // the headline of the capture screen. Name the KIND until it's named.
+            Text(subject.isUnnamed
+                 ? "LOGGING FOR ONE \(subject.kind.label.uppercased())"
+                 : "LOGGING FOR \(subject.name.uppercased())")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Theme.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 4)
+
+            Button { addSubject() } label: {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.label2)
+                    .frame(width: 34, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.iconTile))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add \(subjectNoun)")
+
+            Button { addSkill() } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 34, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.iconTile))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add skill")
+        }
+        .padding(.horizontal, 16)
+    }
+
     /// The one control that flips the matrix: pin a skill (rows = subjects) or pin a
     /// subject (rows = skills). Outcomes stay the columns either way.
-    private var pivotBar: some View {
+    private var standardPivotBar: some View {
         HStack(spacing: 10) {
             Text("PIN")
                 .font(.system(size: 10, weight: .bold))
@@ -243,8 +376,18 @@ struct CaptureView: View {
 
     // MARK: Pin picker (chips for whichever axis is pinned)
 
+    /// Hidden entirely on a 1-on-1 folder — a one-chip picker with nothing to
+    /// pick is just a row of wasted thumb space above the pad.
     @ViewBuilder
     private var pinPicker: some View {
+        if isSingleAthleteFolder {
+            EmptyView()
+        } else {
+            standardPinPicker
+        }
+    }
+
+    private var standardPinPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 switch pivot {
@@ -793,6 +936,10 @@ struct CaptureView: View {
     @ViewBuilder
     private func repChip(_ a: Attempt) -> some View {
         let scorable = a.group?.scoresExecution ?? false
+        // Attribution only means something when someone else logs into this
+        // folder too — see `isCoLogged`.
+        let byCoach = isCoLogged
+            && a.isCoachLogged(teamOwnerUID: currentTeam?.ownerUID, currentUID: auth.uid)
         let body = HStack(spacing: 5) {
             Circle().fill(a.outcomeDef?.color ?? Theme.label3).frame(width: 7, height: 7)
             Text(a.subject?.displayName ?? a.group?.name ?? "—")
@@ -803,6 +950,16 @@ struct CaptureView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
+            if byCoach {
+                Text("COACH")
+                    .font(.system(size: 7, weight: .heavy))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.accentText)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Theme.accent))
+                    .accessibilityLabel("Logged by the coach")
+            }
             if a.executionScored {
                 Image(systemName: "shield.lefthalf.filled")
                     .font(.system(size: 10, weight: .bold))
@@ -865,6 +1022,11 @@ struct CaptureView: View {
                 for (slot, n) in c.enumerated() where n > 0 {
                     for _ in 0..<n {
                         let a = Attempt(slot: slot, group: g, session: session, subject: s, waveID: waveID)
+                        // Stamp WHO logged it now, not at first push. On a shared
+                        // folder the coach's reps and the athlete's reps land in
+                        // the same session, and the attribution has to be readable
+                        // on the floor — offline, before anything has synced.
+                        a.loggerID = auth.uid ?? ""
                         context.insert(a)
                         committed.append(a)
                     }
@@ -976,7 +1138,7 @@ struct CaptureView: View {
         }
     }
 
-    // MARK: Custom-outcome "issues" pad (skill pivot only)
+    // MARK: Custom-outcome "issues" pad (skill pivot, or the 1-on-1 lock)
 
     /// The active folder's user-created outcomes — tallied SEPARATELY from the
     /// hit-rate (a distinct model), shown as a secondary tier under the matrix.
@@ -988,9 +1150,26 @@ struct CaptureView: View {
     /// against the pinned skill (subject-agnostic, matching the legacy semantics).
     /// Tap = +1, hold = −1 (gesture view, not a Button: a Button fires on release
     /// after a hold and would re-increment a decrement).
+    ///
+    /// `showsSkillPicker` is the 1-on-1 lock's case: the pin picker is hidden
+    /// there, so without chips of its own the pad would be tallying against an
+    /// invisible, unchangeable selection.
     @ViewBuilder
-    private func customOutcomePad(group: StuntGroup) -> some View {
+    private func customOutcomePad(group: StuntGroup, showsSkillPicker: Bool = false) -> some View {
         VStack(spacing: 6) {
+            if showsSkillPicker, groups.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(groups) { g in
+                            pinChip(number: g.number, name: g.displayName, color: g.color,
+                                    on: g === group) {
+                                selectedGroupIDRaw = g.id.uuidString
+                                hapticTrigger += 1
+                            }
+                        }
+                    }
+                }
+            }
             Text("ISSUES · \(group.name.uppercased())")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.6)

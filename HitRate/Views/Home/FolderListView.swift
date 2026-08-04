@@ -101,7 +101,9 @@ struct FolderListView: View {
         }
         .sheet(item: $sharing) { t in
             ShareFolderSheet(team: t)
-                .presentationDetents([.medium])
+                // Large, not medium — the QR needs room to be scannable at
+                // arm's length across a gym floor.
+                .presentationDetents([.large])
                 .presentationBackground(Theme.appBGBottom)
         }
         .sheet(isPresented: $joinOpen) {
@@ -365,13 +367,25 @@ private struct ShareFolderSheet: View {
                 .foregroundStyle(Theme.label)
 
             if let code {
-                Text(code)
-                    .font(Theme.barlow(46, .extrabold))
-                    .tracking(6)
-                    .foregroundStyle(Theme.accent)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity)
-                    .wellBackground()
+                // Hand the folder over on the floor: the other phone's camera
+                // scans this and deep-links straight into the join flow, no
+                // squinting at six characters across a gym.
+                VStack(spacing: 12) {
+                    QRCodeView(string: DeepLink.join(code: code).absoluteString)
+
+                    Text("SCAN WITH CAMERA OR ENTER CODE")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Theme.label3)
+
+                    Text(code)
+                        .font(Theme.barlow(40, .extrabold))
+                        .tracking(6)
+                        .foregroundStyle(Theme.accent)
+                }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .wellBackground()
 
                 HStack(spacing: 10) {
                     Button {
@@ -388,7 +402,10 @@ private struct ShareFolderSheet: View {
                     }
                     .buttonStyle(.plain)
 
-                    ShareLink(item: "Join my HitRate folder “\(team.name)” with code \(code)") {
+                    // The link is tappable on the receiving phone (it opens
+                    // straight into the join sheet); the code is spelled out for
+                    // anyone reading it off a screenshot.
+                    ShareLink(item: "Join my HitRate folder “\(team.name)” with code \(code): \(DeepLink.join(code: code).absoluteString)") {
                         Label("Share", systemImage: "square.and.arrow.up")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.label)
@@ -447,12 +464,21 @@ private struct ShareFolderSheet: View {
 
 /// Member-side: enter a 6-char code to join someone else's folder. On success
 /// the sheet dismisses and the roster streams in via SyncEngine's listeners.
-private struct JoinFolderSheet: View {
+///
+/// `prefilledCode` is how a scanned QR / tapped invite link arrives (RootView
+/// hands it over from `onOpenURL`). The code is filled in but NOT auto-
+/// submitted — joining someone's folder is the user's call to make, and a link
+/// can be opened by accident.
+struct JoinFolderSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var code = ""
+    @State private var code: String
     @State private var busy = false
     @State private var error: String?
     private let sync = SyncEngine.shared
+
+    init(prefilledCode: String = "") {
+        _code = State(initialValue: prefilledCode)
+    }
 
     private var trimmed: String {
         code.trimmingCharacters(in: .whitespacesAndNewlines)
