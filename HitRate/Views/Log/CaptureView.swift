@@ -31,6 +31,9 @@ struct CaptureView: View {
 
     /// What's pinned at the top: "skill" (rows = subjects) or "subject" (rows = skills).
     @AppStorage("capturePivot") private var pivotRaw = "skill"
+    /// The pivot the user picked before a 1-on-1 lock borrowed `capturePivot`.
+    /// Blank = no lock is holding it. Restored when the lock releases.
+    @AppStorage("capturePivotBeforeLock") private var pivotBeforeLockRaw = ""
     /// Pinned skill (skill pivot) / pinned subject (subject pivot). Persisted so the
     /// watch can mirror the pulled-up skill and the screen remembers between practices.
     @AppStorage("selectedGroupID") private var selectedGroupIDRaw = ""
@@ -141,17 +144,38 @@ struct CaptureView: View {
         selectedSubjectIDRaw = s.id.uuidString
     }
 
-    /// Mirror the 1-on-1 lock into the PERSISTED pivot/selection. The watch
-    /// bridge attributes wrist taps off `capturePivot` + `selectedSubjectID`
-    /// (AppStorage, read in RootView), so a lock that lived only in the derived
-    /// `pivot` would leave watch reps un-attributed on exactly the folders that
-    /// have one obvious athlete to attribute them to.
+    /// Mirror the 1-on-1 lock into the PERSISTED pivot/selection, and undo that
+    /// mirroring when the lock releases.
+    ///
+    /// The mirroring is load-bearing: the watch bridge attributes wrist taps off
+    /// `capturePivot` + `selectedSubjectID` (AppStorage, read in RootView), so a
+    /// lock that lived only in the derived `pivot` would leave watch reps
+    /// un-attributed on exactly the folders that have one obvious athlete to
+    /// attribute them to.
+    ///
+    /// But the write must be BORROWED, not permanent — the user's own pivot
+    /// choice is stashed on the way in and handed back once the roster grows past
+    /// one, otherwise a deliberate "pin skill" preference is silently eaten by a
+    /// folder that briefly had a single subject.
     private func syncSingleSubjectLock() {
-        guard isSingleAthleteFolder, let only = subjects.first else { return }
-        if pivotRaw != Pivot.subject.rawValue { pivotRaw = Pivot.subject.rawValue }
+        guard isSingleAthleteFolder, let only = subjects.first else {
+            releaseSubjectLock()
+            return
+        }
+        if pivotRaw != Pivot.subject.rawValue {
+            pivotBeforeLockRaw = pivotRaw          // stash what the user chose
+            pivotRaw = Pivot.subject.rawValue
+        }
         if selectedSubjectIDRaw != only.id.uuidString {
             selectedSubjectIDRaw = only.id.uuidString
         }
+    }
+
+    /// Hand the borrowed pivot back. No-op unless a lock actually took it.
+    private func releaseSubjectLock() {
+        guard !pivotBeforeLockRaw.isEmpty else { return }
+        pivotRaw = pivotBeforeLockRaw
+        pivotBeforeLockRaw = ""
     }
 
     // MARK: Screen
@@ -170,9 +194,15 @@ struct CaptureView: View {
                 pinPicker
                 nameSuggestionBar
                 matrix(attempts)
-                // Issues tie to a single skill; only the skill pivot pins one.
-                if pivot == .skill, !customOutcomes.isEmpty, let skill = pinnedSkill {
-                    customOutcomePad(group: skill)
+                // Issues tie to a single skill, and normally only the skill pivot
+                // pins one. The 1-on-1 lock forces the SUBJECT pivot and hides the
+                // picker, which would strand the pad on every single-subject
+                // folder — and one subject is the DEFAULT state
+                // (`seedFirstSubjectIfNeeded`), not an exotic one. Under the lock
+                // the pad therefore carries its own skill chips.
+                if !customOutcomes.isEmpty, let skill = pinnedSkill,
+                   pivot == .skill || isSingleAthleteFolder {
+                    customOutcomePad(group: skill, showsSkillPicker: isSingleAthleteFolder)
                 }
                 waveBar
                 recentTicker(attempts)
@@ -269,7 +299,12 @@ struct CaptureView: View {
             Image(systemName: subject.kind == .person ? "person.circle.fill" : "person.3.fill")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.accent)
-            Text("LOGGING FOR \(subject.displayName.uppercased())")
+            // A freshly seeded subject has no name yet, and `displayName`'s
+            // "Unnamed athlete" placeholder is fine as a small chip but shouts as
+            // the headline of the capture screen. Name the KIND until it's named.
+            Text(subject.isUnnamed
+                 ? "LOGGING FOR ONE \(subject.kind.label.uppercased())"
+                 : "LOGGING FOR \(subject.name.uppercased())")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label)
@@ -1103,7 +1138,7 @@ struct CaptureView: View {
         }
     }
 
-    // MARK: Custom-outcome "issues" pad (skill pivot only)
+    // MARK: Custom-outcome "issues" pad (skill pivot, or the 1-on-1 lock)
 
     /// The active folder's user-created outcomes — tallied SEPARATELY from the
     /// hit-rate (a distinct model), shown as a secondary tier under the matrix.
@@ -1115,9 +1150,26 @@ struct CaptureView: View {
     /// against the pinned skill (subject-agnostic, matching the legacy semantics).
     /// Tap = +1, hold = −1 (gesture view, not a Button: a Button fires on release
     /// after a hold and would re-increment a decrement).
+    ///
+    /// `showsSkillPicker` is the 1-on-1 lock's case: the pin picker is hidden
+    /// there, so without chips of its own the pad would be tallying against an
+    /// invisible, unchangeable selection.
     @ViewBuilder
-    private func customOutcomePad(group: StuntGroup) -> some View {
+    private func customOutcomePad(group: StuntGroup, showsSkillPicker: Bool = false) -> some View {
         VStack(spacing: 6) {
+            if showsSkillPicker, groups.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(groups) { g in
+                            pinChip(number: g.number, name: g.displayName, color: g.color,
+                                    on: g === group) {
+                                selectedGroupIDRaw = g.id.uuidString
+                                hapticTrigger += 1
+                            }
+                        }
+                    }
+                }
+            }
             Text("ISSUES · \(group.name.uppercased())")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.6)

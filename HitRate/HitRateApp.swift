@@ -134,7 +134,14 @@ struct RootView: View {
         // anything else is the Google Sign-In callback coming home.
         .onOpenURL { url in
             if let code = DeepLink.joinCode(from: url) {
-                pendingJoinCode = code
+                // Clear first, then set on the next runloop pass. Assigning the
+                // same value is not a change, so a set-once assignment would
+                // never re-present the sheet — and it can genuinely fail to
+                // present the first time (SwiftUI won't stack a `.sheet` under a
+                // `fullScreenCover`, so a link arriving mid-practice is
+                // swallowed). This way the next scan always re-fires.
+                pendingJoinCode = nil
+                DispatchQueue.main.async { pendingJoinCode = code }
             } else {
                 GIDSignIn.sharedInstance.handle(url)
             }
