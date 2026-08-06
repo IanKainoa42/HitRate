@@ -1116,13 +1116,9 @@ struct CaptureView: View {
     /// 2 = heating up, 3+ = on fire. Keys on the cell so the flame rides whichever
     /// axis is the row.
     private func hotStreak(group: StuntGroup, subject: Subject, in attempts: [Attempt]) -> Int {
-        var run = 0
-        for a in attempts.reversed() {
-            guard a.group === group && a.subject === subject else { continue }
-            guard a.isLandingRep else { break }
-            run += 1
-        }
-        return run
+        StatsEngine.currentLandingStreak(
+            in: attempts.filter { $0.group === group && $0.subject === subject }
+        )
     }
 
     /// Ember at 2 straight hits, pulsing flame at 3+. Rides next to the row label.

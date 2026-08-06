@@ -26,6 +26,14 @@
 				<string>com.googleusercontent.apps.602780812787-1s7rtbkvf29sqgrbm9jv3ajrm5sai36s</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ianrichardson.HitRate.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>hitrate</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>

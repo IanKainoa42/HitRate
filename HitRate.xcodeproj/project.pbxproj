@@ -29,6 +29,7 @@
 		5CD6AE7AA709FEFA6BF343B0 /* QuickClinicSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0742D2161B1FF1918B93F623 /* QuickClinicSummaryView.swift */; };
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
 		717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */; };
+		743D3B86B2B641E8F07DEA84 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */; };
 		79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */; };
 		7B29E71BEF6EEBB70B5B5A4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B8E106687D6F5AA09DD3A66E /* Assets.xcassets */; };
 		7EFC99951270AF184F534565 /* BarlowCondensed-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AF31A21789AA05FC3C05841E /* BarlowCondensed-ExtraBold.ttf */; };
@@ -44,6 +45,7 @@
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
 		93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */; };
 		977B508665FEF8C1BF9C2188 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D10E02645FF41504749C81 /* CaptureView.swift */; };
+		A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */; };
 		A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */; };
 		A23C5536F6A93FD23AF8201F /* SeededRNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = D047AEE6F79270EE4548869F /* SeededRNG.swift */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
@@ -59,6 +61,7 @@
 		C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724ED0A599E2826857191AD3 /* DataManagementView.swift */; };
 		C15242CA4F0E359ABB205F5D /* SyncPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341C704BF36D8A9731D5A827 /* SyncPolicies.swift */; };
 		C3D91D1EFFBD17AD2D9D0882 /* FolderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404429588572142C218018D5 /* FolderListView.swift */; };
+		C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */; };
 		C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */; };
 		C6CE9FFACF20F129D966110D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 682FC96676B2F3C23E0A2C50 /* Assets.xcassets */; };
 		C99416CD5862BBED4B7E884F /* QuickClinicExitWarningSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9E2BC0A4095CA11B4B4114 /* QuickClinicExitWarningSheet.swift */; };
@@ -146,6 +149,7 @@
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-SemiBold.ttf"; sourceTree = "<group>"; };
 		5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsEditorView.swift; sourceTree = "<group>"; };
+		5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLink.swift; sourceTree = "<group>"; };
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
 		682FC96676B2F3C23E0A2C50 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
@@ -156,6 +160,7 @@
 		7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncDataModelTests.swift; sourceTree = "<group>"; };
 		84D10E02645FF41504749C81 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		8CACDF028181ABDC147D68BB /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngineTests.swift; sourceTree = "<group>"; };
 		947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutManager.swift; sourceTree = "<group>"; };
 		9C7E3006F9D9D6763DFA5E8D /* ExecutionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionCard.swift; sourceTree = "<group>"; };
 		9E30AC6D5D161DB570B82771 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -176,6 +181,7 @@
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesTests.swift; sourceTree = "<group>"; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
 		F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogStore.swift; sourceTree = "<group>"; };
@@ -368,6 +374,8 @@
 		D1E2326231807F8A6765157B /* HitRateTests */ = {
 			isa = PBXGroup;
 			children = (
+				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
+				8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */,
 				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
 				7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */,
 				0B271F43B06539CD8C90123E /* SyncPolicyTests.swift */,
@@ -413,6 +421,7 @@
 			children = (
 				077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */,
 				EDD99E08D7FCE2602733C7EF /* CSVExport.swift */,
+				5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */,
 				D047AEE6F79270EE4548869F /* SeededRNG.swift */,
 				138B89E3489E75197EA700F8 /* Sounds.swift */,
 			);
@@ -585,6 +594,7 @@
 				E033839C9325BA8B73DF9AA4 /* CardCatalogRenderer.swift in Sources */,
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
+				743D3B86B2B641E8F07DEA84 /* DeepLink.swift in Sources */,
 				4A2264B0343EFAB8B8AA10D2 /* ExecutionCard.swift in Sources */,
 				14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */,
 				D61621AB7AEAF64DC2C31BFE /* FirestoreModels.swift in Sources */,
@@ -632,6 +642,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
+				C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */,
 				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,
 				C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */,
 				18A3263E1908E1F473615478 /* SyncPolicyTests.swift in Sources */,

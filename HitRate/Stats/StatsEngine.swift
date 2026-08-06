@@ -93,8 +93,7 @@ struct GroupStat: Identifiable {
     var falls: Int { counts[Outcome.buildingFall.rawValue] + counts[Outcome.majorFall.rawValue] }
     var bobbles: Int { counts[Outcome.bobble.rawValue] }
 
-    // Clean-hit lens (Ian: stats should center clean hits, not raw hit/bobble).
-    // `rate` is already hits/total (a bobble is NOT a hit) — the clean-hit rate.
+    // Clean-hit lens remains available alongside the weighted headline rate.
     /// Times the skill stayed up (clean hit or bobble — didn't hit the mat).
     var standUps: Int { hits + bobbles }
     /// Of the reps that stayed up, the share that were CLEAN (no bobble).
@@ -171,9 +170,9 @@ struct FloorStats {
     static let insightMinReps = 6
     private var rankable: [GroupStat] { groups.filter { $0.total >= Self.insightMinReps } }
 
-    /// Highest clean-hit rate — the skill to show off.
+    /// Highest weighted hit rate — the skill to show off.
     var bestSkill: GroupStat? { rankable.max { $0.rate < $1.rate } }
-    /// Lowest clean-hit rate — where to put the reps in. Only when there's a
+    /// Lowest weighted hit rate — where to put the reps in. Only when there's a
     /// field to compare against (≥2 rankable skills).
     var worstSkill: GroupStat? {
         rankable.count >= 2 ? rankable.min { $0.rate < $1.rate } : nil
@@ -276,7 +275,7 @@ enum StatsEngine {
             let counts = outcomeCounts(currentAttempts[g.persistentModelID] ?? [])
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
-            let rate = cleanRate(counts)
+            let rate = weightedRate(counts)
 
             let prevCounts = outcomeCounts(previousAttempts[g.persistentModelID] ?? [])
             let prevTotal = prevCounts.reduce(0, +)
@@ -284,7 +283,7 @@ enum StatsEngine {
             var delta: Int?
             if total > 0, prevTotal > 0 {
                 // For .all, compare against the first session (season start) — "growth since Sept".
-                delta = rate - cleanRate(prevCounts)
+                delta = rate - weightedRate(prevCounts)
             }
 
             groupStats.append(GroupStat(
@@ -300,7 +299,7 @@ enum StatsEngine {
         for s in groupStats { for i in 0..<4 { overall[i] += s.counts[i] } }
         let total = overall.reduce(0, +)
         let hits = overall[Outcome.hit.rawValue]
-        let rate = cleanRate(overall)
+        let rate = weightedRate(overall)
 
         // prevOverall is rolled up from per-group counts (not raw session
         // attempts) so the floor delta and the per-group deltas agree — raw
@@ -309,7 +308,7 @@ enum StatsEngine {
         let prevTotal = prevOverall.reduce(0, +)
         var delta: Int?
         if total > 0, prevTotal > 0 {
-            delta = rate - cleanRate(prevOverall)
+            delta = rate - weightedRate(prevOverall)
         }
 
         let (execution, executionScoredReps) = executionBreakdown(
@@ -382,17 +381,17 @@ enum StatsEngine {
                                     logger: LoggerFilter = .unfiltered) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
-            var hits = 0, total = 0
+            var credit = 0, total = 0
             for s in sessions {
                 for a in s.attempts
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     if let interval, !interval.contains(a.timestamp) { continue }
                     guard subjectMatch(a, subject), logger.matches(a) else { continue }
                     total += 1
-                    if a.isHitRep { hits += 1 }   // clean-hit rate: a bobble is NOT a hit
+                    credit += a.creditValue
                 }
             }
-            return total > 0 ? Int((Double(hits) / Double(total) * 100).rounded()) : nil
+            return total > 0 ? Int((Double(credit) / Double(total)).rounded()) : nil
         }
 
         switch timeframe {
@@ -503,14 +502,27 @@ enum StatsEngine {
         return a.subject?.persistentModelID == subject.persistentModelID
     }
 
-    /// Clean-hit rate (0–100): hits (tier 0) ÷ total. A bobble/fall is NOT a hit,
-    /// so this is the plain "did you stick it" number — it matches the per-skill %
-    /// and the weekly RATE CUP, and agrees with the "Hit N · X%" breakdown.
-    /// (Partial credit 67/33 still exists, but only to drive streaks via
-    /// `isLandingRep` — it no longer weights this headline.)
-    static func cleanRate(_ tierCounts: [Int]) -> Int {
+    /// Weighted hit rate (0–100): average credit across the four fixed credit
+    /// tiers (100 / 67 / 33 / 0). Counts are indexed by `Outcome.rawValue`.
+    static func weightedRate(_ tierCounts: [Int]) -> Int {
+        guard tierCounts.count >= Outcome.allCases.count else { return 0 }
         let total = tierCounts.reduce(0, +)
         guard total > 0 else { return 0 }
-        return Int((Double(tierCounts[Outcome.hit.rawValue]) / Double(total) * 100).rounded())
+        let credit = tierCounts[Outcome.hit.rawValue] * OutcomeCredit.hit.rawValue
+            + tierCounts[Outcome.bobble.rawValue] * OutcomeCredit.decent.rawValue
+            + tierCounts[Outcome.buildingFall.rawValue] * OutcomeCredit.rough.rawValue
+            + tierCounts[Outcome.majorFall.rawValue] * OutcomeCredit.miss.rawValue
+        return Int((Double(credit) / Double(total)).rounded())
+    }
+
+    /// Trailing run of landings. A rep with at least 50% credit keeps the live
+    /// streak active; the first lower-credit rep resets it to zero.
+    static func currentLandingStreak(in attempts: [Attempt]) -> Int {
+        var run = 0
+        for attempt in attempts.reversed() {
+            guard attempt.isLandingRep else { break }
+            run += 1
+        }
+        return run
     }
 }
