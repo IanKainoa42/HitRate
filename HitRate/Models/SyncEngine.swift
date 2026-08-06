@@ -48,7 +48,13 @@ final class SyncEngine: ObservableObject {
 
     private let db = Firestore.firestore()
     private var listeners: [ListenerRegistration] = []
+    /// Lightweight roster listeners stay live for every visible folder.
     private var teamListeners: [String: [ListenerRegistration]] = [:]
+    /// High-volume session/attempt listeners exist only for the open folder.
+    private var historyListeners: [ListenerRegistration] = []
+    private var activeTeamID: String?
+    /// Invalidates callbacks already queued when history listeners are replaced.
+    private var historyGeneration: UInt = 0
     private var modelContext: ModelContext?
     private var isRunning = false
     /// A team is reconciled only after every listener has delivered an
@@ -102,7 +108,18 @@ final class SyncEngine: ObservableObject {
 
         observeLocalSaves()
         attachListeners()
+        attachActiveHistoryListeners()
         pushLocalBootstrap()
+    }
+
+    /// Selects the one folder whose complete rep history should stay live.
+    /// Passing nil returns to the folder list and releases the expensive
+    /// sessions/attempts subscriptions immediately.
+    func setActiveTeamID(_ teamID: String?) {
+        guard activeTeamID != teamID else { return }
+        detachHistoryListeners()
+        activeTeamID = teamID
+        if isRunning { attachActiveHistoryListeners() }
     }
 
     /// Tear down listeners + the save observer (called on sign-out).
@@ -111,6 +128,7 @@ final class SyncEngine: ObservableObject {
         listeners.removeAll()
         teamListeners.values.flatMap { $0 }.forEach { $0.remove() }
         teamListeners.removeAll()
+        detachHistoryListeners()
         if let saveObserver {
             NotificationCenter.default.removeObserver(saveObserver)
             self.saveObserver = nil
@@ -680,8 +698,17 @@ final class SyncEngine: ObservableObject {
             }
             if let snap { self.markServerReady(teamID: teamID, collection: "templates", metadata: snap.metadata) }
         })
-        registrations.append(base.collection("sessions").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
-            guard let self else { return }
+        teamListeners[teamID] = registrations
+    }
+
+    private func attachActiveHistoryListeners() {
+        guard historyListeners.isEmpty, let teamID = activeTeamID else { return }
+        let generation = historyGeneration
+        let base = teamDoc(teamID)
+        historyListeners.append(base.collection("sessions").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self,
+                  self.activeTeamID == teamID,
+                  self.historyGeneration == generation else { return }
             if let error { self.lastError = "Session sync failed: \(error.localizedDescription)"; return }
             snap?.documentChanges.forEach { change in
                 guard !change.document.metadata.hasPendingWrites else { return }
@@ -691,8 +718,10 @@ final class SyncEngine: ObservableObject {
             }
             if let snap { self.markServerReady(teamID: teamID, collection: "sessions", metadata: snap.metadata) }
         })
-        registrations.append(base.collection("attempts").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
-            guard let self else { return }
+        historyListeners.append(base.collection("attempts").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self,
+                  self.activeTeamID == teamID,
+                  self.historyGeneration == generation else { return }
             if let error { self.lastError = "Attempt sync failed: \(error.localizedDescription)"; return }
             guard let snap else { return }
             // A pending-write document is our own local Firestore echo, not a
@@ -702,9 +731,24 @@ final class SyncEngine: ObservableObject {
                 guard !change.document.metadata.hasPendingWrites else { return nil }
                 return try? change.document.data(as: FAttempt.self)
             }
-            self.enqueueAttemptImport(attempts, teamID: teamID, metadata: snap.metadata)
+            self.enqueueAttemptImport(
+                attempts,
+                teamID: teamID,
+                generation: generation,
+                metadata: snap.metadata
+            )
         })
-        teamListeners[teamID] = registrations
+    }
+
+    private func detachHistoryListeners() {
+        historyGeneration &+= 1
+        historyListeners.forEach { $0.remove() }
+        historyListeners.removeAll()
+        attemptImportTasks.values.forEach { $0.cancel() }
+        attemptImportTasks.removeAll()
+        guard let oldTeamID = activeTeamID else { return }
+        teamsReadyForAttemptPush.remove(oldTeamID)
+        serverReadyCollections[oldTeamID]?.subtract(SyncListenerPlan.historyCollections)
     }
 
     private func markServerReady(teamID: String, collection: String,
@@ -723,12 +767,18 @@ final class SyncEngine: ObservableObject {
     /// once, then saves/yields every 250 records so a 10k-rep hydration cannot
     /// monopolize the main actor long enough to block opening a folder.
     private func enqueueAttemptImport(_ remotes: [FAttempt], teamID: String,
+                                      generation: UInt,
                                       metadata: SnapshotMetadata) {
         let previous = attemptImportTasks[teamID]
         attemptImportTasks[teamID] = Task { @MainActor [weak self] in
             _ = await previous?.value
-            guard let self, !Task.isCancelled else { return }
+            guard let self, !Task.isCancelled,
+                  self.activeTeamID == teamID,
+                  self.historyGeneration == generation else { return }
             await self.applyAttempts(remotes, teamID: teamID)
+            guard !Task.isCancelled,
+                  self.activeTeamID == teamID,
+                  self.historyGeneration == generation else { return }
             self.markServerReady(teamID: teamID, collection: "attempts", metadata: metadata)
         }
     }

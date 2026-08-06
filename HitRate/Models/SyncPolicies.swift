@@ -1,5 +1,25 @@
 import Foundation
 
+/// Describes which Firestore collections stay live for each visible folder.
+/// Rosters are lightweight and must remain available in the folder list, while
+/// sessions and attempts can contain thousands of documents and are only needed
+/// for the folder whose dashboard is currently open.
+enum SyncListenerPlan {
+    static let rosterCollections: Set<String> = ["subjects", "groups", "templates"]
+    static let historyCollections: Set<String> = ["sessions", "attempts"]
+
+    static func collections(forTeamID teamID: String, activeTeamID: String?) -> Set<String> {
+        guard teamID == activeTeamID else { return rosterCollections }
+        return rosterCollections.union(historyCollections)
+    }
+
+    /// Includes the two account-level owned/member team queries.
+    static func listenerCount(visibleTeamCount: Int, hasActiveTeam: Bool) -> Int {
+        2 + (visibleTeamCount * rosterCollections.count)
+            + (hasActiveTeam ? historyCollections.count : 0)
+    }
+}
+
 /// A cache snapshot is useful for immediately rendering offline data, but it is
 /// not proof that Firestore has sent the complete server state. Reconciliation
 /// can begin only after an acknowledged server snapshot.

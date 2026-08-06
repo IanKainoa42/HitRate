@@ -10,6 +10,34 @@ final class SyncSnapshotPolicyTests: XCTestCase {
     }
 }
 
+final class SyncListenerPlanTests: XCTestCase {
+    func testOnlyActiveFolderReceivesHistoryListeners() {
+        XCTAssertEqual(
+            SyncListenerPlan.collections(forTeamID: "team-a", activeTeamID: nil),
+            Set(["subjects", "groups", "templates"])
+        )
+        XCTAssertEqual(
+            SyncListenerPlan.collections(forTeamID: "team-a", activeTeamID: "team-b"),
+            Set(["subjects", "groups", "templates"])
+        )
+        XCTAssertEqual(
+            SyncListenerPlan.collections(forTeamID: "team-a", activeTeamID: "team-a"),
+            Set(["subjects", "groups", "templates", "sessions", "attempts"])
+        )
+    }
+
+    func testPerConnectionListenerCountWithFiveFolders() {
+        XCTAssertEqual(
+            SyncListenerPlan.listenerCount(visibleTeamCount: 5, hasActiveTeam: true),
+            19
+        )
+        XCTAssertEqual(
+            SyncListenerPlan.listenerCount(visibleTeamCount: 5, hasActiveTeam: false),
+            17
+        )
+    }
+}
+
 final class SyncAttemptOwnershipPolicyTests: XCTestCase {
     func testImportedAttemptIsNeverReattributedToCurrentUser() {
         XCTAssertFalse(SyncAttemptOwnershipPolicy.canUpload(

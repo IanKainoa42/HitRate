@@ -116,8 +116,19 @@ struct RootView: View {
             configureWatchLogging()
             // Anonymous-first: guarantee a signed-in session so cloud sync has a
             // uid to own/join teams, without ever blocking the UI on a login.
+            sync.setActiveTeamID(openFolderID)
             auth.signInAnonymouslyIfNeeded()
             if auth.uid != nil { sync.startSyncing(context: context) }
+        }
+        .onChange(of: openFolderID) { _, teamID in
+            sync.setActiveTeamID(teamID)
+        }
+        // Home can create/switch folders without returning to FolderListView.
+        // Keep the navigation identity and the high-volume history listeners
+        // pointed at the same folder in that path too.
+        .onChange(of: currentTeamID) { _, teamID in
+            guard openFolderID != nil, !teamID.isEmpty else { return }
+            openFolderID = teamID
         }
         .onChange(of: auth.uid) { _, uid in
             if uid != nil { sync.startSyncing(context: context) }
