@@ -303,7 +303,7 @@ struct LogView: View {
                             context.insert(Attempt(slot: slot, group: group, session: session))
                             try? context.save()
                             selectedGroupIDRaw = group.id.uuidString
-                            hapticTrigger += 1
+                            Haptics.shared.play(def.soundOutcome)
                             Sounds.shared.play(.outcome(def.soundOutcome))
                         } label: {
                             VStack(spacing: 3) {
@@ -475,16 +475,13 @@ struct LogView: View {
                                     .accessibilityHint("Tap to stage one more, hold to remove one")
                             }
                         }
-                        .frame(maxHeight: 50)
+                        .frame(minHeight: 56)
                 }
             }
 
-            if groups.count > 10 {
-                ScrollView(showsIndicators: false) { gridRows }
-            } else {
-                gridRows
-                Spacer(minLength: 0)
-            }
+            // Rows keep a gym-friendly minimum tap height and scroll past
+            // what fits, instead of compressing (mirrors CaptureView's matrices).
+            ScrollView(showsIndicators: false) { gridRows }
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
@@ -504,7 +501,7 @@ struct LogView: View {
             // Each cell names THIS skill's own outcome — mixed rosters and
             // variable outcome counts both read correctly.
             Text(def.short)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(def.color.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -602,8 +599,9 @@ struct LogView: View {
         guard slot >= 0, slot < c.count else { return }
         c[slot] += 1
         staged[g.persistentModelID] = c
-        hapticTrigger += 1
-        Sounds.shared.play(.outcome(g.outcomeDef(at: slot)?.soundOutcome ?? .hit))
+        let o = g.outcomeDef(at: slot)?.soundOutcome ?? .hit
+        Haptics.shared.play(o)
+        Sounds.shared.play(.outcome(o))
     }
 
     /// Hold a cell in wave mode: take one staged rep of that outcome back off.

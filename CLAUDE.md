@@ -41,7 +41,8 @@ the editor.
   lives in `project.yml` (no `increment_build_number`); `/ship` bumps it and
   re-runs `xcodegen generate`. ASC API key is a raw `.p8` via `key_filepath`
   (Ruby 4 / OpenSSL 3 breaks `key_content`).
-- No test target, no linter config.
+- Test target: `HitRateTests` (sync policies, stats, milestones) — run with
+  `xcodebuild … test`. No linter config.
 
 ## Design source of truth
 

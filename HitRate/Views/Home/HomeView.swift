@@ -190,7 +190,7 @@ struct HomeView: View {
                             // Overall first, then a stunt-only and tumbling-only
                             // section stacked beneath it (not a one-at-a-time tab).
                             sectionHeader("OVERALL", icon: "square.grid.2x2.fill", reps: d.total)
-                            dashboardCards(d)
+                            dashboardCards(d, actions: true)
 
                             let st = kindStats(.stunt)
                             sectionHeader("STUNT", icon: SkillKind.stunt.icon, reps: st.total)
@@ -200,15 +200,14 @@ struct HomeView: View {
                             sectionHeader("TUMBLING", icon: SkillKind.tumbling.icon, reps: tu.total)
                             dashboardCards(tu)
                         } else {
-                            dashboardCards(d)
+                            dashboardCards(d, actions: true)
                         }
 
-                        // Latest-session recap + actions sit once at the bottom,
-                        // below every section.
+                        // Latest-session recap sits once at the bottom, below
+                        // every section.
                         if d.latest != nil {
                             SessionTapeCard(snapshot: d.latest!, kind: d.aggregateKind)
                         }
-                        actionRow(d)
                     } else if !hasRoster {
                         // A freshly added team has no buckets yet — guide to the
                         // editor instead of an unusable practice prompt.
@@ -775,9 +774,12 @@ struct HomeView: View {
     /// in a split, a kind may have no reps in the current timeframe even though
     /// it has lifetime data.
     @ViewBuilder
-    private func dashboardCards(_ d: FloorStats) -> some View {
+    private func dashboardCards(_ d: FloorStats, actions: Bool = false) -> some View {
         if d.hasData {
             SummaryCard(stats: d)
+            // Share/CSV ride directly under the headline number (overall block
+            // only) — they were buried below every section at the feed bottom.
+            if actions { actionRow(d) }
             TrendCard(stats: d)
             GroupsCard(stats: d)
             SkillInsightsCard(stats: d)

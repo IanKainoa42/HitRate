@@ -558,7 +558,7 @@ struct CaptureView: View {
                     Color.clear.frame(width: rowLabelWidth, height: 1)
                     ForEach(Array(defs.enumerated()), id: \.offset) { _, def in
                         Text(def.short)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(def.color)
                             .frame(maxWidth: .infinity)
                             .lineLimit(1).minimumScaleFactor(0.6)
@@ -579,7 +579,7 @@ struct CaptureView: View {
                                         matrixCell(group: skill, subject: s, slot: slot, def: def, v: v)
                                     }
                                 }
-                                .frame(maxHeight: 50)
+                                .frame(minHeight: 56)
                             }
                         }
                     }
@@ -623,7 +623,7 @@ struct CaptureView: View {
                                     matrixCell(group: g, subject: subject, slot: slot, def: def, v: v)
                                 }
                             }
-                            .frame(maxHeight: 50)
+                            .frame(minHeight: 56)
                         }
                     }
                 }
@@ -719,7 +719,7 @@ struct CaptureView: View {
                 .contentTransition(.numericText(value: Double(v)))
                 .animation(.spring(duration: 0.3), value: v)
             Text(def.short)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(def.color.opacity(0.9))
                 .lineLimit(1).minimumScaleFactor(0.6)
         }
@@ -997,8 +997,9 @@ struct CaptureView: View {
         guard slot >= 0, slot < c.count else { return }
         c[slot] += 1
         staged[key] = c
-        hapticTrigger += 1
-        Sounds.shared.play(.outcome(g.outcomeDef(at: slot)?.soundOutcome ?? .hit))
+        let o = g.outcomeDef(at: slot)?.soundOutcome ?? .hit
+        Haptics.shared.play(o)
+        Sounds.shared.play(.outcome(o))
     }
 
     /// Hold a cell in wave mode: take one staged rep back off.

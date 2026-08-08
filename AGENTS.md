@@ -180,3 +180,5 @@ Key invariants:
 - `figure.cheerleading` SF Symbol doesn't exist; use `figure.gymnastics`.
 - Latest-session snapshot must skip attempt-less sessions or an ended empty
   session hides the tape card.
+
+## Imported Claude Cowork project instructions
