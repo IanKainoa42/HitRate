@@ -91,6 +91,25 @@ final class SyncSessionIdentityTests: XCTestCase {
     }
 }
 
+final class SyncJoinCodePolicyTests: XCTestCase {
+    func testTimedOutShareKeepsTheCodeItAlreadyPublished() {
+        XCTAssertTrue(SyncJoinCodePolicy.keepsCode(after: .acknowledged))
+        XCTAssertTrue(SyncJoinCodePolicy.keepsCode(after: .timedOut))
+        XCTAssertFalse(SyncJoinCodePolicy.keepsCode(after: .failed))
+    }
+
+    func testRemoteNilNeverErasesAFreshlyMintedCode() {
+        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: nil), "2D6A2N")
+        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: ""), "2D6A2N")
+    }
+
+    func testOwnerPublishedCodeWins() {
+        XCTAssertEqual(SyncJoinCodePolicy.merged(local: nil, remote: "XQ2KUR"), "XQ2KUR")
+        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: "XQ2KUR"), "XQ2KUR")
+        XCTAssertNil(SyncJoinCodePolicy.merged(local: nil, remote: nil))
+    }
+}
+
 final class FolderSummaryIndexTests: XCTestCase {
     func testBuildsFolderCountsInOnePass() {
         let groups = [

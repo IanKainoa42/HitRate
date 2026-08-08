@@ -802,7 +802,8 @@ final class SyncEngine: ObservableObject {
             if local.itemNoun != remote.itemNoun { local.itemNoun = remote.itemNoun; changed = true }
             if local.orderIndex != remote.orderIndex { local.orderIndex = remote.orderIndex; changed = true }
             if local.memberIds != remote.memberIds { local.memberIds = remote.memberIds; changed = true }
-            if local.joinCode != remote.joinCode { local.joinCode = remote.joinCode; changed = true }
+            let mergedCode = SyncJoinCodePolicy.merged(local: local.joinCode, remote: remote.joinCode)
+            if local.joinCode != mergedCode { local.joinCode = mergedCode; changed = true }
             if local.deletedAt != remote.deletedAt { local.deletedAt = remote.deletedAt; changed = true }
             if local.ownerUID == nil { local.ownerUID = remote.ownerUID; changed = true }
         } else {
@@ -991,39 +992,76 @@ final class SyncEngine: ObservableObject {
         guard let uid else { lastError = "Not signed in."; return nil }
         // Claim ownership of a not-yet-synced local team so the code is valid.
         if team.ownerUID == nil { team.ownerUID = uid }
-        if let existing = team.joinCode, !existing.isEmpty { return existing }
         let teamID = team.id.uuidString
+
+        // Re-share RE-PUBLISHES instead of trusting that the first write landed.
+        // A code is stamped locally while its directory entry may still be
+        // unacknowledged, so a blind early return could hand out a code that
+        // never made it to the server.
+        if let existing = team.joinCode, !existing.isEmpty {
+            if case .write(let outcome, let message) = await publishCode(existing, teamID: teamID,
+                                                                        uid: uid),
+               !SyncJoinCodePolicy.keepsCode(after: outcome) {
+                lastError = "Share failed: \(message)"
+                return nil
+            }
+            pushTeamMeta(team)
+            lastError = nil
+            return existing
+        }
+
         for _ in 0..<5 {
             let code = generateCode()
-            let ref = db.collection("joinCodes").document(code)
-            do {
-                // Both round trips share ONE timeout window — two stacked 12s
-                // waits (lookup, then write) made a single attempt take up to
-                // 24s before the user saw anything, which read as "spins
-                // forever" even though it eventually failed.
-                let claimed = try await withTimeout(seconds: 10) { () async throws -> Bool in
-                    let snap = try await ref.getDocument()
-                    if snap.exists { return false }   // extremely unlikely; try another
-                    try await ref.setData([
-                        "teamId": teamID,
-                        "ownerUID": uid,
-                        "createdAt": FieldValue.serverTimestamp()
-                    ])
-                    return true
+            switch await publishCode(code, teamID: teamID, uid: uid, rejectingCollision: true) {
+            case .taken:
+                continue   // extremely unlikely; try another
+            case .write(let outcome, let message):
+                guard SyncJoinCodePolicy.keepsCode(after: outcome) else {
+                    lastError = "Share failed: \(message)"
+                    return nil
                 }
-                guard claimed else { continue }
+                // Stamped even when the publish only TIMED OUT — the write is
+                // still queued, and dropping the code here is what orphaned the
+                // published entry and minted a fresh code on every retry.
                 team.joinCode = code
                 try? modelContext?.save()
                 pushTeamMeta(team)   // propagate the code onto the team doc
                 lastError = nil
                 return code
-            } catch {
-                lastError = "Share failed: \(error.localizedDescription)"
-                return nil
             }
         }
         lastError = "Couldn't allocate a code — try again."
         return nil
+    }
+
+    private enum CodePublish {
+        case taken
+        case write(SyncJoinCodePolicy.ShareWrite, message: String)
+    }
+
+    /// Publishes the public `joinCodes/{code}` directory entry. Both round trips
+    /// share ONE timeout window — two stacked 12s waits (lookup, then write) made
+    /// a single attempt take up to 24s before the user saw anything, which read
+    /// as "spins forever" even though it eventually failed.
+    private func publishCode(_ code: String, teamID: String, uid: String,
+                             rejectingCollision: Bool = false) async -> CodePublish {
+        let ref = db.collection("joinCodes").document(code)
+        do {
+            let taken = try await withTimeout(seconds: 10) { () async throws -> Bool in
+                if rejectingCollision, try await ref.getDocument().exists { return true }
+                try await ref.setData([
+                    "teamId": teamID,
+                    "ownerUID": uid,
+                    "createdAt": FieldValue.serverTimestamp()
+                ], merge: true)
+                return false
+            }
+            return taken ? .taken : .write(.acknowledged, message: "")
+        } catch is TimedOutError {
+            return .write(.timedOut, message: "")
+        } catch {
+            return .write(.failed, message: error.localizedDescription)
+        }
     }
 
     /// Redeem a join code: resolve it to a team and add ourselves to that team's

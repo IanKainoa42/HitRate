@@ -56,6 +56,37 @@ enum SyncSessionIdentity {
     }
 }
 
+/// Publishing `joinCodes/{code}` makes the code a server-side fact the moment the
+/// write lands, but the acknowledgement can outlive the client's timeout — a quota
+/// rejection is retried inside the Firestore SDK rather than thrown, so the
+/// completion handler simply never fires. Dropping the code in that window orphans
+/// the directory entry that did land and mints a brand-new code on the next share.
+enum SyncJoinCodePolicy {
+    enum ShareWrite {
+        case acknowledged
+        /// Unacknowledged, not failed: the write stays in Firestore's local
+        /// mutation queue and still commits once the connection recovers.
+        case timedOut
+        case failed
+    }
+
+    static func keepsCode(after write: ShareWrite) -> Bool {
+        switch write {
+        case .acknowledged, .timedOut: return true
+        case .failed: return false
+        }
+    }
+
+    /// The code to keep when a remote team document arrives. The owner is
+    /// authoritative whenever it publishes a code, but nothing ever un-shares a
+    /// folder, so a nil from the server only means our own push has not landed
+    /// yet — it must never erase a code we already minted.
+    static func merged(local: String?, remote: String?) -> String? {
+        guard let remote, !remote.isEmpty else { return local }
+        return remote
+    }
+}
+
 /// Value-only folder summaries keep SwiftUI from faulting every Attempt
 /// relationship more than once while rendering the folder list.
 enum FolderSummaryIndex {
