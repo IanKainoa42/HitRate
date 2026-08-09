@@ -133,6 +133,77 @@ final class MinBuildPolicyTests: XCTestCase {
     }
 }
 
+final class AttemptCacheInvalidationTests: XCTestCase {
+    func testExternalDeleteDropsTheCache() {
+        // The shipped crash: deleting a folder cascaded its reps away while the
+        // import cache still named them, and resolving one trapped in SwiftData.
+        XCTAssertTrue(AttemptCacheInvalidation.shouldDrop(deletedCount: 40, isImporting: false))
+    }
+
+    func testSaveWithoutDeletesKeepsTheCache() {
+        XCTAssertFalse(AttemptCacheInvalidation.shouldDrop(deletedCount: 0, isImporting: false))
+    }
+
+    func testImportsOwnTombstonesDoNotAbortIt() {
+        // applyAttempts deletes tombstoned reps and maintains `known` inline; if
+        // its own save invalidated the cache it would abort on every batch.
+        XCTAssertFalse(AttemptCacheInvalidation.shouldDrop(deletedCount: 12, isImporting: true))
+    }
+
+    func testGenerationMismatchMarksAnInFlightImportStale() {
+        XCTAssertFalse(AttemptCacheInvalidation.isStale(captured: 7, current: 7))
+        XCTAssertTrue(AttemptCacheInvalidation.isStale(captured: 7, current: 8))
+    }
+}
+
+final class AccountPromptPolicyTests: XCTestCase {
+    func testOnboardingStepLeadsAFreshInstall() {
+        XCTAssertTrue(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: false, isUpgraded: false, replayingIntro: false, restoring: false))
+    }
+
+    func testOnboardingStepIsSkippedOnceSavedOrOnAnIntroReplay() {
+        // Already saved — nothing to offer.
+        XCTAssertFalse(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: false, isUpgraded: true, replayingIntro: false, restoring: false))
+        // Replay is not a fresh install; the user still has their data.
+        XCTAssertFalse(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: false, isUpgraded: false, replayingIntro: true, restoring: false))
+        // "Not now" is honored for the rest of the flow.
+        XCTAssertFalse(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: true, isUpgraded: false, replayingIntro: false, restoring: false))
+    }
+
+    func testRestoringHoldsTheStepEvenAfterSignInFlipsUpgraded() {
+        // The regression this guards: sign-in flips isUpgraded immediately, so
+        // without the restoring pin the step vanishes mid-restore and the user
+        // gets walked through building a duplicate folder.
+        XCTAssertTrue(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: false, isUpgraded: true, replayingIntro: false, restoring: true))
+        XCTAssertTrue(AccountPromptPolicy.showsOnboardingStep(
+            dismissed: true, isUpgraded: true, replayingIntro: true, restoring: true))
+    }
+
+    func testAfterPracticePromptNeedsRepsAndAsksOnlyOnce() {
+        XCTAssertTrue(AccountPromptPolicy.offersSaveAfterPractice(
+            isUpgraded: false, alreadyAsked: false, repCount: 12))
+        // An empty practice has nothing to protect.
+        XCTAssertFalse(AccountPromptPolicy.offersSaveAfterPractice(
+            isUpgraded: false, alreadyAsked: false, repCount: 0))
+        // Never twice, and never once saved.
+        XCTAssertFalse(AccountPromptPolicy.offersSaveAfterPractice(
+            isUpgraded: false, alreadyAsked: true, repCount: 12))
+        XCTAssertFalse(AccountPromptPolicy.offersSaveAfterPractice(
+            isUpgraded: true, alreadyAsked: false, repCount: 12))
+    }
+
+    func testFolderChipPersistsButOnlyWithAFolderToLose() {
+        XCTAssertTrue(AccountPromptPolicy.showsFolderListChip(isUpgraded: false, folderCount: 1))
+        XCTAssertFalse(AccountPromptPolicy.showsFolderListChip(isUpgraded: false, folderCount: 0))
+        XCTAssertFalse(AccountPromptPolicy.showsFolderListChip(isUpgraded: true, folderCount: 3))
+    }
+}
+
 final class FolderSummaryIndexTests: XCTestCase {
     func testBuildsFolderCountsInOnePass() {
         let groups = [

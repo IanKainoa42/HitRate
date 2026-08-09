@@ -26,6 +26,7 @@
 		4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B06141B674607C1343BF33B /* TrophyRoomView.swift */; };
 		5069C1AD971B8FF63B7647A1 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */; };
 		52B11EFC2C5847B02332BB98 /* GroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */; };
+		5704105C4E397519158188B7 /* SaveAccountPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */; };
 		5CD6AE7AA709FEFA6BF343B0 /* QuickClinicSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0742D2161B1FF1918B93F623 /* QuickClinicSummaryView.swift */; };
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
 		717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */; };
@@ -78,6 +79,7 @@
 		E9A8CB07B70E0CCDE117910A /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D8D88E388C1695A810593 /* AccountView.swift */; };
 		EC00C955A569AD7AA035AD1A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0A32BDE8F4EA8761F39A65B /* GoogleSignInSwift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
+		F2EDDEBA74489B4BE59600AC /* AccountSignInButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */; };
 		F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */; };
 		FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */; };
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
@@ -124,6 +126,7 @@
 		138B89E3489E75197EA700F8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
 		168A537A9DBCA16D9D49620A /* FirestoreModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreModels.swift; sourceTree = "<group>"; };
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
+		1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInButtons.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
 		2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLoggingSheet.swift; sourceTree = "<group>"; };
@@ -142,6 +145,7 @@
 		404429588572142C218018D5 /* FolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderListView.swift; sourceTree = "<group>"; };
 		479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
+		48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveAccountPrompt.swift; sourceTree = "<group>"; };
 		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
@@ -413,8 +417,10 @@
 		DB8DC5E39361E17ABD921CBA /* Auth */ = {
 			isa = PBXGroup;
 			children = (
+				1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */,
 				DA1D8D88E388C1695A810593 /* AccountView.swift */,
 				479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */,
+				48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -590,6 +596,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2EDDEBA74489B4BE59600AC /* AccountSignInButtons.swift in Sources */,
 				E9A8CB07B70E0CCDE117910A /* AccountView.swift in Sources */,
 				5069C1AD971B8FF63B7647A1 /* AuthViewModel.swift in Sources */,
 				86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */,
@@ -621,6 +628,7 @@
 				5CD6AE7AA709FEFA6BF343B0 /* QuickClinicSummaryView.swift in Sources */,
 				ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */,
 				226DD6B7AC3D3E7DCA340B3F /* RosterView.swift in Sources */,
+				5704105C4E397519158188B7 /* SaveAccountPrompt.swift in Sources */,
 				A23C5536F6A93FD23AF8201F /* SeededRNG.swift in Sources */,
 				BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */,
 				28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */,

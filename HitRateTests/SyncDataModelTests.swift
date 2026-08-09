@@ -73,6 +73,32 @@ final class SyncDataModelTests: XCTestCase {
         XCTAssertEqual(first.syncState, .pending)
     }
 
+    /// The precondition behind the applyAttempts crash: deleting a folder takes
+    /// its whole rep history with it, so any identifier the import cache had
+    /// recorded for those reps is left naming a row that no longer exists.
+    func testDeletingATeamCascadesItsAttemptsAway() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let team = Team(name: "Doomed", orderIndex: 0)
+        let group = StuntGroup(name: "Full up", number: 1, orderIndex: 0)
+        group.team = team
+        let session = PracticeSession(startedAt: .now)
+        let attempt = Attempt(outcome: .hit, group: group, session: session)
+        context.insert(team)
+        context.insert(group)
+        context.insert(session)
+        context.insert(attempt)
+        try context.save()
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Attempt>()).count, 1)
+
+        context.delete(team)
+        try context.save()
+
+        XCTAssertTrue(try context.fetch(FetchDescriptor<StuntGroup>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<Attempt>()).isEmpty,
+                      "Reps must not outlive their folder — the cache that named them is now stale")
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema([
             Team.self, StuntGroup.self, PracticeSession.self, Attempt.self,

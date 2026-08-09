@@ -32,6 +32,9 @@ struct HomeView: View {
     @State private var shareOpen = false
     @State private var trophyOpen = false
     @State private var editorOpen = false
+    /// Asked at most once per install — a second unprompted ask reads as nagging.
+    @AppStorage("askedSaveAccount") private var askedSaveAccount = false
+    @State private var savePromptOpen = false
     @State private var watchOpen = false
     @State private var rosterOpen = false
     @State private var addTeamOpen = false
@@ -254,8 +257,13 @@ struct HomeView: View {
                 rosterOpen = false
             }
         }
-        .fullScreenCover(item: $logSession, onDismiss: sweepEmptyLiveSessions) { s in
+        .fullScreenCover(item: $logSession, onDismiss: endOfPractice) { s in
             CaptureView(session: s)
+        }
+        .sheet(isPresented: $savePromptOpen) {
+            SaveAccountPrompt(repCount: loggedRepCount)
+                .presentationDetents([.height(430)])
+                .presentationBackground(Theme.appBGBottom)
         }
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
@@ -485,6 +493,22 @@ struct HomeView: View {
         guard !empties.isEmpty else { return }
         for s in empties { context.delete(s) }
         try? context.save()
+    }
+
+    private var loggedRepCount: Int { sessions.reduce(0) { $0 + $1.attempts.count } }
+
+    /// Practice just closed. Sweep the empty session first (deleting a model the
+    /// cover is still rendering crashes mid-dismiss), then — once, and only once
+    /// the user actually has reps to lose — offer to save the account.
+    private func endOfPractice() {
+        sweepEmptyLiveSessions()
+        guard AccountPromptPolicy.offersSaveAfterPractice(isUpgraded: auth.isUpgraded,
+                                                          alreadyAsked: askedSaveAccount,
+                                                          repCount: loggedRepCount) else { return }
+        askedSaveAccount = true
+        // Let the cover finish dismissing; presenting a sheet from inside another
+        // presentation's onDismiss drops it silently often enough to matter.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { savePromptOpen = true }
     }
 
     // MARK: Header (identity well)

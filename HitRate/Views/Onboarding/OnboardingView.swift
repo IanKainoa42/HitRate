@@ -58,10 +58,23 @@ struct OnboardingView: View {
     @AppStorage("teamName") private var teamName = ""
     @AppStorage("currentTeamID") private var currentTeamID = ""
 
+    @EnvironmentObject private var auth: AuthViewModel
+
     @State private var mode: AppMode?
     @State private var draft = ""
     @State private var focus: OnboardingFocus = .stunts
     @State private var pending: [(name: String, focus: OnboardingFocus)] = []   // skills created on finish
+
+    // Step 0 — save/restore. Front-loaded on purpose: signing in here is the
+    // ONLY path that RESTORES a previous install's folders, because
+    // `linkOrSignIn` falls back to a plain sign-in on the "credential already
+    // in use" collision. Buried in the editor, a returning user never finds it,
+    // starts from zero, and mints another orphan team — which is how the cloud
+    // ended up with ~4x more teams than users.
+    @State private var accountStepDone = false
+    /// Sign-in landed; holding the step while the listeners pull any existing
+    /// roster down, so a restore doesn't race the "create your skills" flow.
+    @State private var restoring = false
 
     // Step 3 — a real, hands-on first rep before landing on the (now
     // populated) dashboard. Only shown if the user actually added a skill.
@@ -85,7 +98,9 @@ struct OnboardingView: View {
         ZStack {
             CourtBackdrop()
                 .ignoresSafeArea()
-            if practiceStep, let group = practiceGroup, let session = practiceSession {
+            if showAccountStep {
+                accountStep
+            } else if practiceStep, let group = practiceGroup, let session = practiceSession {
                 practicePreview(group: group, session: session)
             } else if let mode {
                 setup(mode)
@@ -95,6 +110,98 @@ struct OnboardingView: View {
         }
         .animation(.easeOut(duration: 0.25), value: mode)
         .animation(.easeOut(duration: 0.25), value: practiceStep)
+        .animation(.easeOut(duration: 0.25), value: accountStepDone)
+        .onChange(of: auth.isUpgraded) { _, upgraded in
+            guard upgraded, !accountStepDone else { return }
+            watchForRestoredFolders()
+        }
+    }
+
+    // MARK: Step 0 — save or restore
+
+    /// An intro REPLAY is not a fresh install (the user still has their data),
+    /// and an already-saved account has nothing to offer — skip both. `restoring`
+    /// pins the step open so a successful sign-in can't flash past the chooser.
+    private var showAccountStep: Bool {
+        AccountPromptPolicy.showsOnboardingStep(dismissed: accountStepDone,
+                                                isUpgraded: auth.isUpgraded,
+                                                replayingIntro: replayingIntro,
+                                                restoring: restoring)
+    }
+
+    private var accountStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Spacer()
+            IconWordmark(size: 34, rateFill: Theme.navy, dotSize: 15)
+                .padding(.bottom, 2)
+            Text(restoring ? "Looking for your reps…" : "Keep your reps safe")
+                .font(Theme.grotesk(30))
+                .foregroundStyle(.white)
+            Text(restoring
+                 ? "Signed in — checking whether you've logged with HitRate before."
+                 : "Reps live on this phone unless you save them. Sign in and they follow you to a new phone — and if you've had HitRate before, this is how you get your folders back.")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.bottom, 10)
+
+            if restoring {
+                HStack(spacing: 10) {
+                    ProgressView().tint(.white)
+                    Text("One moment")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(.vertical, 6)
+            } else {
+                AccountSignInButtons()
+
+                Button {
+                    accountStepDone = true
+                } label: {
+                    Text("Not now")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+    }
+
+    /// After a sign-in, give the Firestore listeners a window to deliver an
+    /// existing roster. If one lands, this WAS a returning user: drop them
+    /// straight into their restored folder instead of walking them through
+    /// creating a duplicate one. Polls the context rather than the `teams`
+    /// @Query because an escaping closure captures the query's value as it was
+    /// when the closure was made, which would never show the arriving rows.
+    private func watchForRestoredFolders() {
+        restoring = true
+        let context = self.context
+        Task { @MainActor in
+            for _ in 0..<32 {                       // ~8s at 250ms
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                let live = ((try? context.fetch(FetchDescriptor<Team>())) ?? [])
+                    .filter { $0.deletedAt == nil }
+                guard let restored = live.first else { continue }
+                currentTeamID = restored.id.uuidString
+                restoring = false
+                // Mode isn't recoverable from the cloud (it's device-local and
+                // both modes share the same nouns), so keep whatever's stored —
+                // it's one toggle in the editor if they had it the other way.
+                completeOnboarding(AppMode(rawValue: appModeRaw) ?? .athlete)
+                return
+            }
+            // Nothing came down: a genuinely new account. Carry on with setup —
+            // the account is already saved, so their first folder is protected.
+            restoring = false
+            accountStepDone = true
+        }
     }
 
     // MARK: Step 1 — who's counting

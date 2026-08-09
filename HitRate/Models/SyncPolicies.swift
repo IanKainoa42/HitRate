@@ -101,6 +101,59 @@ enum MinBuildPolicy {
     }
 }
 
+/// The attempt-import id cache is only valid while every row it names still
+/// exists. Deleting a folder cascades its whole rep history away, and resolving
+/// one of those stranded identifiers traps inside SwiftData (EXC_BREAKPOINT in
+/// applyAttempts) — so a local delete drops the cache, and an import already
+/// walking the old copy has to notice and stop.
+enum AttemptCacheInvalidation {
+    /// A save that deleted rows invalidates the cache — UNLESS it's the import's
+    /// own tombstone write, which maintains its map inline and would otherwise
+    /// abort itself on every batch.
+    static func shouldDrop(deletedCount: Int, isImporting: Bool) -> Bool {
+        deletedCount > 0 && !isImporting
+    }
+
+    /// An in-flight import compares the generation it captured against the
+    /// current one after each yield; a mismatch means rows went away underneath
+    /// it and the remaining identifiers can no longer be trusted.
+    static func isStale(captured: UInt, current: UInt) -> Bool {
+        captured != current
+    }
+}
+
+/// When to offer "save your account". Anonymous users are device-bound, so a
+/// reinstall orphans their cloud folders — but the app works fully offline, and
+/// App Review 5.1.1(i) doesn't allow gating that behind a login. So every
+/// surface is an OFFER, never a wall, and each has to earn its interruption.
+enum AccountPromptPolicy {
+    /// Onboarding step 0. Front-loaded because signing in here is the only path
+    /// that RESTORES a previous install's folders. Skipped for an intro replay
+    /// (not a fresh install — the user still has their data) and for an already
+    /// saved account. `restoring` pins it open so a sign-in that's still pulling
+    /// the roster down can't flash past into the create-a-folder flow.
+    static func showsOnboardingStep(dismissed: Bool, isUpgraded: Bool,
+                                    replayingIntro: Bool, restoring: Bool) -> Bool {
+        if restoring { return true }
+        return !dismissed && !isUpgraded && !replayingIntro
+    }
+
+    /// After practice. Asked at most once per install, and only once there are
+    /// reps to lose — an empty practice has nothing to protect, and a second
+    /// unprompted ask reads as nagging.
+    static func offersSaveAfterPractice(isUpgraded: Bool, alreadyAsked: Bool,
+                                        repCount: Int) -> Bool {
+        !isUpgraded && !alreadyAsked && repCount > 0
+    }
+
+    /// The always-on folder-list chip. Unlike the prompt this never expires —
+    /// it's the standing door back in — but it stays hidden until there's a
+    /// folder to lose so a first launch isn't nagged.
+    static func showsFolderListChip(isUpgraded: Bool, folderCount: Int) -> Bool {
+        !isUpgraded && folderCount > 0
+    }
+}
+
 /// Value-only folder summaries keep SwiftUI from faulting every Attempt
 /// relationship more than once while rendering the folder list.
 enum FolderSummaryIndex {

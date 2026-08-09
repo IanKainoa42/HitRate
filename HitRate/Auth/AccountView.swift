@@ -132,28 +132,6 @@ struct AccountView: View {
     // MARK: - Provider buttons (shared by save + reauth)
 
     private func signInButtons(for use: AuthViewModel.CredentialUse) -> some View {
-        VStack(spacing: 10) {
-            SignInWithAppleButton(.continue) { request in
-                auth.prepareAppleRequest(request)
-            } onCompletion: { result in
-                auth.completeAppleSignIn(result, for: use)
-            }
-            .signInWithAppleButtonStyle(.white)
-            .frame(height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            Button {
-                auth.signInWithGoogle(for: use)
-            } label: {
-                Text("Continue with Google")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            .buttonStyle(.plain)
-        }
+        AccountSignInButtons(use: use)
     }
 }

@@ -74,7 +74,18 @@ final class SyncEngine: ObservableObject {
     /// genuinely incremental while still allowing later edits to sync.
     private var syncedFingerprints: [String: String] = [:]
     private var inFlightFingerprints: [String: String] = [:]
+    /// Cached document-id → local model lookups, so importing a snapshot doesn't
+    /// re-fetch every rep in the folder. These identifiers can OUTLIVE their
+    /// rows: deleting a folder cascades its attempts away while this map still
+    /// names them, and `context.model(for:)` traps on a dangling identifier
+    /// (SwiftData assertion → EXC_BREAKPOINT inside applyAttempts). Any local
+    /// delete therefore invalidates the cache and bumps the generation, which
+    /// also aborts an import already walking the stale copy.
     private var knownAttemptIDsByTeam: [String: [String: PersistentIdentifier]] = [:]
+    private var attemptCacheGeneration: UInt = 0
+    /// Set while applyAttempts is writing, so its OWN tombstone deletions don't
+    /// invalidate the cache it is actively maintaining and abort itself.
+    private var isImportingAttempts = false
 
     /// Debounce token for save-triggered pushes.
     private var pushWorkItem: DispatchWorkItem?
@@ -173,9 +184,25 @@ final class SyncEngine: ObservableObject {
         }
         // Deleted models cannot be resolved after didSave. Attempt deletions are
         // represented by PendingCloudDeletion insertions, so a delete-only save
-        // needs no fallback rescan.
+        // needs no fallback rescan — but a delete DOES strand every cached
+        // attempt identifier for the rows it cascaded away (deleting a folder
+        // takes its whole rep history with it). Resolving one of those later
+        // trapped inside SwiftData and killed the app, so drop the cache and
+        // let the next snapshot rebuild it from a live fetch.
+        let deleted = notification.userInfo?[ModelContext.NotificationKey.deletedIdentifiers.rawValue]
+            as? [PersistentIdentifier] ?? []
+        if AttemptCacheInvalidation.shouldDrop(deletedCount: deleted.count,
+                                               isImporting: isImportingAttempts) {
+            invalidateAttemptCaches()
+        }
         guard !pendingPushIDs.isEmpty else { return }
         enqueuePush()
+    }
+
+    /// Drops the id caches and invalidates any import currently walking them.
+    private func invalidateAttemptCaches() {
+        knownAttemptIDsByTeam.removeAll()
+        attemptCacheGeneration &+= 1
     }
 
     private func scheduleFullPush() {
@@ -1200,6 +1227,12 @@ final class SyncEngine: ObservableObject {
     private func applyAttempts(_ remotes: [FAttempt], teamID: String) async {
         guard let context = modelContext, !remotes.isEmpty else { return }
 
+        // Our own tombstone deletions must not invalidate the cache this import
+        // is maintaining; `known` is kept correct inline for those.
+        let cacheGeneration = attemptCacheGeneration
+        isImportingAttempts = true
+        defer { isImportingAttempts = false }
+
         do {
             let groups = try context.fetch(FetchDescriptor<StuntGroup>())
             let subjects = try context.fetch(FetchDescriptor<Subject>())
@@ -1313,11 +1346,21 @@ final class SyncEngine: ObservableObject {
                     if changed { try context.save(); changed = false }
                     await Task.yield()
                     guard !Task.isCancelled else { return }
+                    // A folder deleted during the yield strands the rest of
+                    // `known`. Bail out rather than resolve a dangling id; the
+                    // snapshot that follows re-imports against a fresh cache.
+                    guard !AttemptCacheInvalidation.isStale(
+                        captured: cacheGeneration, current: attemptCacheGeneration) else { return }
                 }
             }
 
-            knownAttemptIDsByTeam[teamID] = known
             if changed { try context.save() }
+            // Only publish the cache if it still describes live rows — a delete
+            // that landed during this run already dropped it on purpose.
+            if !AttemptCacheInvalidation.isStale(captured: cacheGeneration,
+                                                 current: attemptCacheGeneration) {
+                knownAttemptIDsByTeam[teamID] = known
+            }
         } catch {
             lastError = "Sync pull failed: \(error.localizedDescription)"
         }

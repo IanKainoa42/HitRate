@@ -31,6 +31,35 @@ struct FolderListView: View {
     @State private var sharing: Team?
     @State private var joinOpen = false
     @State private var pendingTrash: Team?
+    @State private var accountOpen = false
+
+    private var saveAccountChip: some View {
+        Button {
+            accountOpen = true
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.label2)
+                Text("Reps live on this phone only")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.label2)
+                Spacer(minLength: 4)
+                Text("SAVE")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(Theme.accent)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.label3)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .wellBackground()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
 
     /// You own a folder if it's never been claimed (local-only) or its cloud
     /// owner is you. A folder you JOINED carries someone else's ownerUID.
@@ -67,6 +96,15 @@ struct FolderListView: View {
         let summaries = folderSummaries
         VStack(spacing: 9) {
             header
+
+            // The one always-on reminder that reps are device-bound. Quiet by
+            // design — it states the fact and offers the fix in one tap, and it
+            // disappears for good the moment the account is saved. Hidden until
+            // there's a folder to lose, so a first launch isn't nagged.
+            if AccountPromptPolicy.showsFolderListChip(isUpgraded: auth.isUpgraded,
+                                                       folderCount: teams.active.count) {
+                saveAccountChip
+            }
 
             ScrollView {
                 VStack(spacing: 9) {
@@ -110,6 +148,9 @@ struct FolderListView: View {
             JoinFolderSheet()
                 .presentationDetents([.height(300)])
                 .presentationBackground(Theme.appBGBottom)
+        }
+        .sheet(isPresented: $accountOpen) {
+            NavigationStack { AccountView() }
         }
         .alert(
             "Move “\(pendingTrash?.name ?? "")” to Trash?",
@@ -354,6 +395,7 @@ private struct ShareFolderSheet: View {
     @State private var failedMessage: String?
     @State private var copied = false
     @State private var attempt = 0
+    @State private var accountOpen = false
     private let sync = SyncEngine.shared
 
     var body: some View {
@@ -422,15 +464,29 @@ private struct ShareFolderSheet: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                // The moment ownership starts to matter is the moment to say
-                // it's device-bound. One line, no modal — the fix lives in the
-                // editor's Account screen.
+                // Sharing is the moment ownership starts to matter, so it's the
+                // moment to fix it — not to print directions to a settings
+                // screen. If it needs a nav path spelled out, the button is in
+                // the wrong place; so this IS the button.
                 if !auth.isUpgraded {
-                    Text("This folder is tied to this phone until you save your account (editor → Save your account).")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.label3)
+                    Button {
+                        accountOpen = true
+                    } label: {
+                        VStack(spacing: 5) {
+                            Text("This folder is tied to this phone")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.label2)
+                            Label("Save your account", systemImage: "checkmark.shield.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Theme.accent)
+                        }
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .wellBackground()
+                    }
+                    .buttonStyle(.plain)
                 }
             } else if let failedMessage {
                 VStack(spacing: 14) {
@@ -468,6 +524,9 @@ private struct ShareFolderSheet: View {
             } else {
                 failedMessage = sync.lastError ?? "Couldn’t create a code. Check your connection and try again."
             }
+        }
+        .sheet(isPresented: $accountOpen) {
+            NavigationStack { AccountView() }
         }
     }
 }
