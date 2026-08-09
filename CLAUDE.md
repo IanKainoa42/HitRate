@@ -321,6 +321,20 @@ Key invariants:
   reachable as the wrist drops. HealthKit is touched ONLY when an installed
   paired watch exists (`isWatchAppAvailable`) so iPhone-only users never see a
   Health prompt.
+- `Auth/*` — anonymous-first identity. `AuthViewModel` (env object from
+  HitRateApp) owns `uid` (team ownership + rep attribution) and signs in
+  anonymously on launch. `AccountView` (editor → Account section) is the
+  optional "Save your account" upgrade: LINKS the anonymous user to
+  Apple/Google (same uid — folders/reps/shared rosters carry over; collision
+  falls back to plain sign-in) and, once saved, hosts account deletion
+  (App Review 5.1.1(v)): `SyncEngine.deleteCloudFootprint` removes every
+  cloud doc the rules allow (owner's teams/roster/join codes + own
+  sessions/attempts; other members' reps become unreachable when the team
+  doc dies), then `user.delete()` (reauth retry on stale login), then
+  `resetLocalCloudLinkage` detaches local records from the dead uid so the
+  next anonymous session re-adopts OWNED folders only (nil-ing a joined
+  team's ownerUID would push someone else's roster as ours). NO sign-out by
+  design — it would strand the user on a fresh anonymous orphan account.
 - `Views/Share/InteractiveCardView.swift` — wraps `HoloCardView` in a live
   `rotation3DEffect` drag (pitch/yaw + `interactiveTilt` feeding the foil) for
   on-screen "holding" of a card; the static `isSnapshot: true` render path

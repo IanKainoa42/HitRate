@@ -41,6 +41,7 @@
 		87356318218FD967A8EA2535 /* WatchLoggingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */; };
 		8783941B7CA5BA8018A1A80A /* BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */; };
 		8BAFB125C9BB2D65A3122BBF /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 82AC523055C8A5BDDFA69FCB /* GoogleSignIn */; };
+		8F886ACBD963B15BCBB4EB86 /* MinBuildGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F298FD21B0F9D975766C0E /* MinBuildGate.swift */; };
 		908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */; };
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
 		93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */; };
@@ -74,7 +75,7 @@
 		E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */; };
 		E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20184832604D05CBF0C04210 /* HoloCardView.swift */; };
-		EB6588569EC4390ACB99857E /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FB278FBC6D4DE260073658 /* AuthView.swift */; };
+		E9A8CB07B70E0CCDE117910A /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D8D88E388C1695A810593 /* AccountView.swift */; };
 		EC00C955A569AD7AA035AD1A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0A32BDE8F4EA8761F39A65B /* GoogleSignInSwift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
 		F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */; };
@@ -142,7 +143,6 @@
 		479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		49FB278FBC6D4DE260073658 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		51DAAD48087C7E2E3F0D493C /* QuickClinicSetupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickClinicSetupSheet.swift; sourceTree = "<group>"; };
@@ -151,6 +151,7 @@
 		5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsEditorView.swift; sourceTree = "<group>"; };
 		5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLink.swift; sourceTree = "<group>"; };
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
+		63F298FD21B0F9D975766C0E /* MinBuildGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinBuildGate.swift; sourceTree = "<group>"; };
 		682FC96676B2F3C23E0A2C50 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		6B06141B674607C1343BF33B /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
@@ -180,6 +181,7 @@
 		D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HitRateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
+		DA1D8D88E388C1695A810593 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesTests.swift; sourceTree = "<group>"; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
@@ -313,6 +315,7 @@
 			isa = PBXGroup;
 			children = (
 				168A537A9DBCA16D9D49620A /* FirestoreModels.swift */,
+				63F298FD21B0F9D975766C0E /* MinBuildGate.swift */,
 				9E30AC6D5D161DB570B82771 /* Models.swift */,
 				69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */,
 				341C704BF36D8A9731D5A827 /* SyncPolicies.swift */,
@@ -410,7 +413,7 @@
 		DB8DC5E39361E17ABD921CBA /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				49FB278FBC6D4DE260073658 /* AuthView.swift */,
+				DA1D8D88E388C1695A810593 /* AccountView.swift */,
 				479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */,
 			);
 			path = Auth;
@@ -587,7 +590,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EB6588569EC4390ACB99857E /* AuthView.swift in Sources */,
+				E9A8CB07B70E0CCDE117910A /* AccountView.swift in Sources */,
 				5069C1AD971B8FF63B7647A1 /* AuthViewModel.swift in Sources */,
 				86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */,
 				977B508665FEF8C1BF9C2188 /* CaptureView.swift in Sources */,
@@ -607,6 +610,7 @@
 				93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */,
 				273033334A3EA1CC7D5AF753 /* LogView.swift in Sources */,
 				8472DF181A48BC7407E5698A /* Milestones.swift in Sources */,
+				8F886ACBD963B15BCBB4EB86 /* MinBuildGate.swift in Sources */,
 				D9E1104B0EB188559FA6F688 /* Models.swift in Sources */,
 				B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */,
 				717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */,
@@ -684,7 +688,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 27;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -702,7 +706,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 27;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -841,7 +845,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 27;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -899,7 +903,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 27;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

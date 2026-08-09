@@ -1034,6 +1034,104 @@ final class SyncEngine: ObservableObject {
         return nil
     }
 
+    // MARK: - Account deletion
+
+    /// Deletes every cloud document this uid may legally remove, ahead of
+    /// deleting the Firebase Auth account itself (AccountView → Delete account).
+    ///
+    /// Scope follows the security rules, not wishes: an owner may delete the
+    /// team doc, its roster docs (subjects/groups/templates), its join code,
+    /// and their OWN sessions/attempts — but never another member's reps
+    /// (attribution is logger-owned). Those become permanently unreachable the
+    /// moment the parent team doc dies (every rule resolves access through it),
+    /// which is the strongest guarantee a client-side delete can make.
+    ///
+    /// Returns nil on success, else a user-facing message. Subcollection
+    /// stragglers are tolerated (the team-doc delete is what revokes access);
+    /// failing to enumerate or delete a TEAM DOC aborts, so the caller never
+    /// deletes the auth account while cloud data is still reachable.
+    func deleteCloudFootprint(uid: String) async -> String? {
+        stopSyncing()
+        do {
+            let owned = try await db.collection("teams")
+                .whereField("ownerUID", isEqualTo: uid).getDocuments()
+            for teamDoc in owned.documents {
+                let base = teamDoc.reference
+                for sub in ["subjects", "groups", "templates"] {
+                    await deleteAllDocuments(matching: base.collection(sub))
+                }
+                // Rules only let us delete sessions/attempts we logged; query
+                // down to ours instead of collecting a denial per foreign rep.
+                for sub in ["sessions", "attempts"] {
+                    await deleteAllDocuments(
+                        matching: base.collection(sub).whereField("loggerId", isEqualTo: uid))
+                }
+                if let code = teamDoc.data()["joinCode"] as? String, !code.isEmpty {
+                    try? await db.collection("joinCodes").document(code).delete()
+                }
+                try await base.delete()
+            }
+
+            // Leave every folder we joined: drop our uid from its roster.
+            let joined = try await db.collection("teams")
+                .whereField("memberIds", arrayContains: uid).getDocuments()
+            for teamDoc in joined.documents {
+                try? await teamDoc.reference.updateData([
+                    "memberIds": FieldValue.arrayRemove([uid]),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ])
+            }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// Best-effort bulk delete, a small concurrent batch at a time. Not a
+    /// WriteBatch: batches are atomic, so one rule-denied doc would fail the
+    /// whole page — per-doc deletes let the deniable ones just fall through.
+    private func deleteAllDocuments(matching query: Query) async {
+        guard let snap = try? await query.getDocuments() else { return }
+        let refs = snap.documents.map(\.reference)
+        var index = 0
+        while index < refs.count {
+            let page = refs[index ..< min(index + 20, refs.count)]
+            await withTaskGroup(of: Void.self) { group in
+                for ref in page {
+                    group.addTask { try? await ref.delete() }
+                }
+            }
+            index += 20
+        }
+    }
+
+    /// After the auth account dies, detach local records from the dead uid so
+    /// the device behaves like a fresh install that already has data: OWNED
+    /// folders go local-only (`ownerUID = nil` — the next anonymous session
+    /// re-adopts and re-pushes them via `pushLocalBootstrap`), our reps shed
+    /// the dead logger id (empty = adopted by the next uploader, per
+    /// `SyncAttemptOwnershipPolicy`). Folders owned by OTHERS keep their
+    /// ownerUID — nil-ing those would make the bootstrap push someone else's
+    /// roster to the cloud as ours — and other people's mirrored reps keep
+    /// their attribution (`canUpload` skips them).
+    func resetLocalCloudLinkage(oldUID: String, context: ModelContext) {
+        let teams = (try? context.fetch(FetchDescriptor<Team>())) ?? []
+        for team in teams where team.ownerUID == oldUID {
+            team.ownerUID = nil
+            team.joinCode = nil
+            team.memberIds = []
+        }
+        let attempts = (try? context.fetch(FetchDescriptor<Attempt>())) ?? []
+        for attempt in attempts where attempt.loggerID == oldUID {
+            attempt.loggerID = ""
+        }
+        let sessions = (try? context.fetch(FetchDescriptor<PracticeSession>())) ?? []
+        for session in sessions where session.loggerID == oldUID {
+            session.loggerID = ""
+        }
+        try? context.save()
+    }
+
     private enum CodePublish {
         case taken
         case write(SyncJoinCodePolicy.ShareWrite, message: String)

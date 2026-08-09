@@ -13,6 +13,7 @@ import CheerRulesKit
 struct GroupsEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var auth: AuthViewModel
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
 
@@ -214,6 +215,24 @@ struct GroupsEditorView: View {
                     Text("Mode")
                 } footer: {
                     Text("Coach mode tracks multiple stunt groups and puts your program on the share cards. Your logged reps carry over either way.")
+                }
+                .listRowBackground(glassRow)
+
+                Section {
+                    NavigationLink {
+                        AccountView()
+                    } label: {
+                        Label(auth.isUpgraded ? "Account" : "Save your account",
+                              systemImage: auth.isUpgraded
+                                ? "person.crop.circle.badge.checkmark"
+                                : "person.crop.circle.badge.plus")
+                    }
+                } header: {
+                    Text("Account")
+                } footer: {
+                    Text(auth.isUpgraded
+                         ? "Saved with \(auth.providerName) — your folders follow your account to any phone."
+                         : "Your folders live under this phone until you save your account.")
                 }
                 .listRowBackground(glassRow)
 

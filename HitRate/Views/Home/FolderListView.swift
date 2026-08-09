@@ -348,6 +348,7 @@ struct FolderListView: View {
 /// publishes the public `joinCodes/{code}` directory entry.
 private struct ShareFolderSheet: View {
     let team: Team
+    @EnvironmentObject private var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var code: String?
     @State private var failedMessage: String?
@@ -420,6 +421,17 @@ private struct ShareFolderSheet: View {
                     .foregroundStyle(Theme.label2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+
+                // The moment ownership starts to matter is the moment to say
+                // it's device-bound. One line, no modal — the fix lives in the
+                // editor's Account screen.
+                if !auth.isUpgraded {
+                    Text("This folder is tied to this phone until you save your account (editor → Save your account).")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.label3)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else if let failedMessage {
                 VStack(spacing: 14) {
                     Text(failedMessage)
