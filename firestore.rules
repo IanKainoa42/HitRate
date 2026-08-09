@@ -81,6 +81,14 @@ service cloud.firestore {
       }
     }
 
+    // Remote kill switch (`config/ios` → { minBuild }). Every client reads it on
+    // launch; nobody may write it from the app — bumping minBuild is a console /
+    // admin-SDK operation only, so a compromised client can't lock the fleet out.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Public code→team directory so a joiner can resolve a 6-digit code before
     // they're a member. Owner-written; readable by any signed-in user. Holds only
     // { teamId } — no roster data leaks.

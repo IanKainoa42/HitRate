@@ -87,6 +87,20 @@ enum SyncJoinCodePolicy {
     }
 }
 
+/// A remote emergency brake: `config/ios`'s `minBuild` field can be bumped to
+/// stop a specific bad TestFlight/App-Store build from hammering Firestore
+/// (the July/August write-storm was exactly this — a build that rewrote every
+/// synced doc on every save, discovered only after it burned the daily quota).
+/// TestFlight builds can be expired remotely; App Store installs cannot — this
+/// is the only lever for those. Fails OPEN: a missing doc, unset field, or
+/// failed fetch must never lock users out, so `minBuild == nil` never blocks.
+enum MinBuildPolicy {
+    static func isBlocked(currentBuild: Int, minBuild: Int?) -> Bool {
+        guard let minBuild else { return false }
+        return currentBuild < minBuild
+    }
+}
+
 /// Value-only folder summaries keep SwiftUI from faulting every Attempt
 /// relationship more than once while rendering the folder list.
 enum FolderSummaryIndex {

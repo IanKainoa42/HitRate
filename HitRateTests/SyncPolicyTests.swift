@@ -110,6 +110,29 @@ final class SyncJoinCodePolicyTests: XCTestCase {
     }
 }
 
+final class MinBuildPolicyTests: XCTestCase {
+    func testBuildBelowThresholdIsBlocked() {
+        XCTAssertTrue(MinBuildPolicy.isBlocked(currentBuild: 21, minBuild: 22))
+    }
+
+    func testThresholdBuildAndNewerRun() {
+        XCTAssertFalse(MinBuildPolicy.isBlocked(currentBuild: 22, minBuild: 22))
+        XCTAssertFalse(MinBuildPolicy.isBlocked(currentBuild: 27, minBuild: 22))
+    }
+
+    func testMissingRemoteConfigNeverLocksAnyoneOut() {
+        XCTAssertFalse(MinBuildPolicy.isBlocked(currentBuild: 1, minBuild: nil))
+        XCTAssertFalse(MinBuildPolicy.isBlocked(currentBuild: 0, minBuild: nil))
+    }
+
+    func testUnreadableBuildNumberIsNotBlockedByADefaultThreshold() {
+        // CFBundleVersion parses to 0 when absent; a live minBuild would block
+        // it, which is correct — but only when a threshold is actually set.
+        XCTAssertFalse(MinBuildPolicy.isBlocked(currentBuild: 0, minBuild: nil))
+        XCTAssertTrue(MinBuildPolicy.isBlocked(currentBuild: 0, minBuild: 22))
+    }
+}
+
 final class FolderSummaryIndexTests: XCTestCase {
     func testBuildsFolderCountsInOnePass() {
         let groups = [

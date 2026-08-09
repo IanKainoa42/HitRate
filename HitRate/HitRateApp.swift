@@ -82,12 +82,15 @@ struct RootView: View {
     // account) from settings. Sync runs whenever there's any signed-in user.
     @StateObject private var auth = AuthViewModel()
     @StateObject private var sync = SyncEngine.shared
+    @StateObject private var minBuild = MinBuildGate.shared
 
     var body: some View {
         Group {
-            // No tab bar — the folder list is home, a folder's dashboard is one
-            // tap in, and the counter lives in a cover off the dashboard's pill.
-            if didOnboard {
+            // A remotely-retired build stops here: no sync, no logging. Fails
+            // open — see MinBuildGate.
+            if minBuild.isBlocked {
+                UpdateRequiredView()
+            } else if didOnboard {
                 if let id = openFolderID, teams.contains(where: { $0.id.uuidString == id }) {
                     HomeView(onExit: { openFolderID = nil })
                 } else {
@@ -107,6 +110,8 @@ struct RootView: View {
             if now { openFolderID = currentTeamID }
         }
         .onAppear {
+            minBuild.evaluate()
+            guard !minBuild.isBlocked else { return }
             CardCatalogRenderer.runIfRequested()
             dedupeSyncIDs()
             migrateExistingInstallIfNeeded()
@@ -131,11 +136,18 @@ struct RootView: View {
             openFolderID = teamID
         }
         .onChange(of: auth.uid) { _, uid in
-            if uid != nil { sync.startSyncing(context: context) }
+            if uid != nil, !minBuild.isBlocked { sync.startSyncing(context: context) }
             else { sync.stopSyncing() }
+        }
+        // A build retired while the app sat backgrounded stops writing as soon
+        // as it comes forward, without waiting for a cold launch.
+        .onChange(of: minBuild.isBlocked) { _, blocked in
+            if blocked { sync.stopSyncing() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                minBuild.evaluate()
+                guard !minBuild.isBlocked else { return }
                 endStaleSessions()
                 syncWatchLogging()
             }
