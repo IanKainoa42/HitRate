@@ -1,5 +1,18 @@
 default_platform(:ios)
 
+# Two env traps that each cost a failed upload on 2026-08-09 — enforce here so
+# no shell (especially headless/background ones) can forget them:
+# 1. altool dies with "invalid byte sequence in US-ASCII" without a UTF-8 locale.
+# 2. xcode-select on this Mac points at Xcode-beta; ASC rejects beta-SDK
+#    archives (90534). Archive with the release Xcode. An explicit
+#    DEVELOPER_DIR still wins (e.g. when a new RC lands before this updates).
+ENV["LC_ALL"] ||= "en_US.UTF-8"
+ENV["LANG"] ||= "en_US.UTF-8"
+RELEASE_XCODE = "/Applications/Xcode-26.6.0.app/Contents/Developer"
+if ENV["DEVELOPER_DIR"].to_s.empty? && File.directory?(RELEASE_XCODE)
+  ENV["DEVELOPER_DIR"] = RELEASE_XCODE
+end
+
 APP_IDENTIFIER = "com.ianrichardson.HitRate"
 XCODE_PROJECT = "HitRate.xcodeproj"
 SCHEME = "HitRate"
