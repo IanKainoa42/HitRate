@@ -22,7 +22,13 @@ final class MinBuildGate: ObservableObject {
     @AppStorage("minBuildCached") private var cachedMinBuild = 0
     @AppStorage("minBuildCheckedAt") private var lastCheckedAt: Double = 0
 
-    private static let recheckInterval: TimeInterval = 60 * 60 * 6
+    /// Deliberately short. This is an EMERGENCY brake: the storm it exists to
+    /// stop burned a day's quota in under an hour, so a threshold bumped in the
+    /// console has to reach devices in minutes, not hours. The throttle only
+    /// collapses launch + foreground firing together (and rapid app switching)
+    /// into a single read; at one document read per minute-of-use per device
+    /// the cost is noise even at a hundred times the current install base.
+    private static let recheckInterval: TimeInterval = 60
 
     private init() {}
 
@@ -31,18 +37,29 @@ final class MinBuildGate: ObservableObject {
     }
 
     /// Apply the cached verdict immediately, then refresh it in the background.
+    ///
+    /// A BLOCKED build always re-checks, ignoring the interval: the threshold is
+    /// typed by hand under pressure, and an overshoot (or a fix that lands after
+    /// the value is cached) would otherwise keep users locked out for hours with
+    /// correct config on the server. Unblocking must never wait on a timer.
     func evaluate() {
         applyVerdict(minBuild: cachedMinBuild > 0 ? cachedMinBuild : nil)
-        guard Date.now.timeIntervalSince1970 - lastCheckedAt > Self.recheckInterval else { return }
+        let due = Date.now.timeIntervalSince1970 - lastCheckedAt > Self.recheckInterval
+        guard due || isBlocked else { return }
         Task { await refresh() }
     }
 
     func refresh() async {
+        // A FAILED fetch keeps the cached verdict (offline must not silently
+        // un-retire a build). A SUCCESSFUL fetch is authoritative — including
+        // when it says nothing: clearing `minBuild`, or deleting the document
+        // outright, is the intended way to release the whole fleet, so it has
+        // to erase the cache rather than leave everyone pinned to a stale one.
         guard let snapshot = try? await Firestore.firestore()
             .collection("config").document("ios").getDocument() else { return }
         lastCheckedAt = Date.now.timeIntervalSince1970
-        guard let minBuild = snapshot.data()?["minBuild"] as? Int else { return }
-        cachedMinBuild = minBuild
+        let minBuild = snapshot.data()?["minBuild"] as? Int
+        cachedMinBuild = minBuild ?? 0
         applyVerdict(minBuild: minBuild)
     }
 
