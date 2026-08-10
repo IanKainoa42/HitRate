@@ -1,5 +1,5 @@
-Skill and Group naming is clearer throughout, with a new hands-on walkthrough to help you set up your first skills.
+Your reps can now follow you to a new phone.
 
-• Manage Data deletion is now scoped to the folder you're in, not your whole account.
-• Stat cards show smarter, category-aware outcome breakdowns and call out your most common issue.
-• Practice logging is simpler — every rep stages in a batch you review before submitting, so there's no more accidental instant tap.
+• Save your account with Apple or Google. Your folders, reps, and shared rosters come with you — and if you've used HitRate before, signing in brings them back.
+• Fixed a crash that could close the app when deleting a folder.
+• Syncing is steadier, so reps keep saving reliably in the background.
