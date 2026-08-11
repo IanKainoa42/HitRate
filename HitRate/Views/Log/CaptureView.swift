@@ -11,8 +11,7 @@ import os
 ///   - Pin a **skill** → rows are subjects ("everyone on back handsprings").
 ///   - Pin a **subject** → rows are skills ("just Maya today").
 ///
-/// One tap logs one Attempt, no confirm. Subjects can be added unnamed
-/// (capture-first, name-later) and renamed inline. Clinic still uses LogView.
+/// One tap logs one Attempt directly to disk with immediate auto-save and undo.
 struct CaptureView: View {
     let session: PracticeSession
 
@@ -45,15 +44,10 @@ struct CaptureView: View {
     /// recent chip on a United-category skill sets this and presents the sheet.
     @State private var scoringAttempt: Attempt?
 
-    // Wave/Routine staging: the ONLY way reps get logged. Stage any number of
-    // reps per (skill, subject) CELL (tap +1, hold −1), then commit the whole
-    // batch at once. A cell can carry several outcomes in one pass, so staging
-    // is a slot-count array per cell and commit is MANUAL only — with
-    // multi-rep staging there's no "everyone staged" finish line. Works in
-    // either pivot: the pinned axis is fixed, the row axis varies, but the key
-    // always names both skill and subject.
-    @State private var staged: [StageKey: [Int]] = [:]
-    @State private var lastWave: [Attempt] = []
+    // 1-Tap Auto-Save Logging state: stores last logged rep for floating 3s undo toast.
+    @State private var lastLoggedRep: Attempt? = nil
+    @State private var lastLoggedToastText: String = ""
+    @State private var toastResetTask: Task<Void, Never>? = nil
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
@@ -63,9 +57,7 @@ struct CaptureView: View {
     private var subjects: [Subject] { allSubjects.inTeam(currentTeam) }
 
     /// A folder MORE THAN ONE PERSON logs into — the only place the coach vs
-    /// athlete split means anything. Ownership alone is not the test: SyncEngine
-    /// claims an `ownerUID` for every local folder on first sign-in, so a solo
-    /// user would otherwise see a "COACH" badge on every rep they ever logged.
+    /// athlete split means anything.
     private var isCoLogged: Bool {
         guard let team = currentTeam else { return false }
         if !team.memberIds.isEmpty { return true }          // you own it, others joined
@@ -76,13 +68,10 @@ struct CaptureView: View {
     private enum Pivot: String { case skill, subject }
 
     /// A 1-on-1 folder — exactly one subject on the roster ("Maya — Privates").
-    /// There is nothing to pivot and nothing to pick: every rep belongs to that
-    /// one athlete, so the pivot toggle and the pin picker are pure friction.
     private var isSingleAthleteFolder: Bool { subjects.count == 1 }
 
     /// What's pinned. A 1-on-1 folder is LOCKED to its single subject (rows =
-    /// skills) regardless of the stored pivot — the controls that would change
-    /// it are hidden, so the derived value has to be the honest one.
+    /// skills) regardless of the stored pivot.
     private var pivot: Pivot {
         if isSingleAthleteFolder { return .subject }
         return Pivot(rawValue: pivotRaw) ?? .skill
@@ -98,16 +87,8 @@ struct CaptureView: View {
         subjects.first { $0.id.uuidString == selectedSubjectIDRaw } ?? subjects.first
     }
 
-    /// New subjects follow the mode: a coach rosters stunt groups, an athlete rosters
-    /// people. The USER can still pin either axis regardless.
     private var subjectKind: SubjectKind { mode == .coach ? .group : .person }
     private var subjectNoun: String { subjectKind.label.lowercased() }
-
-    /// Coach mental model is a wave of stunt groups; athlete a routine pass.
-    private var waveNoun: String { mode == .coach ? "wave" : "routine" }
-    /// Total staged reps across every cell (a stale key can't over-count — nil rows
-    /// contribute nothing).
-    private var stagedReps: Int { staged.values.reduce(0) { $0 + $1.reduce(0, +) } }
 
     var body: some View {
         NavigationStack {
@@ -131,10 +112,6 @@ struct CaptureView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
     }
 
-    /// A roster of skills with ZERO subjects dead-ends the pad ("Add a group to
-    /// start logging" — QA IAN-515): onboarding creates skills but no subject
-    /// rows. Seed one unnamed subject so practice is immediately loggable; the
-    /// user renames it inline (or it's just "you" in athlete mode).
     private func seedFirstSubjectIfNeeded() {
         guard let team = currentTeam, !groups.isEmpty, subjects.isEmpty else { return }
         let s = Subject(name: "", kind: subjectKind, orderIndex: 0)
@@ -144,19 +121,6 @@ struct CaptureView: View {
         selectedSubjectIDRaw = s.id.uuidString
     }
 
-    /// Mirror the 1-on-1 lock into the PERSISTED pivot/selection, and undo that
-    /// mirroring when the lock releases.
-    ///
-    /// The mirroring is load-bearing: the watch bridge attributes wrist taps off
-    /// `capturePivot` + `selectedSubjectID` (AppStorage, read in RootView), so a
-    /// lock that lived only in the derived `pivot` would leave watch reps
-    /// un-attributed on exactly the folders that have one obvious athlete to
-    /// attribute them to.
-    ///
-    /// But the write must be BORROWED, not permanent — the user's own pivot
-    /// choice is stashed on the way in and handed back once the roster grows past
-    /// one, otherwise a deliberate "pin skill" preference is silently eaten by a
-    /// folder that briefly had a single subject.
     private func syncSingleSubjectLock() {
         guard isSingleAthleteFolder, let only = subjects.first else {
             releaseSubjectLock()
@@ -171,7 +135,6 @@ struct CaptureView: View {
         }
     }
 
-    /// Hand the borrowed pivot back. No-op unless a lock actually took it.
     private func releaseSubjectLock() {
         guard !pivotBeforeLockRaw.isEmpty else { return }
         pivotRaw = pivotBeforeLockRaw
@@ -194,17 +157,11 @@ struct CaptureView: View {
                 pinPicker
                 nameSuggestionBar
                 matrix(attempts)
-                // Issues tie to a single skill, and normally only the skill pivot
-                // pins one. The 1-on-1 lock forces the SUBJECT pivot and hides the
-                // picker, which would strand the pad on every single-subject
-                // folder — and one subject is the DEFAULT state
-                // (`seedFirstSubjectIfNeeded`), not an exotic one. Under the lock
-                // the pad therefore carries its own skill chips.
                 if !customOutcomes.isEmpty, let skill = pinnedSkill,
                    pivot == .skill || isSingleAthleteFolder {
                     customOutcomePad(group: skill, showsSkillPicker: isSingleAthleteFolder)
                 }
-                waveBar
+                autoSaveToastBar
                 recentTicker(attempts)
             }
         }
@@ -214,8 +171,6 @@ struct CaptureView: View {
 
     @ViewBuilder
     private func header(_ attempts: [Attempt]) -> some View {
-        // Clean-hit rate — hits ÷ total (a bobble is NOT a hit), matching the
-        // dashboard headline and the "% HIT" label.
         let rate = attempts.isEmpty ? nil
             : Int((Double(attempts.filter(\.isHitRep).count) / Double(attempts.count) * 100).rounded())
 
@@ -233,19 +188,13 @@ struct CaptureView: View {
                     .monospacedDigit()
                     .contentTransition(.numericText(value: Double(attempts.count)))
                     .animation(.spring(duration: 0.3), value: attempts.count)
-                Text(rate.map { "REPS · \($0)% HIT" } ?? "REPS — LOG EACH AS IT LANDS")
+                Text(rate.map { "REPS · \($0)% HIT" } ?? "1-TAP LOGGING · INSTANT AUTO-SAVE")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(Theme.label2)
             }
             Spacer()
             Button {
-                // Ending must never silently drop staged reps — Submit is easy to
-                // miss. Commit any staged batch first.
-                if stagedReps > 0 { commitWave() }
-                // A session with reps ends here; an empty one stays live and Home
-                // sweeps it on dismiss (mutating-then-rendering a deleted model
-                // mid-animation crashes).
                 if !session.attempts.isEmpty {
                     session.endedAt = .now
                     try? context.save()
@@ -278,9 +227,6 @@ struct CaptureView: View {
 
     // MARK: Pivot control
 
-    /// The pivot row. On a 1-on-1 folder there is no pivot to offer — the screen
-    /// is locked to the one athlete — so the control is replaced by a banner
-    /// naming who's being logged.
     @ViewBuilder
     private var pivotBar: some View {
         if isSingleAthleteFolder, let only = subjects.first {
@@ -290,18 +236,11 @@ struct CaptureView: View {
         }
     }
 
-    /// 1-on-1 banner: who this whole screen is logging for, plus the two things
-    /// still worth doing here — add a skill (the rows), or break out of the lock
-    /// by adding a second subject. Without that second button a folder that
-    /// auto-seeded its first subject could never grow a roster.
     private func singleAthleteBar(_ subject: Subject) -> some View {
         HStack(spacing: 8) {
             Image(systemName: subject.kind == .person ? "person.circle.fill" : "person.3.fill")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.accent)
-            // A freshly seeded subject has no name yet, and `displayName`'s
-            // "Unnamed athlete" placeholder is fine as a small chip but shouts as
-            // the headline of the capture screen. Name the KIND until it's named.
             Text(subject.isUnnamed
                  ? "LOGGING FOR ONE \(subject.kind.label.uppercased())"
                  : "LOGGING FOR \(subject.name.uppercased())")
@@ -321,7 +260,6 @@ struct CaptureView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add \(subjectNoun)")
 
             Button { addSkill() } label: {
                 Image(systemName: "plus")
@@ -332,13 +270,10 @@ struct CaptureView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add skill")
         }
         .padding(.horizontal, 16)
     }
 
-    /// The one control that flips the matrix: pin a skill (rows = subjects) or pin a
-    /// subject (rows = skills). Outcomes stay the columns either way.
     private var standardPivotBar: some View {
         HStack(spacing: 10) {
             Text("PIN")
@@ -349,17 +284,10 @@ struct CaptureView: View {
                     selection: Binding(
                         get: { pivot == .skill ? "Skill" : subjectKind.label },
                         set: { newValue in
-                            // Switching the pinned axis with staged-but-unsubmitted
-                            // reps: commit them rather than silently dropping.
-                            if stagedReps > 0 { commitWave() }
                             pivotRaw = (newValue == "Skill") ? "skill" : "subject"
                             hapticTrigger += 1
                         }))
             Spacer()
-            // The + adds an item of the PINNED axis — the same list the pin picker
-            // shows. Pinned on Skill → new skill; pinned on the subject axis → new
-            // subject. To add the other kind, flip the pin. (Ian: "on the skill tab
-            // it should make a skill, not a group.")
             Button { pivot == .skill ? addSkill() : addSubject() } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .bold))
@@ -369,15 +297,12 @@ struct CaptureView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(pivot == .skill ? "Add skill" : "Add \(subjectNoun)")
         }
         .padding(.horizontal, 16)
     }
 
-    // MARK: Pin picker (chips for whichever axis is pinned)
+    // MARK: Pin picker
 
-    /// Hidden entirely on a 1-on-1 folder — a one-chip picker with nothing to
-    /// pick is just a row of wasted thumb space above the pad.
     @ViewBuilder
     private var pinPicker: some View {
         if isSingleAthleteFolder {
@@ -443,17 +368,10 @@ struct CaptureView: View {
 
     // MARK: Deferred-naming suggestion chips
 
-    /// The blank subject the chips will name: the currently-pinned/last-added
-    /// one, ONLY while still unnamed. nil hides the strip (it self-dismisses the
-    /// moment a name lands). Add-a-subject pins the new blank in both pivots, so
-    /// the strip appears right where you just tapped "+".
     private var namingTarget: Subject? {
         subjects.first { $0.id.uuidString == selectedSubjectIDRaw && $0.isUnnamed }
     }
 
-    /// Names already on THIS roster — the dedup guard. Shown greyed + checked,
-    /// never tappable, so you can see what's taken while naming a blank (kills
-    /// the "Mya" vs "Maya" double-create).
     private var rosterNames: [String] {
         var seen = Set<String>(); var out: [String] = []
         for s in subjects where !s.isUnnamed {
@@ -462,9 +380,6 @@ struct CaptureView: View {
         return out
     }
 
-    /// Names used on your OTHER folders for the SAME kind (people vs groups),
-    /// minus names already on this roster — a reusable bank so a name typed once
-    /// is one tap away everywhere, never retyped into a variant.
     private var nameBank: [String] {
         let taken = Set(subjects.filter { !$0.isUnnamed }.map(\.name))
         var seen = Set<String>(); var out: [String] = []
@@ -494,11 +409,9 @@ struct CaptureView: View {
                             hapticTrigger += 1
                         } label: { suggestionChip(name, taken: false) }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Name this \(subjectNoun) \(name)")
                     }
                     ForEach(rosterNames, id: \.self) { name in
                         suggestionChip(name, taken: true)
-                            .accessibilityLabel("\(name) already used on this roster")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -535,15 +448,11 @@ struct CaptureView: View {
         }
     }
 
-    /// Skill pinned: one skill up top, a ROW PER SUBJECT, this skill's outcome
-    /// columns. Every row shares the pinned skill so a single outcome header reads.
     @ViewBuilder
     private func skillPinnedMatrix(_ attempts: [Attempt]) -> some View {
         if let skill = pinnedSkill {
             let defs = skill.outcomeDefs
             VStack(spacing: 8) {
-                // The pinned skill's name — always editable inline (tap to rename),
-                // not just while blank. RenameField carries its own pencil.
                 RenameField(prompt: "Name this skill", value: skill.name) { new in
                     skill.name = new
                     try? context.save()
@@ -553,15 +462,15 @@ struct CaptureView: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Shared outcome header — valid because every row is this one skill.
+                // EXPLICIT OUTCOME HEADERS
                 HStack(spacing: 6) {
                     Color.clear.frame(width: rowLabelWidth, height: 1)
                     ForEach(Array(defs.enumerated()), id: \.offset) { _, def in
-                        Text(def.short)
+                        Text(def.label.uppercased())
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(def.color)
                             .frame(maxWidth: .infinity)
-                            .lineLimit(1).minimumScaleFactor(0.6)
+                            .lineLimit(1).minimumScaleFactor(0.5)
                     }
                 }
 
@@ -579,7 +488,7 @@ struct CaptureView: View {
                                         matrixCell(group: skill, subject: s, slot: slot, def: def, v: v)
                                     }
                                 }
-                                .frame(minHeight: 56)
+                                .frame(minHeight: 58)
                             }
                         }
                     }
@@ -590,13 +499,10 @@ struct CaptureView: View {
         }
     }
 
-    /// Subject pinned: one subject up top, a ROW PER SKILL, each skill's own outcome
-    /// columns (counts vary), so there's no shared header — just the good→bad hint.
     @ViewBuilder
     private func subjectPinnedMatrix(_ attempts: [Attempt]) -> some View {
         if let subject = pinnedSubject {
             VStack(spacing: 8) {
-                // The pinned subject's name — editable inline (tap to rename).
                 RenameField(prompt: subjectKind.label, value: subject.name) { new in
                     subject.name = new
                     try? context.save()
@@ -623,7 +529,7 @@ struct CaptureView: View {
                                     matrixCell(group: g, subject: subject, slot: slot, def: def, v: v)
                                 }
                             }
-                            .frame(minHeight: 56)
+                            .frame(minHeight: 58)
                         }
                     }
                 }
@@ -637,8 +543,6 @@ struct CaptureView: View {
 
     private var rowLabelWidth: CGFloat { 96 }
 
-    /// A subject row label — colored badge + inline-renameable name (name-later),
-    /// with the hot-streak flame once the cell strings clean hits together.
     private func subjectRowLabel(_ s: Subject, streak: Int) -> some View {
         HStack(spacing: 6) {
             Text("\(s.orderIndex + 1)")
@@ -662,7 +566,6 @@ struct CaptureView: View {
         .frame(maxHeight: .infinity)
     }
 
-    /// A skill row label (subject pivot) — colored number badge + name + flame.
     private func skillRowLabel(_ g: StuntGroup, streak: Int) -> some View {
         HStack(spacing: 6) {
             Text("\(g.number)")
@@ -686,42 +589,31 @@ struct CaptureView: View {
         .frame(maxHeight: .infinity)
     }
 
-    /// One matrix cell — STAGES a rep. The cell is a gesture view, NOT a Button:
-    /// a Button fires on release even after a hold, so a long-press decrement
-    /// would re-increment on lift.
+    /// One matrix cell — 1-TAP DIRECT AUTO-SAVE LOGGING.
     @ViewBuilder
     private func matrixCell(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef, v: Int) -> some View {
-        let stagedN = stagedCount(group, subject, slot)
-        let visual = cellVisual(v: v, def: def, stagedN: stagedN)
-        // Long-press decrements, tap stages. highPriorityGesture lets a genuine
-        // hold win over the tap so it reliably removes one (a plain
-        // onLongPressGesture alongside onTapGesture let the tap steal ~0.5s
-        // holds and re-increment — QA IAN-516).
-        visual
-            .highPriorityGesture(
-                LongPressGesture(minimumDuration: 0.3)
-                    .onEnded { _ in unstage(group, subject, slot) }
-            )
-            .onTapGesture { stage(group, subject, slot) }
-            .accessibilityLabel("Stage \(def.label)")
-            .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
-            .accessibilityHint("Tap to stage one more, hold to remove one")
+        cellVisual(v: v, def: def)
+            .onTapGesture {
+                logDirect(group: group, subject: subject, slot: slot, def: def)
+            }
+            .accessibilityLabel("Log \(def.label) for \(subject.displayName)")
+            .accessibilityValue("\(v) logged")
+            .accessibilityHint("1-tap to log immediately")
     }
 
-    /// The engraved cell face — count in chalk Barlow, outcome color in the edge.
-    /// While staging, the edge lights and a "+n" pip shows this cell's pending reps.
-    private func cellVisual(v: Int, def: OutcomeDef, stagedN: Int) -> some View {
+    /// Engraved cell face with explicit outcome label.
+    private func cellVisual(v: Int, def: OutcomeDef) -> some View {
         VStack(spacing: 1) {
             Text("\(v)")
                 .font(Theme.barlow(20, .extrabold))
                 .monospacedDigit()
-                .foregroundStyle(stagedN > 0 ? def.color : (v == 0 ? Theme.label3 : Theme.label))
+                .foregroundStyle(v == 0 ? Theme.label3 : Theme.label)
                 .contentTransition(.numericText(value: Double(v)))
                 .animation(.spring(duration: 0.3), value: v)
-            Text(def.short)
-                .font(.system(size: 10, weight: .bold))
+            Text(def.label.uppercased())
+                .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(def.color.opacity(0.9))
-                .lineLimit(1).minimumScaleFactor(0.6)
+                .lineLimit(1).minimumScaleFactor(0.5)
         }
         .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
@@ -733,62 +625,96 @@ struct CaptureView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(def.color, lineWidth: stagedN > 0 ? 2.5 : 0)
+                .stroke(def.color.opacity(0.4), lineWidth: 1)
         )
-        .overlay(alignment: .topTrailing) {
-            if stagedN > 0 {
-                Text("+\(stagedN)")
-                    .font(Theme.barlow(11, .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.well)
-                    .padding(.horizontal, 5).padding(.vertical, 1.5)
-                    .background(Capsule().fill(def.color))
-                    .padding(3)
-            }
-        }
         .contentShape(Rectangle())
     }
 
-    /// Docked under the matrix in wave mode. While staging: rep count + Clear +
-    /// Submit. After a commit (nothing staged): Undo. Commit is ALWAYS manual.
-    private var waveBar: some View {
+    // MARK: 1-Tap Auto-Save Toast Bar
+
+    private var autoSaveToastBar: some View {
         HStack(spacing: 10) {
-            Text("\(stagedReps) REP\(stagedReps == 1 ? "" : "S") STAGED")
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.4)
-                .foregroundStyle(Theme.label2)
-            Spacer()
-            if stagedReps > 0 {
-                Button { staged = [:]; hapticTrigger += 1 } label: {
-                    Text("Clear")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.label2)
-                        .contentShape(Rectangle())
+            if let lastRep = lastLoggedRep {
+                HStack(spacing: 6) {
+                    Circle().fill(lastRep.outcomeDef?.color ?? Theme.accent).frame(width: 8, height: 8)
+                    Text(lastLoggedToastText)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.label)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
-                Button { commitWave() } label: {
-                    Text("Submit \(stagedReps)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.well)
-                        .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } else if !lastWave.isEmpty {
-                Button { undoWave() } label: {
-                    Label("Undo \(waveNoun)", systemImage: "arrow.uturn.backward")
-                        .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button {
+                    undoLastDirectLog()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Theme.accent)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.hit)
+                    Text("1-TAP AUTO-SAVE ACTIVE")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(Theme.label2)
+                }
+                Spacer()
+                Text("TAP CELL TO LOG")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.label3)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .wellBackground()
         .padding(.horizontal, 16)
+        .animation(.easeInOut(duration: 0.2), value: lastLoggedRep != nil)
+    }
+
+    // MARK: Direct 1-Tap Auto-Save Logic
+
+    private func logDirect(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef) {
+        let a = Attempt(slot: slot, group: group, session: session, subject: subject)
+        a.loggerID = auth.uid ?? ""
+        context.insert(a)
+        currentTeam?.isDemo = false
+        try? context.save()
+
+        let soundOutcome = def.soundOutcome
+        Haptics.shared.play(soundOutcome)
+        Sounds.shared.play(.outcome(soundOutcome))
+
+        let targetName = subject.displayName.isEmpty ? group.displayName : subject.displayName
+        lastLoggedToastText = "\(def.label.uppercased()) · \(targetName)"
+        lastLoggedRep = a
+
+        toastResetTask?.cancel()
+        toastResetTask = Task {
+            try? await Task.sleep(for: .seconds(3.5))
+            if !Task.isCancelled {
+                await MainActor.run {
+                    withAnimation {
+                        lastLoggedRep = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func undoLastDirectLog() {
+        guard let rep = lastLoggedRep else { return }
+        SyncEngine.shared.queueDeletion(of: rep, in: context)
+        context.delete(rep)
+        try? context.save()
+        lastLoggedRep = nil
+        toastResetTask?.cancel()
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
     }
 
     // MARK: Empty states
@@ -860,7 +786,7 @@ struct CaptureView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             Color.clear.frame(width: 0, height: 1).id("live")
-                            ForEach(Array(logSegments(attempts).reversed())) { tickerChip($0) }
+                            ForEach(attempts.reversed().prefix(15)) { repChip($0) }
                         }
                         .padding(.vertical, 2)
                     }
@@ -877,67 +803,9 @@ struct CaptureView: View {
         .padding(.bottom, 8)
     }
 
-    /// One chunk of the recent log: a wave (reps committed together, same waveID)
-    /// or a lone rep.
-    private enum LogSegment: Identifiable {
-        case single(Attempt)
-        case wave(UUID, [Attempt])
-        var id: String {
-            switch self {
-            case .single(let a): return "s\(a.persistentModelID.hashValue)"
-            case .wave(let id, _): return "w\(id.uuidString)"
-            }
-        }
-    }
-
-    /// Collapse the chronological attempts into segments: maximal runs of the same
-    /// non-nil `waveID` become one wave; nil-waveID reps stay singletons.
-    private func logSegments(_ attempts: [Attempt]) -> [LogSegment] {
-        var segs: [LogSegment] = []
-        var i = 0
-        while i < attempts.count {
-            let a = attempts[i]
-            if let wid = a.waveID {
-                var reps = [a]
-                var j = i + 1
-                while j < attempts.count, attempts[j].waveID == wid { reps.append(attempts[j]); j += 1 }
-                segs.append(.wave(wid, reps))
-                i = j
-            } else {
-                segs.append(.single(a)); i += 1
-            }
-        }
-        return segs
-    }
-
-    /// One ticker entry: a lone rep is a single chip; a wave is its chips wrapped in
-    /// a hairline cluster so the batch reads as one event.
-    @ViewBuilder
-    private func tickerChip(_ seg: LogSegment) -> some View {
-        switch seg {
-        case .single(let a):
-            repChip(a)
-        case .wave(_, let reps):
-            HStack(spacing: 4) { ForEach(reps) { repChip($0) } }
-                .padding(.horizontal, 5).padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
-                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(Color.white.opacity(0.10), lineWidth: 1))
-                )
-        }
-    }
-
-    /// Engraved chip: outcome dot + subject/skill context + outcome short word.
-    /// On a United-category skill the chip is tappable — it opens the optional
-    /// EXECUTION read (Feature B) for that rep, and shows a small shield once a
-    /// read has been committed (green = all held, amber = something slipped).
     @ViewBuilder
     private func repChip(_ a: Attempt) -> some View {
         let scorable = a.group?.scoresExecution ?? false
-        // Attribution only means something when someone else logs into this
-        // folder too — see `isCoLogged`.
         let byCoach = isCoLogged
             && a.isCoachLogged(teamOwnerUID: currentTeam?.ownerUID, currentUID: auth.uid)
         let body = HStack(spacing: 5) {
@@ -946,7 +814,7 @@ struct CaptureView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.label)
                 .lineLimit(1)
-            Text(a.outcomeDef?.short ?? "—")
+            Text(a.outcomeDef?.label.uppercased() ?? "—")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
@@ -958,7 +826,6 @@ struct CaptureView: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(Theme.accent))
-                    .accessibilityLabel("Logged by the coach")
             }
             if a.executionScored {
                 Image(systemName: "shield.lefthalf.filled")
@@ -981,96 +848,12 @@ struct CaptureView: View {
         }
     }
 
-    // MARK: Wave / Routine staging
-
-    private func stagedCount(_ g: StuntGroup, _ s: Subject, _ slot: Int) -> Int {
-        guard let arr = staged[StageKey(g, s)], slot >= 0, slot < arr.count else { return 0 }
-        return arr[slot]
-    }
-
-    /// Tap a cell in wave mode: stage one more rep of that outcome for that cell.
-    private func stage(_ g: StuntGroup, _ s: Subject, _ slot: Int) {
-        let key = StageKey(g, s)
-        let n = g.outcomeDefs.count
-        var c = staged[key] ?? Array(repeating: 0, count: n)
-        if c.count < n { c += Array(repeating: 0, count: n - c.count) }
-        guard slot >= 0, slot < c.count else { return }
-        c[slot] += 1
-        staged[key] = c
-        let o = g.outcomeDef(at: slot)?.soundOutcome ?? .hit
-        Haptics.shared.play(o)
-        Sounds.shared.play(.outcome(o))
-    }
-
-    /// Hold a cell in wave mode: take one staged rep back off.
-    private func unstage(_ g: StuntGroup, _ s: Subject, _ slot: Int) {
-        let key = StageKey(g, s)
-        guard var c = staged[key], slot >= 0, slot < c.count, c[slot] > 0 else { return }
-        c[slot] -= 1
-        staged[key] = c.reduce(0, +) == 0 ? nil : c
-        hapticTrigger += 1
-        Sounds.shared.play(.undo)
-    }
-
-    /// Write one Attempt per staged rep (all sharing a `waveID`), then clear the
-    /// staging. Keeps the batch in `lastWave` so it can be pulled back in one tap.
-    private func commitWave() {
-        let waveID = UUID()
-        var committed: [Attempt] = []
-        for g in groups {
-            for s in subjects {
-                guard let c = staged[StageKey(g, s)] else { continue }
-                for (slot, n) in c.enumerated() where n > 0 {
-                    for _ in 0..<n {
-                        let a = Attempt(slot: slot, group: g, session: session, subject: s, waveID: waveID)
-                        // Stamp WHO logged it now, not at first push. On a shared
-                        // folder the coach's reps and the athlete's reps land in
-                        // the same session, and the attribution has to be readable
-                        // on the floor — offline, before anything has synced.
-                        a.loggerID = auth.uid ?? ""
-                        context.insert(a)
-                        committed.append(a)
-                    }
-                }
-            }
-        }
-        guard !committed.isEmpty else { return }
-        // A real logged rep means the team has moved past "Load demo data"
-        // preview content — resume sync so this genuine usage isn't silently
-        // dropped by the isDemo guard.
-        currentTeam?.isDemo = false
-        try? context.save()
-        lastWave = committed
-        staged = [:]
-        hapticTrigger += 1
-        Sounds.shared.play(.start)
-    }
-
-    /// Delete the whole last committed batch. Guards each attempt against having
-    /// already been removed (e.g. via the Recent undo) so we never touch a deleted
-    /// model.
-    private func undoWave() {
-        let live = session.attempts
-        for a in lastWave where live.contains(where: { $0 === a }) {
-            SyncEngine.shared.queueDeletion(of: a, in: context)
-            context.delete(a)
-        }
-        try? context.save()
-        lastWave = []
-        hapticTrigger += 1
-        Sounds.shared.play(.undo)
-    }
-
-    /// Add a skill (unnamed — name-later, like a subject). Pins it so it's the
-    /// live one, and inherits the currently-pinned skill's category so a skill
-    /// added mid-tumbling stays tumbling (Balk and all). Name it in the header
-    /// RenameField or the skills editor; outcomes are editable in the editor.
     private func addSkill() {
         guard let team = currentTeam else { return }
         let nextNum = (groups.map(\.number).max() ?? 0) + 1
         let nextOrder = (groups.map(\.orderIndex).max() ?? -1) + 1
         let g = StuntGroup(name: "", number: nextNum, orderIndex: nextOrder)
-        g.category = pinnedSkill?.category ?? .stunts   // sets kindRaw too
+        g.category = pinnedSkill?.category ?? .stunts
         g.team = team
         context.insert(g)
         try? context.save()
@@ -1078,8 +861,6 @@ struct CaptureView: View {
         hapticTrigger += 1
     }
 
-    /// Add a subject (unnamed — name-later). Pins it in subject pivot so it's
-    /// immediately usable.
     private func addSubject() {
         guard let team = currentTeam else { return }
         let next = (subjects.map { $0.orderIndex }.max() ?? -1) + 1
@@ -1091,7 +872,6 @@ struct CaptureView: View {
         hapticTrigger += 1
     }
 
-    /// Per-slot session counts for one (skill, subject) pair.
     private func counts(group: StuntGroup, subject: Subject, in attempts: [Attempt]) -> [Int] {
         var counts = Array(repeating: 0, count: group.outcomeDefs.count)
         for a in attempts where a.group === group && a.subject === subject {
@@ -1110,19 +890,12 @@ struct CaptureView: View {
         Sounds.shared.play(.undo)
     }
 
-    // MARK: Hot streak (heating up / on fire)
-
-    /// Trailing run of LANDINGS (credit ≥ 50% — stuck it, clean or not) for one
-    /// (skill, subject) cell in this session. A fall/miss/balk (< 50%) breaks it.
-    /// 2 = heating up, 3+ = on fire. Keys on the cell so the flame rides whichever
-    /// axis is the row.
     private func hotStreak(group: StuntGroup, subject: Subject, in attempts: [Attempt]) -> Int {
         StatsEngine.currentLandingStreak(
             in: attempts.filter { $0.group === group && $0.subject === subject }
         )
     }
 
-    /// Ember at 2 straight hits, pulsing flame at 3+. Rides next to the row label.
     @ViewBuilder
     private func flameBadge(_ streak: Int) -> some View {
         if streak >= 2 {
@@ -1130,27 +903,13 @@ struct CaptureView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(streak >= 3 ? Theme.fireHot : Theme.fireWarm)
                 .symbolEffect(.pulse, options: .repeating, isActive: streak >= 3)
-                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) landings in a row"
-                                                : "Heating up — 2 landings in a row")
         }
     }
 
-    // MARK: Custom-outcome "issues" pad (skill pivot, or the 1-on-1 lock)
-
-    /// The active folder's user-created outcomes — tallied SEPARATELY from the
-    /// hit-rate (a distinct model), shown as a secondary tier under the matrix.
     private var customOutcomes: [CustomOutcome] {
         (currentTeam?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
 
-    /// A row of tap buttons under the matrix — the folder's own outcomes, tallied
-    /// against the pinned skill (subject-agnostic, matching the legacy semantics).
-    /// Tap = +1, hold = −1 (gesture view, not a Button: a Button fires on release
-    /// after a hold and would re-increment a decrement).
-    ///
-    /// `showsSkillPicker` is the 1-on-1 lock's case: the pin picker is hidden
-    /// there, so without chips of its own the pad would be tallying against an
-    /// invisible, unchangeable selection.
     @ViewBuilder
     private func customOutcomePad(group: StuntGroup, showsSkillPicker: Bool = false) -> some View {
         VStack(spacing: 6) {
@@ -1202,16 +961,12 @@ struct CaptureView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { addCustom(o, group) }
                     .onLongPressGesture(minimumDuration: 0.4) { removeCustom(o, group) }
-                    .accessibilityLabel("Log \(o.name)")
-                    .accessibilityValue("\(c) logged for \(group.name)")
-                    .accessibilityHint("Tap to add one, hold to remove one")
                 }
             }
         }
         .padding(.horizontal, 16)
     }
 
-    /// This session's tally count of a custom outcome on one skill.
     private func customCount(_ o: CustomOutcome, group: StuntGroup) -> Int {
         session.customTallies.filter { $0.outcome?.id == o.id && $0.group === group }.count
     }
@@ -1222,7 +977,6 @@ struct CaptureView: View {
         hapticTrigger += 1
     }
 
-    /// Remove the most recent tally of this outcome+skill (long-press undo).
     private func removeCustom(_ o: CustomOutcome, _ group: StuntGroup) {
         let mine = session.customTallies
             .filter { $0.outcome?.id == o.id && $0.group === group }
@@ -1241,20 +995,6 @@ private extension Array {
     }
 }
 
-/// Staging key: a rep is staged against one (skill, subject) cell. Both pivots
-/// use the same key — the pinned axis is fixed, the row axis varies.
-private struct StageKey: Hashable {
-    let group: PersistentIdentifier
-    let subject: PersistentIdentifier
-    init(_ g: StuntGroup, _ s: Subject) {
-        self.group = g.persistentModelID
-        self.subject = s.persistentModelID
-    }
-}
-
-/// "On fire" chrome: a slow warm gradient sweeping around a row label once its
-/// cell has 3+ straight hits. The one sanctioned flame on the training floor
-/// (Ian asked for it 2026-06-11) — keep it small and warm, never sparkle.
 private struct FireBorder: ViewModifier {
     let active: Bool
     var cornerRadius: CGFloat = 8

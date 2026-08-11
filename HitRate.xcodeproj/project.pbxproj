@@ -53,6 +53,7 @@
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
 		A6B063D90E22AE3A3D79C92D /* PremiumPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A534562CEDB6CC6C852F51B /* PremiumPaywallSheet.swift */; };
 		A945591D0A1989368FC3D909 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D2EBDF727517B7CF1CB8A6AA /* FirebaseAuth */; };
+		ABFF0225BC9FABBBB17656D3 /* WatchSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C15802783EEC8B5EC244962 /* WatchSyncTests.swift */; };
 		ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD703A6A661621DEEE37E48 /* QuickClinicTests.swift */; };
 		B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */; };
 		B6B85D818F2E16B83D464F1D /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */; };
@@ -129,6 +130,7 @@
 		1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInButtons.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
+		2C15802783EEC8B5EC244962 /* WatchSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSyncTests.swift; sourceTree = "<group>"; };
 		2D9AC4DB29F9D8A2A9A93729 /* WatchLoggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLoggingSheet.swift; sourceTree = "<group>"; };
 		2DD703A6A661621DEEE37E48 /* QuickClinicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickClinicTests.swift; sourceTree = "<group>"; };
 		341C704BF36D8A9731D5A827 /* SyncPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPolicies.swift; sourceTree = "<group>"; };
@@ -386,6 +388,7 @@
 				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
 				7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */,
 				0B271F43B06539CD8C90123E /* SyncPolicyTests.swift */,
+				2C15802783EEC8B5EC244962 /* WatchSyncTests.swift */,
 			);
 			path = HitRateTests;
 			sourceTree = "<group>";
@@ -659,6 +662,7 @@
 				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,
 				C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */,
 				18A3263E1908E1F473615478 /* SyncPolicyTests.swift in Sources */,
+				ABFF0225BC9FABBBB17656D3 /* WatchSyncTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -696,7 +700,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -714,7 +718,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -853,7 +857,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -911,7 +915,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

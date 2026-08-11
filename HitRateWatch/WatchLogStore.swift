@@ -21,15 +21,7 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     let workout = WatchWorkoutManager()
 
     private var session: WCSession? {
-        #if targetEnvironment(simulator)
-        // WatchConnectivity has XPC/IPC bugs on simulator (iOS 18/watchOS 11)
-        // that cause -[OS_dispatch_mach_msg _setContext:] crashes.
-        // Always return nil on simulator to avoid the crash.
-        print("⚠️ WatchConnectivity disabled on simulator (known XPC bug)")
-        return nil
-        #else
-        return WCSession.isSupported() ? WCSession.default : nil
-        #endif
+        WCSession.isSupported() ? WCSession.default : nil
     }
 
     /// The skill the wrist currently has up (crown selection, clamped).
@@ -51,40 +43,27 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     func activate() {
         print("🔵 Attempting to activate WatchConnectivity...")
         print("🔵 WCSession.isSupported: \(WCSession.isSupported())")
-        
+
         guard let session else {
             print("❌ WCSession not supported on this device")
             #if targetEnvironment(simulator)
-            // On simulator, load demo data so UI can be tested
-            print("⚠️ Loading demo data for simulator testing")
-            DispatchQueue.main.async { [weak self] in
-                self?.snapshot = .screenshotDemo
-                self?.statusText = "Simulator demo mode"
+            if snapshot.groups.isEmpty {
+                snapshot = .screenshotDemo
+                statusText = "Simulator demo mode"
             }
             #endif
             return
         }
-        
+
         print("🔵 Current activation state: \(session.activationState.rawValue)")
-        
-        #if targetEnvironment(simulator)
-        // Skip WatchConnectivity on simulator to avoid XPC crash
-        print("⚠️ Skipping WCSession activation on simulator (XPC issues)")
-        print("⚠️ Use physical device for actual Watch Connectivity testing")
-        DispatchQueue.main.async { [weak self] in
-            self?.snapshot = .screenshotDemo
-            self?.statusText = "Simulator: Use device for sync"
-        }
-        return
-        #endif
-        
+
         // CRITICAL: WCSession.delegate must be set on main thread
         // Use async after to ensure run loop is fully ready
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            
+
             print("🔵 Setting delegate on main thread...")
-            
+
             // Only set delegate if not already set (avoid re-activation issues)
             if session.delegate == nil {
                 print("🔵 Delegate is nil, setting and activating...")
@@ -92,7 +71,6 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
                 session.activate()
             } else if session.activationState != .activated {
                 print("🔵 Delegate exists but not activated, attempting activation...")
-                // If delegate is set but not activated, try to activate
                 session.activate()
             } else {
                 print("✅ Session already activated")
@@ -101,7 +79,15 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     }
 
     func requestSnapshot() {
-        guard let session else { return }
+        guard let session else {
+            #if targetEnvironment(simulator)
+            if snapshot.groups.isEmpty {
+                snapshot = .screenshotDemo
+                statusText = "Simulator demo mode"
+            }
+            #endif
+            return
+        }
         let message = [WatchPayloadCodec.typeKey: WatchPayloadCodec.snapshotRequest]
         if session.isReachable {
             session.sendMessage(message) { [weak self] reply in
@@ -117,9 +103,17 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
     }
 
     func log(outcome: WatchOutcomeSnapshot) {
-        guard let group = selectedGroup, let session else { return }
+        guard let group = selectedGroup else { return }
+
+        // Optimistically increment local count for instant wrist feedback
+        incrementLocalCount(groupID: group.id, outcomeRaw: outcome.rawValue)
+
+        guard let session else {
+            isLogging = false
+            return
+        }
+
         isLogging = true
-        statusText = "Logging"
 
         let request = WatchLogRequest(id: UUID(),
                                       groupID: group.id,
@@ -148,21 +142,53 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
         }
     }
 
+    private func incrementLocalCount(groupID: UUID, outcomeRaw: Int) {
+        guard let groupIdx = snapshot.groups.firstIndex(where: { $0.id == groupID }) else { return }
+        var group = snapshot.groups[groupIdx]
+        if outcomeRaw >= 0 && outcomeRaw < group.counts.count {
+            group.counts[outcomeRaw] += 1
+            snapshot.groups[groupIdx] = group
+            snapshot.activeSessionReps += 1
+            statusText = "\(snapshot.activeSessionReps) reps live"
+        }
+    }
+
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState,
                  error: Error?) {
         DispatchQueue.main.async { [weak self] in
             if let error = error {
                 self?.statusText = "Sync error: \(error.localizedDescription)"
                 print("❌ Watch activation failed: \(error)")
+                #if targetEnvironment(simulator)
+                if self?.snapshot.groups.isEmpty == true {
+                    self?.snapshot = .screenshotDemo
+                    self?.statusText = "Simulator demo mode"
+                }
+                #endif
                 return
             }
-            
+
             print("✅ Watch activated with state: \(activationState.rawValue)")
-            
+
             if !session.receivedApplicationContext.isEmpty {
                 self?.receive(message: session.receivedApplicationContext)
             }
             self?.requestSnapshot()
+        }
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if session.isReachable {
+                self.requestSnapshot()
+            } else {
+                if self.snapshot.groups.isEmpty {
+                    self.statusText = "Open HitRate on iPhone"
+                } else {
+                    self.statusText = "Using last roster"
+                }
+            }
         }
     }
 
@@ -172,6 +198,10 @@ final class WatchLogStore: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         receiveOnMain(message)
+    }
+
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        receiveOnMain(userInfo)
     }
 
     private func receiveOnMain(_ message: [String: Any]) {

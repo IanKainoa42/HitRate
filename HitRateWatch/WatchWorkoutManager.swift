@@ -44,7 +44,12 @@ final class WatchWorkoutManager: NSObject, HKWorkoutSessionDelegate {
     }
 
     private func end() {
-        session?.end()
+        guard let s = session else {
+            isRunning = false
+            return
+        }
+        s.stopActivity(with: Date())
+        s.end()
         session = nil
         isRunning = false
     }
@@ -53,10 +58,15 @@ final class WatchWorkoutManager: NSObject, HKWorkoutSessionDelegate {
                         didChangeTo toState: HKWorkoutSessionState,
                         from fromState: HKWorkoutSessionState,
                         date: Date) {
-        if toState == .ended || toState == .stopped {
-            DispatchQueue.main.async { [weak self] in
+        DispatchQueue.main.async { [weak self] in
+            switch toState {
+            case .running:
+                self?.isRunning = true
+            case .ended, .stopped:
                 self?.session = nil
                 self?.isRunning = false
+            default:
+                break
             }
         }
     }

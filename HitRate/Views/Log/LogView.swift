@@ -34,41 +34,21 @@ struct LogView: View {
         (teams.current(id: currentTeamID)?.customOutcomes ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
 
-    // Persisted (not @State) so the watch can mirror the pulled-up skill via
-    // RootView's snapshot — and the pad remembers it between practices.
     @AppStorage("selectedGroupID") private var selectedGroupIDRaw = ""
     @State private var hapticTrigger = 0
     @State private var showGroupsEditor = false
 
-    // Wave/Routine staging (grid only, the ONLY way the grid logs): stage any
-    // number of reps per bucket (tap +1, hold −1), then commit the whole
-    // batch at once. A group can carry several outcomes in one pass (2 hits +
-    // a bobble), so staging is a 4-slot count array per group, NOT one
-    // outcome — and commit is manual only (with multi-staging there is no
-    // "everyone staged" finish line). `lastWave` is the just-committed batch
-    // for Undo.
     @State private var staged: [PersistentIdentifier: [Int]] = [:]
     @State private var lastWave: [Attempt] = []
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
-    /// The group the pad logs into. Resolves the persisted id against the
-    /// CURRENT roster so a selection that was deleted in the editor can't
-    /// receive new attempts (deleted SwiftData models crash on property access).
     private var activeGroup: StuntGroup? {
         groups.first { $0.id.uuidString == selectedGroupIDRaw } ?? groups.first
     }
 
-    /// The tap-to-log matrix has ONE outcome-label header row, so it's only
-    /// offered when every group shares a kind (coach is always all-stunt; a
-    /// single-kind athlete also qualifies). Mixed-kind athletes stay on the
-    /// per-skill pad, which labels each skill in its own kind's words.
-    /// Every cell now names its own skill's outcome, so the grid no longer needs
-    /// a single shared kind — any roster (mixed categories included) can use it.
     private var gridAvailable: Bool { !groups.isEmpty }
     private var gridKind: SkillKind { groups.first?.kind ?? .stunt }
-    /// Coach defaults to the matrix; athlete to the pad. Either flips via the
-    /// Grid⇄Pad toggle (persisted in `practiceLayout`).
     private var useGrid: Bool {
         guard gridAvailable else { return false }
         switch practiceLayoutRaw {
@@ -80,22 +60,15 @@ struct LogView: View {
     private var layoutBinding: Binding<String> {
         Binding(get: { useGrid ? "Grid" : "Pad" },
                 set: { newValue in
-                    // Leaving the grid with staged-but-unsubmitted reps: commit
-                    // them rather than silently dropping (they were taps the user
-                    // meant to keep — the old behavior lost them on switch).
                     if newValue == "Pad", stagedReps > 0 { commitWave() }
                     practiceLayoutRaw = (newValue == "Grid") ? "grid" : "pad"
                 })
     }
 
-    /// Wave staging is grid-only, and it's the grid's only input mode.
     private var waveActive: Bool { useGrid }
-    /// Total staged reps among the CURRENT roster — a deleted group's stale
-    /// key never counts.
     private var stagedReps: Int {
         groups.reduce(0) { $0 + (staged[$1.persistentModelID]?.reduce(0, +) ?? 0) }
     }
-    /// Coach mental model is a wave of stunt groups; athlete is a routine pass.
     private var waveNoun: String { mode == .coach ? "wave" : "routine" }
     private var gridNameColumnWidth: CGFloat { 96 }
 
@@ -137,7 +110,6 @@ struct LogView: View {
                     QuickClinicSummaryView(session: session, groups: groups, goalRate: goalRate) {
                         onArchive?()
                     } onDiscard: {
-                        // Handled cleanly by onDismiss when showSummary closes
                     }
                 }
         }
@@ -153,12 +125,10 @@ struct LogView: View {
     private var activeView: some View {
         let attempts = session.sortedAttempts
         let hits = attempts.filter { $0.isHitRep }.count
-        // Weighted hit rate: credit averages directly to a percentage (0–100).
         let rate = attempts.isEmpty ? nil
             : Int((Double(attempts.reduce(0) { $0 + $1.creditValue }) / Double(attempts.count)).rounded())
 
         return VStack(spacing: 9) {
-            // Session header (well)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
@@ -202,12 +172,7 @@ struct LogView: View {
                 
                 Spacer()
                 Button {
-                    // Ending must never silently drop staged reps — the Submit
-                    // button is easy to miss. Commit any staged batch first.
                     if stagedReps > 0 { commitWave() }
-                    // A session with reps ends here; an empty one stays live
-                    // and Home deletes it on dismiss (mutating-then-rendering
-                    // a deleted model mid-animation crashes).
                     if !session.attempts.isEmpty {
                         session.endedAt = .now
                         try? context.save()
@@ -241,7 +206,6 @@ struct LogView: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
 
-            // Layout toggle — grid is offered only for single-kind rosters.
             if gridAvailable {
                 HStack(spacing: 10) {
                     Spacer()
@@ -254,7 +218,6 @@ struct LogView: View {
                 logGrid(attempts)
                 waveBar
             } else {
-            // Group picker
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(groups) { g in
@@ -291,7 +254,6 @@ struct LogView: View {
                 .padding(.horizontal, 16)
             }
 
-            // Outcome pad — the skill's own flexible outcome list (2–6).
             if let group = activeGroup {
                 let defs = group.outcomeDefs
                 let groupCounts = countsFor(group: group, in: attempts)
@@ -347,10 +309,8 @@ struct LogView: View {
                     .foregroundStyle(Theme.label2)
                     .padding(.top, 30)
             }
-            }   // end of pad layout (else useGrid)
+            }
 
-            // Recent — the grid collapses it to a swipeable bottom ticker so the
-            // group rows get the room; the pad keeps the taller vertical list.
             if useGrid {
                 recentTicker(attempts)
             } else {
@@ -359,8 +319,6 @@ struct LogView: View {
         }
     }
 
-    /// The taller vertical recent log (pad layout): wave/routine batches in
-    /// bordered containers, one-at-a-time reps as flat rows, newest first.
     @ViewBuilder
     private func recentWell(_ attempts: [Attempt]) -> some View {
         VStack(spacing: 4) {
@@ -398,24 +356,15 @@ struct LogView: View {
         .padding(.bottom, 8)
     }
 
-    // MARK: Tap-to-log matrix (groups × outcomes)
-
-    /// The whole roster on one screen: a column per outcome, a row per group,
-    /// every cell a tap-to-+1 button into this session. No group selection —
-    /// tap "Bobble" on Group 1 and it adds a bobble to Group 1. Cells are the
-    /// same engraved wells as the pad (outcome color in the machined edge, the
-    /// running count in chalk Barlow); the column header names the outcome.
     @ViewBuilder
     private func logGrid(_ attempts: [Attempt]) -> some View {
         VStack(spacing: 8) {
-            Text("TAP TO STAGE \(waveNoun.uppercased()) REPS · HOLD TO REMOVE ONE")
+            Text("1-TAP AUTO-SAVE LOGGING · TAP ANY CELL TO LOG REPS")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.6)
                 .foregroundStyle(Theme.label3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Each row shows its OWN skill's outcomes (count varies per skill),
-            // so there's no shared column header — just the good→bad direction.
             Text("← good   ·   bad →")
                 .font(.system(size: 8, weight: .bold))
                 .tracking(0.5)
@@ -428,8 +377,6 @@ struct LogView: View {
                         let c = countsFor(group: g, in: attempts)
                         let streakN = hotStreak(group: g, in: attempts)
                         HStack(spacing: 6) {
-                            // Row label — colored number badge + name (+ flame
-                            // once the group strings clean hits together).
                             HStack(spacing: 6) {
                                 Text("\(g.number)")
                                     .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -463,48 +410,41 @@ struct LogView: View {
 
                             ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                 let v = slot < c.count ? c[slot] : 0
-                                let stagedN = stagedCount(g, slot)
-                                // NOT a Button: a Button fires its action on
-                                // release even after a hold, so a long-press
-                                // decrement would be re-incremented on lift.
-                                gridCellLabel(v, def: def, stagedN: stagedN)
-                                    .onTapGesture { stage(g, slot) }
-                                    .onLongPressGesture(minimumDuration: 0.4) { unstage(g, slot) }
-                                    .accessibilityLabel("Stage \(def.label) for \(g.name)")
-                                    .accessibilityValue("\(v)\(stagedN > 0 ? ", \(stagedN) staged" : "")")
-                                    .accessibilityHint("Tap to stage one more, hold to remove one")
+                                gridCellLabel(v, def: def)
+                                    .onTapGesture {
+                                        context.insert(Attempt(slot: slot, group: g, session: session))
+                                        try? context.save()
+                                        Haptics.shared.play(def.soundOutcome)
+                                        Sounds.shared.play(.outcome(def.soundOutcome))
+                                    }
+                                    .accessibilityLabel("Log \(def.label) for \(g.name)")
+                                    .accessibilityValue("\(v) logged")
+                                    .accessibilityHint("Tap to log 1 rep immediately")
                             }
                         }
-                        .frame(minHeight: 56)
+                        .frame(minHeight: 58)
                 }
             }
 
-            // Rows keep a gym-friendly minimum tap height and scroll past
-            // what fits, instead of compressing (mirrors CaptureView's matrices).
             ScrollView(showsIndicators: false) { gridRows }
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
     }
 
-    /// One engraved matrix cell: the session count in chalk, and — while
-    /// staging — a "+n" pip in the outcome color showing this cell's pending
-    /// reps. Shared by both the tap-to-log Button and the wave gesture view.
-    private func gridCellLabel(_ v: Int, def: OutcomeDef, stagedN: Int) -> some View {
+    private func gridCellLabel(_ v: Int, def: OutcomeDef) -> some View {
         VStack(spacing: 1) {
             Text("\(v)")
                 .font(Theme.barlow(20, .extrabold))
                 .monospacedDigit()
-                .foregroundStyle(stagedN > 0 ? def.color : (v == 0 ? Theme.label3 : Theme.label))
+                .foregroundStyle(v == 0 ? Theme.label3 : Theme.label)
                 .contentTransition(.numericText(value: Double(v)))
                 .animation(.spring(duration: 0.3), value: v)
-            // Each cell names THIS skill's own outcome — mixed rosters and
-            // variable outcome counts both read correctly.
-            Text(def.short)
-                .font(.system(size: 10, weight: .bold))
+            Text(def.label.uppercased())
+                .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(def.color.opacity(0.9))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
         }
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
@@ -514,69 +454,23 @@ struct LogView: View {
                         .shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1))
                         .shadow(.inner(color: def.color.opacity(0.85), radius: 1, y: -2)))
             )
-            // Staged cell stays lit until the wave commits.
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(def.color, lineWidth: stagedN > 0 ? 2.5 : 0)
+                    .stroke(def.color.opacity(0.35), lineWidth: 1)
             )
-            .overlay(alignment: .topTrailing) {
-                if stagedN > 0 {
-                    Text("+\(stagedN)")
-                        .font(Theme.barlow(11, .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.well)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1.5)
-                        .background(Capsule().fill(def.color))
-                        .padding(3)
-                }
-            }
             .contentShape(Rectangle())
     }
 
-    // MARK: Wave / Routine staging
-
-    /// Docked under the matrix in wave mode. While staging: rep count + Clear +
-    /// Submit. After a commit (nothing staged): Undo. Commit is ALWAYS manual —
-    /// with multi-rep staging there is no "everyone staged" finish line to
-    /// auto-commit on.
     private var waveBar: some View {
         HStack(spacing: 10) {
-            Text("\(stagedReps) REP\(stagedReps == 1 ? "" : "S") STAGED")
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.hit)
+            Text("AUTO-SAVE LOGGING ACTIVE")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label2)
             Spacer()
-            if stagedReps > 0 {
-                Button {
-                    staged = [:]
-                    hapticTrigger += 1
-                } label: {
-                    Text("Clear")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.label2)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                Button { commitWave() } label: {
-                    Text("Submit \(stagedReps)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.well)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } else if !lastWave.isEmpty {
-                Button { undoWave() } label: {
-                    Label("Undo \(waveNoun)", systemImage: "arrow.uturn.backward")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -584,9 +478,6 @@ struct LogView: View {
         .padding(.horizontal, 16)
     }
 
-    /// Tap a cell in wave mode: stage one more rep of that outcome for that
-    /// group. No cap and no auto-commit — a group can carry several outcomes
-    /// in one pass, so only the user knows when the batch is done (Submit).
     private func stagedCount(_ g: StuntGroup, _ slot: Int) -> Int {
         guard let arr = staged[g.persistentModelID], slot >= 0, slot < arr.count else { return 0 }
         return arr[slot]
@@ -604,7 +495,6 @@ struct LogView: View {
         Sounds.shared.play(.outcome(o))
     }
 
-    /// Hold a cell in wave mode: take one staged rep of that outcome back off.
     private func unstage(_ g: StuntGroup, _ slot: Int) {
         guard var c = staged[g.persistentModelID], slot >= 0, slot < c.count, c[slot] > 0 else { return }
         c[slot] -= 1
@@ -613,10 +503,8 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
-    /// Write one Attempt per staged rep, then clear the staging row. Keeps
-    /// the batch in `lastWave` so it can be pulled back in one tap.
     private func commitWave() {
-        let waveID = UUID()   // ties this batch together for the grouped log container
+        let waveID = UUID()
         var committed: [Attempt] = []
         for g in groups {
             guard let c = staged[g.persistentModelID] else { continue }
@@ -636,9 +524,6 @@ struct LogView: View {
         Sounds.shared.play(.start)
     }
 
-    /// Step back: delete the whole last committed batch. Guards each attempt
-    /// against having already been removed (e.g. via the Recent undo) so we
-    /// never touch a deleted model.
     private func undoWave() {
         let live = session.attempts
         for a in lastWave where live.contains(where: { $0 === a }) {
@@ -651,10 +536,6 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
-    // MARK: Recent log (wave-grouped)
-
-    /// One chunk of the recent log: either a wave (reps committed together) or a
-    /// lone rep. Identifiable so the ForEach diffs cleanly.
     private enum LogSegment: Identifiable {
         case single(Attempt)
         case wave(UUID, [Attempt])
@@ -666,9 +547,6 @@ struct LogView: View {
         }
     }
 
-    /// Collapse the chronological attempts into segments: maximal runs of the
-    /// same non-nil `waveID` become one wave; nil-waveID reps stay singletons.
-    /// (A wave's reps are always contiguous — committed in one pass.)
     private func logSegments(_ attempts: [Attempt]) -> [LogSegment] {
         var segs: [LogSegment] = []
         var i = 0
@@ -690,7 +568,6 @@ struct LogView: View {
         return segs
     }
 
-    /// One rep line. `inWave` drops the per-row time (the container header owns it).
     @ViewBuilder
     private func recentRow(_ a: Attempt, inWave: Bool = false) -> some View {
         HStack(spacing: 10) {
@@ -710,8 +587,6 @@ struct LogView: View {
         .padding(.vertical, 7)
     }
 
-    /// A committed wave/routine: hairline-bordered container with a batch-summary
-    /// header (noun · reps · hit%) and its reps stacked inside.
     @ViewBuilder
     private func waveContainer(_ reps: [Attempt]) -> some View {
         let hits = reps.filter { $0.isHitRep }.count
@@ -740,7 +615,6 @@ struct LogView: View {
         )
     }
 
-    /// Delete the most recent single rep (per-rep undo, shared by both layouts).
     private func undoLastRep(_ attempts: [Attempt]) {
         guard let last = attempts.last else { return }
         SyncEngine.shared.queueDeletion(of: last, in: context)
@@ -750,13 +624,9 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
-    /// The grid's compact bottom recent strip. A pinned Undo on the left, then a
-    /// horizontally swipeable run of rep chips (newest at the leading edge, next
-    /// to Undo). A tap — or any new rep — snaps back to the live edge. This keeps
-    /// the strip readable and avoids a perpetual animation on the practice screen.
     @ViewBuilder
     private func recentTicker(_ attempts: [Attempt]) -> some View {
-        let segs = Array(logSegments(attempts).reversed())   // newest-first
+        let segs = Array(logSegments(attempts).reversed())
         HStack(spacing: 8) {
             Button { undoLastRep(attempts) } label: {
                 Image(systemName: "arrow.uturn.backward")
@@ -805,8 +675,6 @@ struct LogView: View {
         .padding(.bottom, 8)
     }
 
-    /// One ticker entry: a lone rep is a single chip; a wave is its chips wrapped
-    /// in a hairline cluster so the batch reads as one event.
     @ViewBuilder
     private func tickerChip(_ seg: LogSegment) -> some View {
         switch seg {
@@ -827,15 +695,14 @@ struct LogView: View {
         }
     }
 
-    /// Engraved chip: outcome dot + group name + outcome short word.
     private func repChip(_ a: Attempt) -> some View {
         HStack(spacing: 5) {
             Circle().fill(a.outcomeDef?.color ?? Theme.label3).frame(width: 7, height: 7)
             Text(a.group?.name ?? "—")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.label)
                 .lineLimit(1)
-            Text(a.outcomeDef?.short ?? "—")
+            Text(a.outcomeDef?.label.uppercased() ?? "—")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.label2)
                 .lineLimit(1)
@@ -849,12 +716,6 @@ struct LogView: View {
         )
     }
 
-    // MARK: Custom-outcome pad (user-created, tallied separately from hit-rate)
-
-    /// A second group of tap buttons under the locked 4 — the folder's own
-    /// outcomes. Tap = +1, long-press = −1 (gesture view, not a Button: a
-    /// Button fires on release after a hold and would re-increment a decrement,
-    /// same reason the wave cells use gestures). No dropdowns, nothing closes.
     @ViewBuilder
     private func customOutcomePad(group: StuntGroup) -> some View {
         VStack(spacing: 6) {
@@ -867,9 +728,6 @@ struct LogView: View {
                       spacing: 10) {
                 ForEach(customOutcomes) { o in
                     let c = customCount(o, group: group)
-                    // ~Half the height of the locked outcome wells (92 → 44) and
-                    // a flat row of color dot + name + count, so issues read as a
-                    // clearly secondary tier, not another outcome.
                     HStack(spacing: 7) {
                         Circle().fill(o.color).frame(width: 8, height: 8)
                         Text(o.name)
@@ -900,16 +758,12 @@ struct LogView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { addCustom(o, group) }
                     .onLongPressGesture(minimumDuration: 0.4) { removeCustom(o, group) }
-                    .accessibilityLabel("Log \(o.name)")
-                    .accessibilityValue("\(c) logged for \(group.name)")
-                    .accessibilityHint("Tap to add one, hold to remove one")
                 }
             }
         }
         .padding(.horizontal, 16)
     }
 
-    /// This session's tally count of a custom outcome on one group.
     private func customCount(_ o: CustomOutcome, group: StuntGroup) -> Int {
         session.customTallies.filter { $0.outcome?.id == o.id && $0.group === group }.count
     }
@@ -921,7 +775,6 @@ struct LogView: View {
         hapticTrigger += 1
     }
 
-    /// Remove the most recent tally of this outcome+group (long-press undo).
     private func removeCustom(_ o: CustomOutcome, _ group: StuntGroup) {
         let mine = session.customTallies
             .filter { $0.outcome?.id == o.id && $0.group === group }
@@ -933,7 +786,6 @@ struct LogView: View {
         Sounds.shared.play(.undo)
     }
 
-    /// Per-slot session counts for a skill, sized to its outcome list.
     private func countsFor(group: StuntGroup, in attempts: [Attempt]) -> [Int] {
         var counts = Array(repeating: 0, count: group.outcomeDefs.count)
         for a in attempts where a.group === group {
@@ -943,10 +795,6 @@ struct LogView: View {
         return counts
     }
 
-    // MARK: Hot streak (heating up / on fire)
-
-    /// Trailing run of clean hits (100%-credit outcomes) for one group in this
-    /// session. Any non-hit outcome breaks it. 2 = heating up, 3+ = on fire.
     private func hotStreak(group: StuntGroup, in attempts: [Attempt]) -> Int {
         var run = 0
         for a in attempts.reversed() {
@@ -957,8 +805,6 @@ struct LogView: View {
         return run
     }
 
-    /// Ember at 2 straight hits, pulsing flame at 3+. Rides next to the group
-    /// name in both layouts.
     @ViewBuilder
     private func flameBadge(_ streak: Int) -> some View {
         if streak >= 2 {
@@ -966,16 +812,10 @@ struct LogView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(streak >= 3 ? Theme.fireHot : Theme.fireWarm)
                 .symbolEffect(.pulse, options: .repeating, isActive: streak >= 3)
-                .accessibilityLabel(streak >= 3 ? "On fire — \(streak) hits in a row"
-                                                : "Heating up — 2 hits in a row")
         }
     }
 }
 
-/// "On fire" chrome: a slow warm gradient sweeping around the group's chip or
-/// row label once it has 3+ straight hits. The one sanctioned flame on the
-/// training floor — Ian asked for it (2026-06-11); keep it small and warm,
-/// never sparkle.
 private struct FireBorder: ViewModifier {
     let active: Bool
     var cornerRadius: CGFloat = 8

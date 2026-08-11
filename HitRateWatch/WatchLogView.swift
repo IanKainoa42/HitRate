@@ -78,11 +78,16 @@ struct WatchLogView: View {
     }
 
     private var emptyState: some View {
-        Text("Open HitRate on iPhone to sync your \(store.snapshot.nounPlural), then log from here.")
-            .font(.system(size: 13))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 6)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Open HitRate on iPhone to sync your \(store.snapshot.nounPlural), then log from here.")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+
+            Text(store.statusText)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 6)
     }
 
     private var outcomeGrid: some View {
@@ -106,6 +111,7 @@ struct WatchLogView: View {
                                group: WatchGroupSnapshot?) -> some View {
         let count = group?.counts[safe: outcome.rawValue] ?? 0
         return Button {
+            playHaptic(for: outcome.rawValue)
             store.log(outcome: outcome)
         } label: {
             VStack(spacing: 2) {
@@ -129,11 +135,25 @@ struct WatchLogView: View {
         .accessibilityLabel("Log \(outcome.label)")
     }
 
+    private func playHaptic(for rawValue: Int) {
+        let device = WKInterfaceDevice.current()
+        switch rawValue {
+        case 0:
+            device.play(.success)
+        case 1:
+            device.play(.directionUp)
+        case 2:
+            device.play(.directionDown)
+        default:
+            device.play(.failure)
+        }
+    }
+
     private func outcomeColor(_ rawValue: Int) -> Color {
         switch rawValue {
         case 0: return .green
-        case 1: return .orange
-        case 2: return .yellow
+        case 1: return .yellow
+        case 2: return .orange
         default: return .red
         }
     }
