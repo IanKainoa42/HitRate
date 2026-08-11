@@ -12,8 +12,9 @@ rules_version = '2';
 //   joinCodes/{code}                        { teamId } — public code→team lookup
 //
 // Roster is OWNER-authoritative; attempts are append-only and tagged with the
-// logger's uid. A joiner resolves a code via joinCodes/, then adds only itself
-// to the team's memberIds (the sole member-write allowed on the team doc).
+// logger's uid. A joiner resolves one exact, non-listable code via joinCodes/,
+// then adds only itself to the team's memberIds (the sole member-write allowed
+// on the team doc). Team ids are random UUIDs and act as the resolved capability.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -33,20 +34,35 @@ service cloud.firestore {
       return signedIn() && (t.ownerUID == uid() || uid() in t.memberIds);
     }
 
+    function changesOnlyOwnMembership() {
+      let before = resource.data.memberIds;
+      let after = request.resource.data.memberIds;
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return before is list
+        && after is list
+        && request.resource.data.ownerUID == resource.data.ownerUID
+        && request.resource.data.updatedAt == request.time
+        && changed.hasOnly(['memberIds', 'updatedAt'])
+        && (
+          // First redemption: preserve everyone and add exactly the caller.
+          (!(uid() in before) && after == before.concat([uid()]))
+          // Leave: preserve everyone else, including any legacy duplicates.
+          || (uid() in before && after == before.removeAll([uid()]))
+          // Re-entering the same code is an idempotent membership update.
+          || (uid() in before && after == before)
+        );
+    }
+
     match /teams/{teamId} {
       allow read:   if signedIn() && (resource.data.ownerUID == uid()
                                        || uid() in resource.data.memberIds);
       allow create: if signedIn() && request.resource.data.ownerUID == uid();
       allow delete: if signedIn() && resource.data.ownerUID == uid();
-      // Owner: full update. Member: may change ONLY memberIds/updatedAt (join or
-      // leave), and only to add or remove THEMSELVES — never touch other fields.
+      // Owner: full update. Non-owner: may add/remove only their own uid (or
+      // idempotently rejoin), while preserving every other member and field.
       allow update: if signedIn() && (
         resource.data.ownerUID == uid()
-        || (
-          request.resource.data.ownerUID == resource.data.ownerUID
-          && request.resource.data.diff(resource.data)
-               .affectedKeys().hasOnly(['memberIds', 'updatedAt'])
-        )
+        || changesOnlyOwnMembership()
       );
 
       match /subjects/{docId} {
@@ -89,11 +105,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Public code→team directory so a joiner can resolve a 6-digit code before
-    // they're a member. Owner-written; readable by any signed-in user. Holds only
-    // { teamId } — no roster data leaks.
+    // Exact code→team lookup so a joiner can resolve a 6-digit code before
+    // they're a member. Listing is forbidden: the directory is not an invite
+    // catalog. Owner-written; exact documents hold only { teamId, ownerUID }.
     match /joinCodes/{code} {
-      allow read:   if signedIn();
+      allow get:    if signedIn();
+      allow list:   if false;
       allow create: if signedIn() && request.resource.data.ownerUID == uid();
       allow update, delete: if signedIn() && resource.data.ownerUID == uid();
     }

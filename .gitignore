@@ -9,6 +9,13 @@ xcuserdata/
 # macOS
 .DS_Store
 
+# Firebase rules test tooling
+node_modules/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Agent scratch — never commit
 plan.md
 TECHNICAL_DEBT_LOG.md
