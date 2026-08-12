@@ -18,12 +18,22 @@ XCODE_PROJECT = "HitRate.xcodeproj"
 SCHEME = "HitRate"
 TEAM_ID = "WC46K49VFA"
 
+def resolve_p8_path
+  if ENV["APP_STORE_CONNECT_API_KEY_JSON_PATH"] && File.exist?(ENV["APP_STORE_CONNECT_API_KEY_JSON_PATH"])
+    return ENV["APP_STORE_CONNECT_API_KEY_JSON_PATH"]
+  end
+  paths = [
+    File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8"),
+    "/Users/ianrichardson/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8"
+  ]
+  paths.find { |p| File.exist?(p) } || paths.first
+end
+
 # App Store Connect API key loader (ported from CoachCard).
 # Ruby 4.0 + OpenSSL 3.x breaks key_content loading ("invalid curve name") —
 # always load the raw .p8 via key_filepath.
 def app_store_api_key
-  p8_path = ENV["APP_STORE_CONNECT_API_KEY_JSON_PATH"] ||
-            File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+  p8_path = resolve_p8_path
   UI.user_error!("Missing .p8 at #{p8_path}") unless File.exist?(p8_path)
   app_store_connect_api_key(
     key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"] || "6H24WZ2RQ5",
@@ -60,7 +70,9 @@ platform :ios do
 
     prof_dirs = [
       File.expand_path("~/Library/Developer/Xcode/UserData/Provisioning Profiles"),
-      File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
+      File.expand_path("~/Library/MobileDevice/Provisioning Profiles"),
+      "/Users/ianrichardson/Library/Developer/Xcode/UserData/Provisioning Profiles",
+      "/Users/ianrichardson/Library/MobileDevice/Provisioning Profiles"
     ]
     profile = prof_dirs.flat_map { |d| Dir["#{d}/*.mobileprovision"] }.find do |p|
       `security cms -D -i "#{p}" 2>/dev/null | plutil -extract Name raw - 2>/dev/null`.strip == prof_name
@@ -202,7 +214,7 @@ platform :ios do
   desc "Push App Privacy declaration from app_privacy_details.json (User ID + User Content, linked, App Functionality — Firebase sync; no tracking/analytics)."
   lane :ship_privacy do
     require "spaceship"
-    p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+    p8_path = resolve_p8_path
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
       key_id: "6H24WZ2RQ5", issuer_id: "7642a25e-aca7-402d-8b7d-de18dfef1756",
       key: File.read(p8_path)
@@ -216,7 +228,7 @@ platform :ios do
   desc "Print current/latest App Store build status as JSON (read-only). Used by /ship pre-flight."
   lane :asc_build_status do
     require "spaceship"
-    p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+    p8_path = resolve_p8_path
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
       key_id: "6H24WZ2RQ5", issuer_id: "7642a25e-aca7-402d-8b7d-de18dfef1756",
       key: File.read(p8_path)
@@ -238,7 +250,7 @@ platform :ios do
   desc "Set copyright + mark App Review sign-in NOT required (no-login app). Surgical; no metadata overwrite."
   lane :ship_fix_review do
     require "spaceship"
-    p8_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_6H24WZ2RQ5.p8")
+    p8_path = resolve_p8_path
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
       key_id: "6H24WZ2RQ5", issuer_id: "7642a25e-aca7-402d-8b7d-de18dfef1756",
       key: File.read(p8_path)
