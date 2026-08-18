@@ -45,12 +45,18 @@ service cloud.firestore {
         && changed.hasOnly(['memberIds', 'updatedAt'])
         && (
           // First redemption: preserve everyone and add exactly the caller.
-          (!(uid() in before) && after == before.concat([uid()]))
+          (!(uid() in before) && teamAcceptsMembers()
+            && after == before.concat([uid()]))
           // Leave: preserve everyone else, including any legacy duplicates.
           || (uid() in before && after == before.removeAll([uid()]))
           // Re-entering the same code is an idempotent membership update.
-          || (uid() in before && after == before)
+          || (uid() in before && teamAcceptsMembers() && after == before)
         );
+    }
+
+    function teamAcceptsMembers() {
+      return !resource.data.keys().hasAny(['deletedAt'])
+        || resource.data.deletedAt == null;
     }
 
     match /teams/{teamId} {

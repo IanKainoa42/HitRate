@@ -87,6 +87,34 @@ enum SyncJoinCodePolicy {
     }
 }
 
+/// A join-code document can outlive the folder it names. Firestore reports a
+/// missing team as NOT_FOUND and a soft-deleted team as PERMISSION_DENIED (the
+/// rules reject new membership). Both mean the code has no joinable target;
+/// transport failures remain retryable errors instead of being mislabeled.
+enum SyncJoinTargetPolicy {
+    private static let firestoreErrorDomain = "FIRFirestoreErrorDomain"
+    private static let notFoundCode = 5
+    private static let permissionDeniedCode = 7
+
+    static func isStaleTarget(errorDomain: String, errorCode: Int) -> Bool {
+        errorDomain == firestoreErrorDomain
+            && (errorCode == notFoundCode || errorCode == permissionDeniedCode)
+    }
+}
+
+/// Membership changes affect access only. Logger-owned sessions/attempts are
+/// deliberately outside this plan, so removing a member never selects or
+/// deletes their history.
+enum SyncRosterMembershipPolicy {
+    static func remainingMemberIDs(_ memberIDs: [String], removing memberID: String) -> [String] {
+        memberIDs.filter { $0 != memberID }
+    }
+
+    static func isVisible(ownerUID: String, memberIDs: [String], currentUID: String) -> Bool {
+        ownerUID == currentUID || memberIDs.contains(currentUID)
+    }
+}
+
 /// A remote emergency brake: `config/ios`'s `minBuild` field can be bumped to
 /// stop a specific bad TestFlight/App-Store build from hammering Firestore
 /// (the July/August write-storm was exactly this — a build that rewrote every

@@ -25,6 +25,7 @@ const joinCode = "ABC234";
 const ownerId = "owner-uid";
 const memberAId = "member-a-uid";
 const memberBId = "member-b-uid";
+const joiningId = "joining-uid";
 
 let testEnv;
 
@@ -62,6 +63,19 @@ describe("HitRate Firestore team authorization", () => {
         ownerUID: ownerId,
         createdAt: new Date("2026-08-11T00:00:00Z"),
       });
+      await setDoc(doc(db, "teams", teamId, "sessions", "member-session"), {
+        teamId,
+        loggerId: memberBId,
+        startedAt: new Date("2026-08-11T00:00:00Z"),
+        updatedAt: new Date("2026-08-11T00:01:00Z"),
+      });
+      await setDoc(doc(db, "teams", teamId, "attempts", "member-attempt"), {
+        teamId,
+        loggerId: memberBId,
+        outcomeRaw: 0,
+        timestamp: new Date("2026-08-11T00:01:00Z"),
+        updatedAt: new Date("2026-08-11T00:01:00Z"),
+      });
     });
   });
 
@@ -69,12 +83,19 @@ describe("HitRate Firestore team authorization", () => {
     await testEnv.cleanup();
   });
 
-  it("allows the owner to administer the membership list", async () => {
+  it("allows the owner to remove access without deleting the member's history", async () => {
     const db = firestoreFor(ownerId);
     await assertSucceeds(updateDoc(teamRef(db), {
       memberIds: [memberAId],
       updatedAt: serverTimestamp(),
     }));
+
+    const session = await getDoc(doc(db, "teams", teamId, "sessions", "member-session"));
+    const attempt = await getDoc(doc(db, "teams", teamId, "attempts", "member-attempt"));
+    assert.equal(session.exists(), true);
+    assert.equal(session.data().loggerId, memberBId);
+    assert.equal(attempt.exists(), true);
+    assert.equal(attempt.data().loggerId, memberBId);
   });
 
   it("allows a signed-in user to resolve one exact join code", async () => {
@@ -88,10 +109,71 @@ describe("HitRate Firestore team authorization", () => {
   });
 
   it("allows a nonmember to add only their own uid", async () => {
-    const uid = "joining-uid";
-    const db = firestoreFor(uid);
+    const db = firestoreFor(joiningId);
     await assertSucceeds(updateDoc(teamRef(db), {
-      memberIds: arrayUnion(uid),
+      memberIds: arrayUnion(joiningId),
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("rejects a join code whose folder has been deleted", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(teamRef(context.firestore()), {
+        deletedAt: new Date("2026-08-12T00:00:00Z"),
+      });
+    });
+
+    const db = firestoreFor(joiningId);
+    await assertSucceeds(getDoc(doc(db, "joinCodes", joinCode)));
+    await assertFails(updateDoc(teamRef(db), {
+      memberIds: arrayUnion(joiningId),
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("still lets an existing member leave a deleted folder", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(teamRef(context.firestore()), {
+        deletedAt: new Date("2026-08-12T00:00:00Z"),
+      });
+    });
+
+    const db = firestoreFor(memberAId);
+    await assertSucceeds(updateDoc(teamRef(db), {
+      memberIds: arrayRemove(memberAId),
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("rejects an existing member reusing a deleted folder's code", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(teamRef(context.firestore()), {
+        deletedAt: new Date("2026-08-12T00:00:00Z"),
+      });
+    });
+
+    const db = firestoreFor(memberAId);
+    await assertFails(updateDoc(teamRef(db), {
+      memberIds: arrayUnion(memberAId),
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("rejects a join code whose folder document is missing", async () => {
+    const staleCode = "STALE2";
+    const missingTeamId = "7E0B08CC-5FD1-4997-99B2-417488D4A5B8";
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "joinCodes", staleCode), {
+        teamId: missingTeamId,
+        ownerUID: ownerId,
+        createdAt: new Date("2026-08-11T00:00:00Z"),
+      });
+    });
+
+    const db = firestoreFor(joiningId);
+    await assertSucceeds(getDoc(doc(db, "joinCodes", staleCode)));
+    await assertFails(updateDoc(doc(db, "teams", missingTeamId), {
+      memberIds: arrayUnion(joiningId),
       updatedAt: serverTimestamp(),
     }));
   });

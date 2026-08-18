@@ -671,6 +671,15 @@ final class SyncEngine: ObservableObject {
                 for change in snap.documentChanges {
                     if let team = try? change.document.data(as: FTeam.self) {
                         let teamID = team.id ?? change.document.documentID
+                        if change.type == .removed,
+                           !SyncRosterMembershipPolicy.isVisible(
+                                ownerUID: team.ownerUID,
+                                memberIDs: team.memberIds,
+                                currentUID: uid
+                           ) {
+                            self.detachTeam(teamID: teamID, remote: team)
+                            continue
+                        }
                         self.applyTeam(
                             team,
                             acknowledged: !change.document.metadata.hasPendingWrites
@@ -689,6 +698,25 @@ final class SyncEngine: ObservableObject {
             }
             listeners.append(reg)
         }
+    }
+
+    /// Stop every subscription for a folder this account can no longer see.
+    /// Keep the local mirror as a soft-deleted cache: removing access must not
+    /// cascade-delete historical reps, and a later rejoin can restore the same
+    /// rows when the owner publishes the folder again.
+    private func detachTeam(teamID: String, remote: FTeam) {
+        teamListeners.removeValue(forKey: teamID)?.forEach { $0.remove() }
+        serverReadyCollections.removeValue(forKey: teamID)
+        teamsReadyForAttemptPush.remove(teamID)
+        knownAttemptIDsByTeam.removeValue(forKey: teamID)
+        attemptImportTasks.removeValue(forKey: teamID)?.cancel()
+        if activeTeamID == teamID { setActiveTeamID(nil) }
+
+        guard let local = team(teamID) else { return }
+        local.ownerUID = remote.ownerUID
+        local.memberIds = remote.memberIds
+        if local.deletedAt == nil { local.deletedAt = .now }
+        try? modelContext?.save()
     }
 
     private func attachTeamSubcollections(teamID: String) {
@@ -1061,6 +1089,37 @@ final class SyncEngine: ObservableObject {
         return nil
     }
 
+    /// Owner-only access removal. The team document is the only write: sessions
+    /// and attempts stay untouched, retaining both their logger attribution and
+    /// their contribution to the owner's folder history.
+    func removeMember(_ memberID: String, from team: Team) async -> Bool {
+        guard let uid, team.ownerUID == uid else {
+            lastError = "Only the folder owner can remove members."
+            return false
+        }
+        let remaining = SyncRosterMembershipPolicy.remainingMemberIDs(
+            team.memberIds, removing: memberID
+        )
+        guard remaining != team.memberIds else { return true }
+
+        do {
+            let teamID = team.id.uuidString
+            try await withTimeout(seconds: 10) {
+                try await self.teamDoc(teamID).updateData([
+                    "memberIds": remaining,
+                    "updatedAt": FieldValue.serverTimestamp()
+                ])
+            }
+            team.memberIds = remaining
+            try? modelContext?.save()
+            lastError = nil
+            return true
+        } catch {
+            lastError = "Remove member failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     // MARK: - Account deletion
 
     /// Deletes every cloud document this uid may legally remove, ahead of
@@ -1220,6 +1279,13 @@ final class SyncEngine: ObservableObject {
             lastError = nil
             return .joined
         } catch {
+            let nsError = error as NSError
+            if SyncJoinTargetPolicy.isStaleTarget(
+                errorDomain: nsError.domain,
+                errorCode: nsError.code
+            ) {
+                return .invalidCode
+            }
             return .failed(error.localizedDescription)
         }
     }

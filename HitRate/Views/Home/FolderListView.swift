@@ -396,6 +396,9 @@ private struct ShareFolderSheet: View {
     @State private var copied = false
     @State private var attempt = 0
     @State private var accountOpen = false
+    @State private var pendingMemberRemoval: String?
+    @State private var removingMember: String?
+    @State private var memberError: String?
     private let sync = SyncEngine.shared
 
     var body: some View {
@@ -464,6 +467,10 @@ private struct ShareFolderSheet: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if !team.memberIds.isEmpty {
+                    memberAccessSection
+                }
+
                 // Sharing is the moment ownership starts to matter, so it's the
                 // moment to fix it — not to print directions to a settings
                 // screen. If it needs a nav path spelled out, the button is in
@@ -527,6 +534,75 @@ private struct ShareFolderSheet: View {
         }
         .sheet(isPresented: $accountOpen) {
             NavigationStack { AccountView() }
+        }
+        .confirmationDialog(
+            "Remove folder access?",
+            isPresented: Binding(
+                get: { pendingMemberRemoval != nil },
+                set: { if !$0 { pendingMemberRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let memberID = pendingMemberRemoval {
+                Button("Remove member", role: .destructive) {
+                    pendingMemberRemoval = nil
+                    removeMember(memberID)
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingMemberRemoval = nil }
+        } message: {
+            Text("They’ll stop receiving this folder. Every rep they already logged stays in your history.")
+        }
+    }
+
+    private var memberAccessSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("FOLDER ACCESS")
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(1.4)
+                .foregroundStyle(Theme.label3)
+
+            ForEach(Array(team.memberIds.enumerated()), id: \.offset) { index, memberID in
+                HStack(spacing: 10) {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(Theme.label2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(team.memberIds.count == 1 ? "Joined member" : "Joined member \(index + 1)")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.label)
+                        Text("ID …\(memberID.suffix(6).uppercased()) · past reps stay")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.label3)
+                    }
+                    Spacer()
+                    if removingMember == memberID {
+                        ProgressView().tint(Theme.accent)
+                    } else {
+                        Button("Remove") { pendingMemberRemoval = memberID }
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.majorFall)
+                    }
+                }
+            }
+
+            if let memberError {
+                Text(memberError)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.majorFall)
+            }
+        }
+        .padding(12)
+        .wellBackground()
+    }
+
+    private func removeMember(_ memberID: String) {
+        removingMember = memberID
+        memberError = nil
+        Task {
+            if !(await sync.removeMember(memberID, from: team)) {
+                memberError = sync.lastError ?? "Couldn’t remove this member. Try again."
+            }
+            removingMember = nil
         }
     }
 }

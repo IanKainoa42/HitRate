@@ -91,7 +91,8 @@ struct RootView: View {
             if minBuild.isBlocked {
                 UpdateRequiredView()
             } else if didOnboard {
-                if let id = openFolderID, teams.contains(where: { $0.id.uuidString == id }) {
+                if let id = openFolderID,
+                   teams.active.contains(where: { $0.id.uuidString == id }) {
                     HomeView(onExit: { openFolderID = nil })
                 } else {
                     FolderListView(onOpen: { team in

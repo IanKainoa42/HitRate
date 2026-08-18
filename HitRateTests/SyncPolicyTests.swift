@@ -110,6 +110,46 @@ final class SyncJoinCodePolicyTests: XCTestCase {
     }
 }
 
+final class SyncJoinTargetPolicyTests: XCTestCase {
+    func testMissingOrInaccessibleFolderMakesAJoinCodeInvalid() {
+        XCTAssertTrue(SyncJoinTargetPolicy.isStaleTarget(
+            errorDomain: "FIRFirestoreErrorDomain", errorCode: 5
+        ))
+        XCTAssertTrue(SyncJoinTargetPolicy.isStaleTarget(
+            errorDomain: "FIRFirestoreErrorDomain", errorCode: 7
+        ))
+    }
+
+    func testNetworkFailureDoesNotMasqueradeAsAnInvalidCode() {
+        XCTAssertFalse(SyncJoinTargetPolicy.isStaleTarget(
+            errorDomain: "NSURLErrorDomain", errorCode: -1009
+        ))
+        XCTAssertFalse(SyncJoinTargetPolicy.isStaleTarget(
+            errorDomain: "FIRFirestoreErrorDomain", errorCode: 14
+        ))
+    }
+}
+
+final class SyncRosterMembershipPolicyTests: XCTestCase {
+    func testOwnerRemovalDropsOnlyTheSelectedMember() {
+        XCTAssertEqual(
+            SyncRosterMembershipPolicy.remainingMemberIDs(
+                ["member-a", "member-b", "member-c"], removing: "member-b"
+            ),
+            ["member-a", "member-c"]
+        )
+    }
+
+    func testRemovedJoinerNoLongerKeepsFolderListeners() {
+        XCTAssertTrue(SyncRosterMembershipPolicy.isVisible(
+            ownerUID: "owner", memberIDs: [], currentUID: "owner"
+        ))
+        XCTAssertFalse(SyncRosterMembershipPolicy.isVisible(
+            ownerUID: "owner", memberIDs: ["member-a"], currentUID: "member-b"
+        ))
+    }
+}
+
 final class MinBuildPolicyTests: XCTestCase {
     func testBuildBelowThresholdIsBlocked() {
         XCTAssertTrue(MinBuildPolicy.isBlocked(currentBuild: 21, minBuild: 22))
