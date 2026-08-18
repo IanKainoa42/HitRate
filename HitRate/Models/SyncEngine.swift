@@ -62,6 +62,11 @@ final class SyncEngine: ObservableObject {
     /// fingerprints, but can be stale or incomplete.
     private var teamsReadyForAttemptPush: Set<String> = []
     private var serverReadyCollections: [String: Set<String>] = [:]
+    /// The folder list is the union of two Firestore queries. Track their full
+    /// acknowledged result sets so a cold launch can revoke a stale local
+    /// joined-folder mirror even when Firestore emits no `.removed` change.
+    private var visibleTeamIDsBySource: [SyncRosterMembershipPolicy.QuerySource: Set<String>] = [:]
+    private var readyTeamQuerySources: Set<SyncRosterMembershipPolicy.QuerySource> = []
     private let requiredServerCollections: Set<String> = [
         "team", "subjects", "groups", "templates", "sessions", "attempts"
     ]
@@ -150,6 +155,8 @@ final class SyncEngine: ObservableObject {
         knownAttemptIDsByTeam.removeAll()
         teamsReadyForAttemptPush.removeAll()
         serverReadyCollections.removeAll()
+        visibleTeamIDsBySource.removeAll()
+        readyTeamQuerySources.removeAll()
         attemptImportTasks.values.forEach { $0.cancel() }
         attemptImportTasks.removeAll()
         pendingPushIDs.removeAll()
@@ -660,7 +667,11 @@ final class SyncEngine: ObservableObject {
         // Teams I own or am a member of. Two queries unioned by their listeners.
         let owned = db.collection("teams").whereField("ownerUID", isEqualTo: uid)
         let member = db.collection("teams").whereField("memberIds", arrayContains: uid)
-        for query in [owned, member] {
+        let queries: [(Query, SyncRosterMembershipPolicy.QuerySource)] = [
+            (owned, .owned),
+            (member, .member)
+        ]
+        for (query, source) in queries {
             let reg = query.addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
                 guard let self else { return }
                 if let error {
@@ -671,13 +682,10 @@ final class SyncEngine: ObservableObject {
                 for change in snap.documentChanges {
                     if let team = try? change.document.data(as: FTeam.self) {
                         let teamID = team.id ?? change.document.documentID
-                        if change.type == .removed,
-                           !SyncRosterMembershipPolicy.isVisible(
-                                ownerUID: team.ownerUID,
-                                memberIDs: team.memberIds,
-                                currentUID: uid
-                           ) {
-                            self.detachTeam(teamID: teamID, remote: team)
+                        // The complete acknowledged query union below decides
+                        // removals. A removed change may carry the last matching
+                        // payload, so never re-apply or re-subscribe from it.
+                        if change.type == .removed {
                             continue
                         }
                         self.applyTeam(
@@ -695,8 +703,36 @@ final class SyncEngine: ObservableObject {
                     self.markServerReady(teamID: document.documentID, collection: "team",
                                          metadata: snap.metadata)
                 }
+                if !snap.metadata.isFromCache {
+                    self.visibleTeamIDsBySource[source] = Set(
+                        snap.documents.map(\.documentID)
+                    )
+                    self.readyTeamQuerySources.insert(source)
+                    self.reconcileVisibleTeamUnionIfReady()
+                }
             }
             listeners.append(reg)
+        }
+    }
+
+    /// Reconcile only after both owner/member queries have produced server
+    /// snapshots. Cache-only or half-complete results must never hide a folder.
+    private func reconcileVisibleTeamUnionIfReady() {
+        let required: Set<SyncRosterMembershipPolicy.QuerySource> = [.owned, .member]
+        guard readyTeamQuerySources == required,
+              let context = modelContext,
+              let uid else { return }
+        let visibleTeamIDs = visibleTeamIDsBySource.values.reduce(into: Set<String>()) {
+            $0.formUnion($1)
+        }
+        guard let localTeams = try? context.fetch(FetchDescriptor<Team>()) else { return }
+        for local in localTeams where SyncRosterMembershipPolicy.shouldDetachLocalMirror(
+            teamID: local.id.uuidString,
+            ownerUID: local.ownerUID,
+            currentUID: uid,
+            visibleTeamIDs: visibleTeamIDs
+        ) {
+            detachTeam(teamID: local.id.uuidString, remote: nil)
         }
     }
 
@@ -704,7 +740,7 @@ final class SyncEngine: ObservableObject {
     /// Keep the local mirror as a soft-deleted cache: removing access must not
     /// cascade-delete historical reps, and a later rejoin can restore the same
     /// rows when the owner publishes the folder again.
-    private func detachTeam(teamID: String, remote: FTeam) {
+    private func detachTeam(teamID: String, remote: FTeam?) {
         teamListeners.removeValue(forKey: teamID)?.forEach { $0.remove() }
         serverReadyCollections.removeValue(forKey: teamID)
         teamsReadyForAttemptPush.remove(teamID)
@@ -713,8 +749,10 @@ final class SyncEngine: ObservableObject {
         if activeTeamID == teamID { setActiveTeamID(nil) }
 
         guard let local = team(teamID) else { return }
-        local.ownerUID = remote.ownerUID
-        local.memberIds = remote.memberIds
+        if let remote {
+            local.ownerUID = remote.ownerUID
+            local.memberIds = remote.memberIds
+        }
         if local.deletedAt == nil { local.deletedAt = .now }
         try? modelContext?.save()
     }

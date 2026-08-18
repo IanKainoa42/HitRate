@@ -106,12 +106,32 @@ enum SyncJoinTargetPolicy {
 /// deliberately outside this plan, so removing a member never selects or
 /// deletes their history.
 enum SyncRosterMembershipPolicy {
+    enum QuerySource: Hashable {
+        case owned
+        case member
+    }
+
     static func remainingMemberIDs(_ memberIDs: [String], removing memberID: String) -> [String] {
         memberIDs.filter { $0 != memberID }
     }
 
     static func isVisible(ownerUID: String, memberIDs: [String], currentUID: String) -> Bool {
         ownerUID == currentUID || memberIDs.contains(currentUID)
+    }
+
+    /// Once both acknowledged server queries have arrived, their union is the
+    /// authority for joined-folder access. A local joined mirror can outlive
+    /// Firestore's query cache without producing a `.removed` change on the
+    /// next launch, so local `memberIds` must not override an empty union.
+    static func shouldDetachLocalMirror(
+        teamID: String,
+        ownerUID: String?,
+        currentUID: String,
+        visibleTeamIDs: Set<String>
+    ) -> Bool {
+        ownerUID != nil
+            && ownerUID != currentUID
+            && !visibleTeamIDs.contains(teamID)
     }
 }
 

@@ -148,6 +148,32 @@ final class SyncRosterMembershipPolicyTests: XCTestCase {
             ownerUID: "owner", memberIDs: ["member-a"], currentUID: "member-b"
         ))
     }
+
+    func testAcknowledgedEmptyQueryUnionDetachesStaleJoinedMirror() {
+        let visibleTeamIDs: Set<String> = []
+
+        XCTAssertTrue(SyncRosterMembershipPolicy.shouldDetachLocalMirror(
+            teamID: "team-a",
+            ownerUID: "owner",
+            currentUID: "member-a",
+            visibleTeamIDs: visibleTeamIDs
+        ))
+    }
+
+    func testAcknowledgedQueryUnionKeepsOwnedAndVisibleJoinedFolders() {
+        XCTAssertFalse(SyncRosterMembershipPolicy.shouldDetachLocalMirror(
+            teamID: "owned-team",
+            ownerUID: "owner",
+            currentUID: "owner",
+            visibleTeamIDs: []
+        ))
+        XCTAssertFalse(SyncRosterMembershipPolicy.shouldDetachLocalMirror(
+            teamID: "joined-team",
+            ownerUID: "owner",
+            currentUID: "member-a",
+            visibleTeamIDs: ["joined-team"]
+        ))
+    }
 }
 
 final class MinBuildPolicyTests: XCTestCase {
