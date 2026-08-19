@@ -9,9 +9,6 @@ struct HitRateApp: App {
 
     init() {
         FirebaseApp.configure()
-        if CommandLine.arguments.contains("--run-e2e-tests") {
-            QuickClinicTests.runAndExit()
-        }
         do {
             let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, PendingCloudDeletion.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, Subject.self, OutcomeTemplate.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

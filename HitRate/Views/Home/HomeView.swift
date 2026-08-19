@@ -43,12 +43,6 @@ struct HomeView: View {
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
 
-    @State private var clinicContainer: ModelContainer?
-    @State private var clinicSessionToLog: PracticeSession?
-    @State private var clinicGoalRate: Int = 80
-    @State private var showClinicSetup = false
-    @State private var pendingClinicSetup: (matCount: Int, goalRate: Int)? = nil
-
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
     /// The active team and its roster — every stat below is scoped to it.
@@ -283,38 +277,6 @@ struct HomeView: View {
                  ? "Track another squad with its own roster and stats."
                  : "Track another team or gym with its own skills and stats.")
         }
-        .sheet(isPresented: $showClinicSetup, onDismiss: {
-            if let setup = pendingClinicSetup {
-                let count = setup.matCount
-                let goal = setup.goalRate
-                pendingClinicSetup = nil
-                startClinic(matCount: count, goalRate: goal)
-            }
-        }) {
-            QuickClinicSetupSheet { matCount, goalRate in
-                pendingClinicSetup = (matCount, goalRate)
-                showClinicSetup = false
-            }
-        }
-        .overlay(
-            EmptyView()
-                .fullScreenCover(isPresented: Binding(
-                    get: { clinicSessionToLog != nil },
-                    set: { if !$0 { clinicSessionToLog = nil } }
-                )) {
-                    if let container = clinicContainer, let s = clinicSessionToLog {
-                        LogView(
-                            session: s,
-                            isClinic: true,
-                            goalRate: clinicGoalRate,
-                            onArchive: {
-                                archiveClinicSession(clinicContext: container.mainContext, mainContext: context)
-                            }
-                        )
-                        .modelContainer(container)
-                    }
-                }
-        )
         .sheet(isPresented: $showIconGuide) {
             iconGuideSheet
                 .presentationDetents([.medium])
@@ -416,64 +378,43 @@ struct HomeView: View {
 
     /// The one RAISED element on the dashboard — everything else is inset.
     private var practiceCTA: some View {
-        HStack(spacing: 8) {
-            Button {
-                let s: PracticeSession
-                if let live = activeSession {
-                    s = live
-                } else {
-                    s = PracticeSession()
-                    context.insert(s)
-                    try? context.save()
-                    Sounds.shared.play(.start)
-                    // Wake the Apple Watch app so reps can be logged from the wrist
-                    // the instant practice begins (no-op without an installed watch).
-                    PracticeWatchLauncher.launchIfWatchAvailable()
-                }
-                hapticTrigger += 1
-                logSession = s
-            } label: {
-                HStack(spacing: 9) {
-                    BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
-                        .shadow(color: .black.opacity(0.24), radius: 2, y: 1)
-                    Text(activeSession.map {
-                            "RESUME PRACTICE · \($0.attempts.count) REP\($0.attempts.count == 1 ? "" : "S")"
-                         } ?? "START PRACTICE")
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(1.5)
-                }
-                .foregroundStyle(Theme.accentText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Theme.accent)
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(.white.opacity(0.28), lineWidth: 1))
-                        .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
-                .contentShape(Rectangle())
+        Button {
+            let s: PracticeSession
+            if let live = activeSession {
+                s = live
+            } else {
+                s = PracticeSession()
+                context.insert(s)
+                try? context.save()
+                Sounds.shared.play(.start)
+                // Wake the Apple Watch app so reps can be logged from the wrist
+                // the instant practice begins (no-op without an installed watch).
+                PracticeWatchLauncher.launchIfWatchAvailable()
             }
-            .buttonStyle(.plain)
-            
-            // Clinic Wand Button
-            Button {
-                showClinicSetup = true
-                hapticTrigger += 1
-            } label: {
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Theme.iconTile)
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(Theme.iconTileEdge.opacity(0.85), lineWidth: 1))
-                    )
+            hapticTrigger += 1
+            logSession = s
+        } label: {
+            HStack(spacing: 9) {
+                BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
+                    .shadow(color: .black.opacity(0.24), radius: 2, y: 1)
+                Text(activeSession.map {
+                        "RESUME PRACTICE · \($0.attempts.count) REP\($0.attempts.count == 1 ? "" : "S")"
+                     } ?? "START PRACTICE")
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(1.5)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Start Quick Clinic")
+            .foregroundStyle(Theme.accentText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.accent)
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(.white.opacity(0.28), lineWidth: 1))
+                    .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 4)
@@ -944,124 +885,4 @@ struct HomeView: View {
         .padding(.top, 40)
     }
 
-    private func startClinic(matCount: Int, goalRate: Int) {
-        let schema = Schema([Team.self, StuntGroup.self, PracticeSession.self, Attempt.self, UnlockedMilestone.self, CustomOutcome.self, CustomTally.self, OutcomeTemplate.self])
-        guard let container = try? ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
-            print("❌ Failed to create in-memory container for Quick Clinic")
-            return
-        }
-        
-        let clinicContext = container.mainContext
-        
-        // Insert a new Team named "Guest Clinic" (or user custom name)
-        let guestTeam = Team(name: "Guest Clinic", orderIndex: 0)
-        clinicContext.insert(guestTeam)
-        
-        // Insert matCount groups named "Mat 1" to "Mat N"
-        for i in 1...matCount {
-            let group = StuntGroup(name: "Mat \(i)", number: i, orderIndex: i - 1)
-            group.team = guestTeam
-            clinicContext.insert(group)
-        }
-        
-        // Insert an active PracticeSession
-        let activeSession = PracticeSession()
-        clinicContext.insert(activeSession)
-        
-        do {
-            try clinicContext.save()
-            let logger = Logger(subsystem: "com.ianrichardson.HitRate", category: "Clinic")
-            logger.notice("🟢 startClinic: saved guestTeam & \(matCount) mats.")
-            
-            // Set clinic states
-            self.clinicGoalRate = goalRate
-            self.clinicContainer = container
-            self.clinicSessionToLog = activeSession
-        } catch {
-            let logger = Logger(subsystem: "com.ianrichardson.HitRate", category: "Clinic")
-            logger.error("❌ Failed to save clinic setup: \(error)")
-        }
-    }
-    
-    private func archiveClinicSession(clinicContext: ModelContext, mainContext: ModelContext) {
-        // 1. Fetch the clinic team
-        let teamsDescriptor = FetchDescriptor<Team>()
-        guard let clinicTeams = try? clinicContext.fetch(teamsDescriptor),
-              let clinicTeam = clinicTeams.first else {
-            return
-        }
-        
-        // Create persistent team
-        let persistentTeam = Team(name: clinicTeam.name, orderIndex: teams.count)
-        persistentTeam.createdAt = clinicTeam.createdAt
-        mainContext.insert(persistentTeam)
-        
-        // 2. Fetch the custom outcomes of the clinic team (if any)
-        let customOutcomesDescriptor = FetchDescriptor<CustomOutcome>()
-        let clinicCustomOutcomes = (try? clinicContext.fetch(customOutcomesDescriptor)) ?? []
-        var customOutcomeMap: [UUID: CustomOutcome] = [:]
-        for co in clinicCustomOutcomes {
-            let newCo = CustomOutcome(name: co.name, colorIndex: co.colorIndex, orderIndex: co.orderIndex)
-            newCo.team = persistentTeam
-            mainContext.insert(newCo)
-            customOutcomeMap[co.id] = newCo
-        }
-        
-        // 3. Fetch clinic groups
-        let groupsDescriptor = FetchDescriptor<StuntGroup>()
-        let clinicGroups = (try? clinicContext.fetch(groupsDescriptor)) ?? []
-        
-        // Create persistent groups and map them
-        var groupMap: [UUID: StuntGroup] = [:]
-        for g in clinicGroups {
-            let newGroup = StuntGroup(name: g.name, number: g.number, orderIndex: g.orderIndex, kind: g.kind)
-            newGroup.team = persistentTeam
-            newGroup.outcomeDefsRaw = g.outcomeDefsRaw
-            newGroup.outcomeOverridesRaw = g.outcomeOverridesRaw
-            newGroup.categoryRaw = g.categoryRaw
-            newGroup.deletedAt = g.deletedAt
-            mainContext.insert(newGroup)
-            groupMap[g.id] = newGroup
-        }
-        
-        // 4. Fetch clinic sessions
-        let sessionsDescriptor = FetchDescriptor<PracticeSession>()
-        let clinicSessions = (try? clinicContext.fetch(sessionsDescriptor)) ?? []
-        
-        // Create persistent sessions, attempts and custom tallies
-        for s in clinicSessions {
-            let newSession = PracticeSession(startedAt: s.startedAt)
-            newSession.endedAt = s.endedAt
-            mainContext.insert(newSession)
-            
-            // Replicate attempts
-            for a in s.sortedAttempts {
-                guard let epGroup = a.group, let persGroup = groupMap[epGroup.id] else { continue }
-                let newAttempt = Attempt(slot: a.outcomeRaw, group: persGroup, session: newSession, timestamp: a.timestamp, waveID: a.waveID)
-                mainContext.insert(newAttempt)
-            }
-            
-            // Replicate custom tallies (if any)
-            let talliesDescriptor = FetchDescriptor<CustomTally>()
-            let clinicTallies = (try? clinicContext.fetch(talliesDescriptor)) ?? []
-            for t in clinicTallies {
-                guard t.session?.id == s.id else { continue }
-                guard let epGroup = t.group, let persGroup = groupMap[epGroup.id] else { continue }
-                // Find custom outcome
-                guard let epCo = t.outcome, let persCo = customOutcomeMap[epCo.id] else { continue }
-                let newTally = CustomTally(outcome: persCo, group: persGroup, session: newSession, timestamp: t.timestamp)
-                mainContext.insert(newTally)
-            }
-        }
-        
-        do {
-            try mainContext.save()
-            // Set current team to the archived clinic team so it opens on the dashboard immediately!
-            currentTeamID = persistentTeam.id.uuidString
-            // Re-sync achievements/milestones for the main store
-            Milestones.sync(sessions: sessions, groups: groups, mode: mode, unlocked: unlockedMilestones, context: mainContext)
-        } catch {
-            print("❌ Failed to archive clinic session: \(error)")
-        }
-    }
 }

@@ -638,7 +638,7 @@ final class StuntGroup {
     /// reps for that skill anyway, so it just needs to not collide visually
     /// with a real, populated chip. Cards should read THIS, not
     /// `outcomeWords` (word-only, pre-dates the flexible label+color+credit
-    /// system and stays behind for QuickClinic).
+    /// system).
     var tierOutcomeDefs: [OutcomeDef] {
         let defs = outcomeDefs
         let presetDefaults = category.defaultOutcomeDefs

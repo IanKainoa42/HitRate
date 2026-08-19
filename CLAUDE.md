@@ -101,8 +101,7 @@ Key invariants:
   2026-06-06 (practice is occasional; the dashboard is the app). The counter
   is `CaptureView(session:)` in a fullScreenCover off Home's floating practice
   pill; the pill resumes a live session or creates one (the ONLY place
-  sessions are created for normal practice — Quick Clinic sessions are a
-  separate flow, below). "End" returns to Home; an empty session is left live
+  sessions are created). "End" returns to Home; an empty session is left live
   and swept in Home's cover `onDismiss` (deleting a model the cover still
   renders crashes mid-dismiss). The stale-session/orphan sweeps hang off
   RootView's root `Group` — keep them attached when touching RootView. NO
@@ -274,16 +273,8 @@ Key invariants:
   long-press decrement would re-increment on lift). The custom "issues" pad
   (skill pivot only, user-created outcomes) is a separate, still-immediate
   tap-to-add-one/hold-to-remove-one tally, NOT part of wave staging.
-  `Views/Log/LogView.swift` is now CLINIC-ONLY (`isClinic: true`, reached via
-  Home's Quick Clinic setup sheet into its own ephemeral SwiftData container —
-  never the normal practice pill). It keeps its own TWO layouts: **Pad**
-  (pick one group from the horizontal scroll, then hammer the 4 outcome wells
-  — per-skill kind labels, still immediate tap-to-log) and **Grid** (`logGrid`
-  — the whole roster as a groups×outcomes matrix; single-kind rosters only,
-  `gridAvailable`, via the `MiniSeg` Grid⇄Pad toggle persisted in
-  `practiceLayout`). Grid, like CaptureView's matrix, is wave-staging-only
-  (no toggle, same stage/commit/`waveBar` mechanics) — Pad is the one place
-  in the app that still logs immediately, since Pad isn't "the grid."
+  `CaptureView` is the ONLY logger — the old `Views/Log/LogView.swift` (Pad /
+  Grid layouts) went out with the Quick Clinic feature on 2026-08-19.
   **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
