@@ -1,5 +1,6 @@
-Your reps can now follow you to a new phone.
+Your reps and shared folders are safer and more reliable.
 
-• Save your account with Apple or Google. Your folders, reps, and shared rosters come with you — and if you've used HitRate before, signing in brings them back.
-• Fixed a crash that could close the app when deleting a folder.
-• Syncing is steadier, so reps keep saving reliably in the background.
+• Deleted or missing folders now fail cleanly when someone tries an old join code.
+• Removing someone from a shared roster revokes their access without deleting their historical reps.
+• Clinic sessions can now be saved directly to your permanent roster.
+• Save your account with Apple or Google so your folders, reps, and shared rosters follow you to a new phone.

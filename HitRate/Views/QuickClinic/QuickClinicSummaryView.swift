@@ -1,6 +1,16 @@
 import SwiftUI
 import SwiftData
 
+enum QuickClinicArchiveDestination: Equatable {
+    case archive
+}
+
+enum QuickClinicArchivePolicy {
+    static func destination(purchasesAvailable: Bool) -> QuickClinicArchiveDestination {
+        .archive
+    }
+}
+
 struct QuickClinicSummaryView: View {
     @Environment(\.dismiss) private var dismiss
     
@@ -12,7 +22,6 @@ struct QuickClinicSummaryView: View {
     var onDiscard: () -> Void
     
     @State private var showShareCards = false
-    @State private var showPaywall = false
     @State private var showExitWarning = false
     @State private var isArchived = false
     
@@ -214,14 +223,9 @@ struct QuickClinicSummaryView: View {
                 mode: .coach
             )
         }
-        .sheet(isPresented: $showPaywall) {
-            PremiumPaywallSheet {
-                performArchive()
-            }
-        }
         .sheet(isPresented: $showExitWarning) {
             QuickClinicExitWarningSheet(attemptsCount: stats.total) {
-                showPaywall = true
+                performArchive()
             } onDiscard: {
                 showExitWarning = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -242,11 +246,9 @@ struct QuickClinicSummaryView: View {
     }
     
     private func handleSave() {
-        let isPro = UserDefaults.standard.bool(forKey: "isHitRatePro")
-        if isPro {
+        switch QuickClinicArchivePolicy.destination(purchasesAvailable: false) {
+        case .archive:
             performArchive()
-        } else {
-            showPaywall = true
         }
     }
     

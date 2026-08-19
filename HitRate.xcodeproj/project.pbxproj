@@ -50,8 +50,8 @@
 		A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */; };
 		A229FB48DF487E38D13FD8FC /* WeeklyTournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */; };
 		A23C5536F6A93FD23AF8201F /* SeededRNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = D047AEE6F79270EE4548869F /* SeededRNG.swift */; };
+		A24F01C746D5BFFE22FE3A3B /* QuickClinicArchivePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E0A47E080D8463ED13D6D6 /* QuickClinicArchivePolicyTests.swift */; };
 		A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138B89E3489E75197EA700F8 /* Sounds.swift */; };
-		A6B063D90E22AE3A3D79C92D /* PremiumPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A534562CEDB6CC6C852F51B /* PremiumPaywallSheet.swift */; };
 		A945591D0A1989368FC3D909 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D2EBDF727517B7CF1CB8A6AA /* FirebaseAuth */; };
 		ABFF0225BC9FABBBB17656D3 /* WatchSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C15802783EEC8B5EC244962 /* WatchSyncTests.swift */; };
 		ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD703A6A661621DEEE37E48 /* QuickClinicTests.swift */; };
@@ -140,7 +140,6 @@
 		35BF9F1654CE44D595A576C6 /* CheerRulesKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CheerRulesKit; path = ../CheerRulesKit; sourceTree = SOURCE_ROOT; };
 		370E93B7A33E3347D40365F5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		3A436FC34AF005E2FBE847B8 /* HitRate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRate.entitlements; sourceTree = "<group>"; };
-		3A534562CEDB6CC6C852F51B /* PremiumPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumPaywallSheet.swift; sourceTree = "<group>"; };
 		3B9E2BC0A4095CA11B4B4114 /* QuickClinicExitWarningSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickClinicExitWarningSheet.swift; sourceTree = "<group>"; };
 		3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveCardView.swift; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
@@ -160,6 +159,7 @@
 		63F298FD21B0F9D975766C0E /* MinBuildGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinBuildGate.swift; sourceTree = "<group>"; };
 		682FC96676B2F3C23E0A2C50 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
+		69E0A47E080D8463ED13D6D6 /* QuickClinicArchivePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickClinicArchivePolicyTests.swift; sourceTree = "<group>"; };
 		6B06141B674607C1343BF33B /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
 		6D653ADB1DFF52C863B43EE3 /* HitRateWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HitRateWatch.entitlements; sourceTree = "<group>"; };
 		724ED0A599E2826857191AD3 /* DataManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManagementView.swift; sourceTree = "<group>"; };
@@ -228,7 +228,6 @@
 		1C04F224AB10433F95DEC719 /* QuickClinic */ = {
 			isa = PBXGroup;
 			children = (
-				3A534562CEDB6CC6C852F51B /* PremiumPaywallSheet.swift */,
 				3B9E2BC0A4095CA11B4B4114 /* QuickClinicExitWarningSheet.swift */,
 				51DAAD48087C7E2E3F0D493C /* QuickClinicSetupSheet.swift */,
 				0742D2161B1FF1918B93F623 /* QuickClinicSummaryView.swift */,
@@ -384,6 +383,7 @@
 			isa = PBXGroup;
 			children = (
 				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
+				69E0A47E080D8463ED13D6D6 /* QuickClinicArchivePolicyTests.swift */,
 				8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */,
 				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
 				7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */,
@@ -624,7 +624,6 @@
 				D9E1104B0EB188559FA6F688 /* Models.swift in Sources */,
 				B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */,
 				717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */,
-				A6B063D90E22AE3A3D79C92D /* PremiumPaywallSheet.swift in Sources */,
 				79BF82BB2D994340B99FB722 /* PuckView.swift in Sources */,
 				C99416CD5862BBED4B7E884F /* QuickClinicExitWarningSheet.swift in Sources */,
 				2D6D391FD8A6ACCE8E245799 /* QuickClinicSetupSheet.swift in Sources */,
@@ -658,6 +657,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
+				A24F01C746D5BFFE22FE3A3B /* QuickClinicArchivePolicyTests.swift in Sources */,
 				C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */,
 				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,
 				C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */,
@@ -700,7 +700,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 33;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -718,7 +718,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 33;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.6;
@@ -857,7 +857,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 33;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -915,7 +915,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 33;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
