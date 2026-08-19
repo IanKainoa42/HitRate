@@ -57,6 +57,7 @@
 		ADCC96CFDF7B808E45A4D6AD /* QuickClinicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD703A6A661621DEEE37E48 /* QuickClinicTests.swift */; };
 		B64293AA2738006C83B9FB47 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */; };
 		B6B85D818F2E16B83D464F1D /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C73FC00D8B4C2B7F5CEF7A /* SyncEngine.swift */; };
+		B8BB525D1C79B70A104182EC /* WatchLogWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D6820731E484F1579899A7 /* WatchLogWriter.swift */; };
 		BA5DE252AC6CBCD0335F8489 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3585336DE27B6B9C9A0D63D1 /* SpaceGrotesk-Bold.ttf */; };
 		BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD34ACD23F8DA7A6168614F /* Components.swift */; };
 		BE401B0188A6A9D911D39B30 /* SessionTapeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */; };
@@ -169,6 +170,7 @@
 		8CACDF028181ABDC147D68BB /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngineTests.swift; sourceTree = "<group>"; };
 		947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutManager.swift; sourceTree = "<group>"; };
+		99D6820731E484F1579899A7 /* WatchLogWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogWriter.swift; sourceTree = "<group>"; };
 		9C7E3006F9D9D6763DFA5E8D /* ExecutionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionCard.swift; sourceTree = "<group>"; };
 		9E30AC6D5D161DB570B82771 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWatchLauncher.swift; sourceTree = "<group>"; };
@@ -397,6 +399,7 @@
 			isa = PBXGroup;
 			children = (
 				AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */,
+				99D6820731E484F1579899A7 /* WatchLogWriter.swift */,
 				E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */,
 				0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */,
 			);
@@ -644,6 +647,7 @@
 				14C31D70B78C11075ADB2741 /* Theme.swift in Sources */,
 				491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */,
 				4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */,
+				B8BB525D1C79B70A104182EC /* WatchLogWriter.swift in Sources */,
 				87356318218FD967A8EA2535 /* WatchLoggingSheet.swift in Sources */,
 				E314EC326B7808756D84F439 /* WatchPayloads.swift in Sources */,
 				908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */,

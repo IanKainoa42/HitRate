@@ -229,30 +229,11 @@ struct RootView: View {
     }
 
     private func handleWatchLog(_ request: WatchLogRequest) -> WatchRosterSnapshot? {
-        guard let group = watchGroups.first(where: { $0.id == request.groupID }),
-              let outcome = Outcome(rawValue: request.outcomeRaw) else {
-            return nil
-        }
-
-        let session: PracticeSession
-        if let live = activeSession {
-            session = live
-        } else {
-            session = PracticeSession(startedAt: request.timestamp)
-            context.insert(session)
-        }
-
-        let attempt = Attempt(outcome: outcome,
-                              group: group,
-                              session: session,
-                              subject: watchLogSubject,
-                              timestamp: request.timestamp)
-        // The wrist is this phone's user logging — stamp the attribution now so
-        // co-logged folders read right before anything syncs (same rule as
-        // CaptureView's commit).
-        attempt.loggerID = auth.uid ?? ""
-        context.insert(attempt)
-        try? context.save()
+        let writer = WatchLogWriter(context: context)
+        guard writer.log(request,
+                         groups: watchGroups,
+                         subject: watchLogSubject,
+                         loggerID: auth.uid ?? "") else { return nil }
         return watchSnapshot
     }
 

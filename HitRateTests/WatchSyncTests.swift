@@ -1,7 +1,19 @@
 import XCTest
+import SwiftData
 @testable import HitRate
 
 final class WatchSyncTests: XCTestCase {
+    private struct LegacyWatchRosterSnapshot: Encodable {
+        var modeRaw: String
+        var teamName: String
+        var noun: String
+        var nounPlural: String
+        var groups: [WatchGroupSnapshot]
+        var selectedGroupID: UUID?
+        var activeSessionReps: Int
+        var generatedAt: Date
+    }
+
     func testWatchRosterSnapshotCodecRoundTrip() throws {
         let groupID = UUID()
         let outcomes = [
@@ -60,6 +72,66 @@ final class WatchSyncTests: XCTestCase {
         XCTAssertNotNil(decoded)
         XCTAssertEqual(decoded?.groupID, groupID)
         XCTAssertEqual(decoded?.outcomeRaw, 0)
+    }
+
+    func testLegacyRosterWithoutPracticeFlagDefaultsToNotLive() throws {
+        let legacy = LegacyWatchRosterSnapshot(
+            modeRaw: "athlete",
+            teamName: "My Skills",
+            noun: "skill",
+            nounPlural: "skills",
+            groups: [],
+            selectedGroupID: nil,
+            activeSessionReps: 0,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let message: [String: Any] = [
+            WatchPayloadCodec.typeKey: WatchPayloadCodec.snapshot,
+            WatchPayloadCodec.dataKey: try JSONEncoder().encode(legacy),
+        ]
+
+        let decoded = WatchPayloadCodec.decode(WatchRosterSnapshot.self, from: message)
+
+        XCTAssertNotNil(decoded)
+        XCTAssertEqual(decoded?.isPracticeLive, false)
+    }
+
+    @MainActor
+    func testRedeliveredWatchRequestOnlyWritesOneAttempt() throws {
+        let schema = Schema([
+            Team.self, StuntGroup.self, PracticeSession.self, Attempt.self,
+            PendingCloudDeletion.self, UnlockedMilestone.self, CustomOutcome.self,
+            CustomTally.self, Subject.self, OutcomeTemplate.self,
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+        )
+        let context = container.mainContext
+        let team = Team(name: "Varsity", orderIndex: 0)
+        let group = StuntGroup(name: "Full Up", number: 1, orderIndex: 0)
+        group.team = team
+        context.insert(team)
+        context.insert(group)
+        try context.save()
+
+        let request = WatchLogRequest(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            groupID: group.id,
+            outcomeRaw: Outcome.hit.rawValue,
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let writer = WatchLogWriter(context: context)
+
+        XCTAssertTrue(writer.log(request, groups: [group], subject: nil, loggerID: "coach"))
+        XCTAssertTrue(writer.log(request, groups: [group], subject: nil, loggerID: "coach"))
+
+        let attempts = try context.fetch(FetchDescriptor<Attempt>())
+        let sessions = try context.fetch(FetchDescriptor<PracticeSession>())
+        XCTAssertEqual(attempts.count, 1)
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(attempts.first?.cloudID, "watch-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")
+        XCTAssertEqual(attempts.first?.loggerID, "coach")
     }
 
     func testScreenshotDemoSnapshot() {

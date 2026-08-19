@@ -1,6 +1,18 @@
 import Foundation
 
 struct WatchRosterSnapshot: Codable, Equatable {
+    private enum CodingKeys: String, CodingKey {
+        case modeRaw
+        case teamName
+        case noun
+        case nounPlural
+        case groups
+        case selectedGroupID
+        case activeSessionReps
+        case isPracticeLive
+        case generatedAt
+    }
+
     var modeRaw: String
     var teamName: String
     var noun: String
@@ -57,6 +69,21 @@ struct WatchRosterSnapshot: Codable, Equatable {
                                         outcomes: outcomes)],
             selectedGroupID: id, activeSessionReps: 17, generatedAt: .now)
     }()
+}
+
+extension WatchRosterSnapshot {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        modeRaw = try values.decode(String.self, forKey: .modeRaw)
+        teamName = try values.decode(String.self, forKey: .teamName)
+        noun = try values.decode(String.self, forKey: .noun)
+        nounPlural = try values.decode(String.self, forKey: .nounPlural)
+        groups = try values.decode([WatchGroupSnapshot].self, forKey: .groups)
+        selectedGroupID = try values.decodeIfPresent(UUID.self, forKey: .selectedGroupID)
+        activeSessionReps = try values.decode(Int.self, forKey: .activeSessionReps)
+        isPracticeLive = try values.decodeIfPresent(Bool.self, forKey: .isPracticeLive) ?? false
+        generatedAt = try values.decode(Date.self, forKey: .generatedAt)
+    }
 }
 
 struct WatchGroupSnapshot: Codable, Equatable, Identifiable {
