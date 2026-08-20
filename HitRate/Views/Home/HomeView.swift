@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import os
 
 struct HomeView: View {
     /// Return to the folder-list home. Nil when Home is shown standalone.
