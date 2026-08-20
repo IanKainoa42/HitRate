@@ -12,6 +12,7 @@ struct HomeView: View {
     @Query(sort: \Subject.orderIndex) private var allSubjects: [Subject]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var unlockedMilestones: [UnlockedMilestone]
+    @Query(sort: \PracticePage.orderIndex) private var allPages: [PracticePage]
 
     /// Co-logging: needed to tell the folder owner's reps from a member's.
     @EnvironmentObject private var auth: AuthViewModel
@@ -41,6 +42,13 @@ struct HomeView: View {
     @State private var newTeamName = ""
     @State private var showIconGuide = false
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
+    /// Which page (if any) the cover should run — nil = the freeform counter.
+    /// Set BEFORE logSession so the cover content branch sees it; cleared in
+    /// endOfPractice so a later resume opens the counter.
+    @State private var pendingPage: PracticePage?
+    @State private var startSheetOpen = false          // pre-practice chooser
+    @State private var builderOpen = false             // page builder sheet
+    @State private var editingPage: PracticePage?      // builder edit target
     @State private var hapticTrigger = 0
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
@@ -49,6 +57,7 @@ struct HomeView: View {
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
     private var subjects: [Subject] { allSubjects.inTeam(currentTeam) }
+    private var pages: [PracticePage] { allPages.inTeam(currentTeam) }
 
     /// Which axis the person filter runs on — a person (athlete) or a stunt
     /// group (coach), mirroring the capture pivot.
@@ -232,13 +241,29 @@ struct HomeView: View {
         .background(FloorBackdrop().ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
         .fullScreenCover(isPresented: $shareOpen) {
-            // Milestones are lifetime — deliberately not filtered by timeframe.
-            ShareCardsSheet(stats: stats,
-                            milestones: Milestones.evaluate(sessions: sessions,
-                                                            groups: groups, mode: mode, unlocked: unlockedMilestones),
+            // Cards are the season record: lifetime numbers, never the Home
+            // timeframe (person/skill filters still apply — an athlete's deck
+            // is a real thing). Milestones and the card ladder are lifetime
+            // by the same rule.
+            let shareStats = StatsEngine.compute(sessions: sessions, groups: filteredGroups,
+                                                 timeframe: .all, subject: activePerson,
+                                                 logger: loggerFilter)
+            let shareMilestones = Milestones.evaluate(sessions: sessions, groups: groups,
+                                                      mode: mode, unlocked: unlockedMilestones)
+            // The ladder describes the CARD's lifetime, so it only rides along
+            // on the unfiltered deck — a person/logger-filtered deck showing
+            // lifetime badges and band colors against a 4-rep filtered rate
+            // would defeat the small-sample grey exactly where it matters.
+            let unfiltered = activePerson == nil && !loggerFilter.isActive
+            ShareCardsSheet(stats: shareStats,
+                            milestones: shareMilestones,
                             teamName: shareTeamName,
                             orgName: identityLabel,
-                            mode: mode)
+                            mode: mode,
+                            standings: unfiltered ? CardStandings.compute(
+                                groups: filteredGroups,
+                                milestones: shareMilestones,
+                                cups: WeeklyLeague.cupHistory(sessions: sessions, groups: groups)) : nil)
         }
         .fullScreenCover(isPresented: $trophyOpen) {
             TrophyRoomView(sessions: sessions, groups: groups, mode: mode,
@@ -252,7 +277,26 @@ struct HomeView: View {
             }
         }
         .fullScreenCover(item: $logSession, onDismiss: endOfPractice) { s in
-            CaptureView(session: s)
+            // One cover, two run modes: a page run when a page rode along
+            // with the session, the freeform counter otherwise. Same session
+            // lifecycle either way (endOfPractice sweeps an empty live one).
+            if let page = pendingPage {
+                PageRunView(page: page, session: s, slots: page.slots(in: groups))
+            } else {
+                CaptureView(session: s)
+            }
+        }
+        .sheet(isPresented: $startSheetOpen) {
+            PracticeStartSheet(
+                pages: pages, groups: groups,
+                onFreeform: { afterSheetDismiss { startFreeform() } },
+                onRunPage: { page in afterSheetDismiss { startPage(page) } },
+                onNewPage: { afterSheetDismiss { editingPage = nil; builderOpen = true } },
+                onEditPage: { page in afterSheetDismiss { editingPage = page; builderOpen = true } })
+        }
+        .sheet(isPresented: $builderOpen) {
+            PageBuilderView(team: currentTeam,
+                            existing: editingPage, nextOrderIndex: allPages.count)
         }
         .sheet(isPresented: $savePromptOpen) {
             SaveAccountPrompt(repCount: loggedRepCount)
@@ -379,20 +423,19 @@ struct HomeView: View {
     /// The one RAISED element on the dashboard — everything else is inset.
     private var practiceCTA: some View {
         Button {
-            let s: PracticeSession
             if let live = activeSession {
-                s = live
+                // A live session always resumes straight into the counter —
+                // every rep from any run path is visible there.
+                pendingPage = nil
+                hapticTrigger += 1
+                logSession = live
+            } else if pages.isEmpty {
+                // No saved pages: zero-friction straight into practice,
+                // exactly as before pages existed.
+                startFreeform()
             } else {
-                s = PracticeSession()
-                context.insert(s)
-                try? context.save()
-                Sounds.shared.play(.start)
-                // Wake the Apple Watch app so reps can be logged from the wrist
-                // the instant practice begins (no-op without an installed watch).
-                PracticeWatchLauncher.launchIfWatchAvailable()
+                startSheetOpen = true
             }
-            hapticTrigger += 1
-            logSession = s
         } label: {
             HStack(spacing: 9) {
                 BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
@@ -415,6 +458,14 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // The only path to CREATE the first page (a tap with zero pages goes
+        // straight to freeform on purpose, which would otherwise make pages
+        // unreachable). Once a page exists, a plain tap offers the sheet too.
+        .contextMenu {
+            Button {
+                startSheetOpen = true
+            } label: { Label("Run or build a page", systemImage: "square.grid.3x3") }
+        }
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 4)
@@ -441,7 +492,44 @@ struct HomeView: View {
     /// Practice just closed. Sweep the empty session first (deleting a model the
     /// cover is still rendering crashes mid-dismiss), then — once, and only once
     /// the user actually has reps to lose — offer to save the account.
+    /// Fresh-session side effects shared by the freeform and page paths —
+    /// sound, watch wake, haptic. Returns the inserted live session.
+    private func startSession() -> PracticeSession {
+        let s = PracticeSession()
+        context.insert(s)
+        try? context.save()
+        Sounds.shared.play(.start)
+        // Wake the Apple Watch app so reps can be logged from the wrist
+        // the instant practice begins (no-op without an installed watch).
+        PracticeWatchLauncher.launchIfWatchAvailable()
+        hapticTrigger += 1
+        return s
+    }
+
+    private func startFreeform() {
+        // The delayed start can race a re-opened presentation (user tapped the
+        // pill again inside the dismiss window) — presenting the cover under a
+        // live sheet drops it and strands the session. Skip; they'll re-choose.
+        guard logSession == nil, !startSheetOpen, !builderOpen else { return }
+        pendingPage = nil
+        logSession = activeSession ?? startSession()
+    }
+
+    private func startPage(_ page: PracticePage) {
+        guard logSession == nil, !startSheetOpen, !builderOpen else { return }
+        pendingPage = page
+        logSession = activeSession ?? startSession()
+    }
+
+    /// Run a follow-up presentation only after the chooser sheet has actually
+    /// dismissed — presenting from inside another presentation's teardown
+    /// drops silently often enough to matter (same rule as the save prompt).
+    private func afterSheetDismiss(_ action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: action)
+    }
+
     private func endOfPractice() {
+        pendingPage = nil
         sweepEmptyLiveSessions()
         guard AccountPromptPolicy.offersSaveAfterPractice(isUpgraded: auth.isUpgraded,
                                                           alreadyAsked: askedSaveAccount,

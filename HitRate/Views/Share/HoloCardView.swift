@@ -18,6 +18,9 @@ struct CardSpec: Identifiable {
     // card, which spans every skill and stays generic on purpose.
     var category: SkillCategory? = nil
     var outcomeDefs: [OutcomeDef]? = nil
+    // Card-ladder position (lifetime reps + earned badges) — nil renders the
+    // pre-ladder flat card (legacy callers, the render harness).
+    var standing: CardStanding? = nil
 
     /// The single non-hit outcome this card logged the most of, by its own
     /// word (or the generic one on the aggregate card) — nil if it's a clean
@@ -28,21 +31,30 @@ struct CardSpec: Identifiable {
         return outcomeDefs?[worst.slot].label ?? Outcome(rawValue: worst.slot)?.label(kind)
     }
 
-    static func deck(from stats: FloorStats, teamName: String, mode: AppMode) -> [CardSpec] {
+    static func deck(from stats: FloorStats, teamName: String, mode: AppMode,
+                     standings: CardStandings? = nil) -> [CardSpec] {
         var cards: [CardSpec] = [
             CardSpec(id: 0, kicker: mode == .athlete ? "ALL SKILLS" : "FULL FLOOR",
                      name: teamName, badge: "★",
                      color: Theme.electric, rate: stats.rate, counts: stats.overall,
                      total: stats.total, delta: stats.delta, flavorNoun: mode.noun,
-                     kind: stats.aggregateKind)
+                     kind: stats.aggregateKind, standing: standings?.team)
         ]
-        for (i, g) in stats.ranked.enumerated() where g.total > 0 {
+        // Ranked cards with data first; with the ladder in play, zero-rep
+        // buckets follow as MINTED cards — every skill you track has a card
+        // from the moment it's created, blank until reps fill it in.
+        let ranked = stats.ranked
+        let ordered = standings == nil
+            ? ranked.filter { $0.total > 0 }
+            : ranked.filter { $0.total > 0 } + ranked.filter { $0.total == 0 }
+        for (i, g) in ordered.enumerated() {
             cards.append(CardSpec(
                 id: i + 1, kicker: "\(mode.nounTitle.uppercased()) \(g.number)",
                 name: g.name, badge: "\(g.number)",
                 color: Theme.groupColor(g.colorIndex), rate: g.rate, counts: g.counts,
                 total: g.total, delta: g.delta, flavorNoun: mode.noun, kind: g.kind,
-                category: g.category, outcomeDefs: g.tierDefs))
+                category: g.category, outcomeDefs: g.tierDefs,
+                standing: standings?.standing(for: g.id)))
         }
         return cards
     }
@@ -99,11 +111,25 @@ struct HoloCardView: View {
 
     private var rarity: Rarity {
         switch card.content {
-        case .stats(let s): Rarity.stats(rate: s.rate, noun: s.flavorNoun,
-                                         category: s.category, dominantIssue: s.dominantIssueLabel,
-                                         seed: s.name.unicodeScalars.reduce(0) { $0 + Int($1.value) })
+        case .stats(let s):
+            // Ladder chrome when a standing rode in with the spec; the flat
+            // pre-ladder card otherwise (legacy callers, render harness).
+            if let standing = s.standing {
+                Rarity.staged(standing, rate: s.rate, noun: s.flavorNoun,
+                              category: s.category, dominantIssue: s.dominantIssueLabel,
+                              seed: s.name.unicodeScalars.reduce(0) { $0 + Int($1.value) })
+            } else {
+                Rarity.stats(rate: s.rate, noun: s.flavorNoun,
+                             category: s.category, dominantIssue: s.dominantIssueLabel,
+                             seed: s.name.unicodeScalars.reduce(0) { $0 + Int($1.value) })
+            }
         case .milestone(let m): Rarity.of(tier: m.tier)
         }
+    }
+
+    private var mintedCard: Bool {
+        if case .stats(let s) = card.content { return s.standing?.stage == .minted }
+        return false
     }
 
     private var locked: Bool { card.lockedMilestone != nil }
@@ -125,6 +151,15 @@ struct HoloCardView: View {
             if rarity.foil != .none && !locked {
                 foilSheen
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+            // A minted card is still a blank — dashed inner rule, like an
+            // unfilled sleeve.
+            if mintedCard {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [6, 5]))
+                    .foregroundStyle(.white.opacity(0.28))
                     .padding(8)
                     .allowsHitTesting(false)
             }
@@ -229,6 +264,9 @@ struct HoloCardView: View {
                 gauge(spec)
                 powerBar(spec)
                 energyChips(spec)
+                if let badges = spec.standing?.badges, !badges.isEmpty {
+                    badgeRow(badges)
+                }
                 Spacer(minLength: 0)
                 tagAndFlavor(rarity.flavor)
                 footer
@@ -261,13 +299,54 @@ struct HoloCardView: View {
     private func gauge(_ spec: CardSpec) -> some View {
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [spec.color.opacity(0.2), .clear],
+                .fill(RadialGradient(colors: [spec.color.opacity(mintedCard ? 0.08 : 0.2), .clear],
                                      center: .center, startRadius: 0, endRadius: 63))
                 .frame(width: 126, height: 126)
-            GaugeRing(rate: spec.rate, color: spec.color)
+            GaugeRing(rate: mintedCard ? 0 : spec.rate, color: spec.color,
+                      numberColor: numberColor(spec),
+                      display: mintedCard ? "—" : nil,
+                      caption: mintedCard ? "NO REPS YET" : "HIT RATE")
                 .frame(width: 116, height: 116)
         }
         .padding(.top, 2)
+    }
+
+    /// The ladder's one concession to rate: the number takes its band color —
+    /// but only once the card has a real sample under it. Under
+    /// `colorMinReps` it stays grey; without a standing (legacy callers) the
+    /// original plain white holds.
+    private func numberColor(_ spec: CardSpec) -> Color {
+        guard let standing = spec.standing else { return .white }
+        if standing.stage == .minted { return .white.opacity(0.35) }
+        return standing.hasBandColor ? Theme.rateColor(spec.rate) : .white.opacity(0.45)
+    }
+
+    /// Earned badges pinned to the card — power-ups stacked on the card that
+    /// earned them. Six pips, then a count for the rest.
+    private func badgeRow(_ badges: [CardBadge]) -> some View {
+        HStack(spacing: 5) {
+            ForEach(badges.prefix(6)) { b in
+                let tag = Rarity.of(tier: b.tier).tag
+                Image(systemName: b.icon)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(tag)
+                    .frame(width: 21, height: 21)
+                    .background(tag.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(tag.opacity(0.4), lineWidth: 1))
+            }
+            if badges.count > 6 {
+                Text("+\(badges.count - 6)")
+                    .font(Theme.grotesk(10, .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 13)
+        .padding(.top, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Badges: " + badges.map(\.label).joined(separator: ", "))
     }
 
     private func powerBar(_ spec: CardSpec) -> some View {
@@ -472,7 +551,9 @@ struct HoloCardView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-                if rarity.tier != "STATS" {
+                // Stars are milestone chrome only — ladder stages renamed the
+                // stat tier string, so gate on content, not the label.
+                if case .milestone = card.content {
                     StarsView(filled: rarity.stars)
                 }
                 Text("\(String(format: "%03d", index + 1))/\(String(format: "%03d", count))")
@@ -493,6 +574,9 @@ struct HoloCardView: View {
 struct GaugeRing: View {
     let rate: Int
     let color: Color
+    var numberColor: Color = .white      // ladder band color once earned
+    var display: String? = nil           // overrides the number ("—" on mint)
+    var caption: String = "HIT RATE"
 
     var body: some View {
         ZStack {
@@ -506,10 +590,10 @@ struct GaugeRing: View {
                 .padding(9)
                 .shadow(color: color.opacity(0.9), radius: 3.2)
             VStack(spacing: 4) {
-                Text("\(rate)")
+                Text(display ?? "\(rate)")
                     .font(Theme.grotesk(35))
-                    .foregroundStyle(.white)
-                Text("HIT RATE")
+                    .foregroundStyle(numberColor)
+                Text(caption)
                     .font(Theme.grotesk(9))
                     .tracking(1.44)
                     .foregroundStyle(.white.opacity(0.55))

@@ -42,9 +42,12 @@ enum OnboardingFocus: String, CaseIterable, Identifiable {
     }
 }
 
-/// First launch: choose who's counting (athlete vs coach), name the identity,
-/// and create the first skills/groups. Nothing is pre-seeded — every bucket
-/// in the app is one the user made. Rendered in the brand register ("court at
+/// First launch: name your DECK (one screen — the deck name plus a
+/// mine/my-team's toggle that quietly sets AppMode), then MINT the first
+/// cards. The old two-screen chooser+identity form dissolved into the card
+/// metaphor 2026-08-19: every skill you track gets a card, blank until reps
+/// fill it in (see CardStage.swift). Nothing is pre-seeded — every card in
+/// the app is one the user minted. Rendered in the brand register ("court at
 /// night") since it's the app's first impression.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var context
@@ -63,7 +66,14 @@ struct OnboardingView: View {
     @State private var mode: AppMode?
     @State private var draft = ""
     @State private var focus: OnboardingFocus = .stunts
-    @State private var pending: [(name: String, focus: OnboardingFocus)] = []   // skills created on finish
+    @State private var pending: [(name: String, focus: OnboardingFocus)] = []   // cards minted on finish
+
+    // Deck cover (step 1) — the deck name is buffered locally (it becomes the
+    // Team name at commit, not an AppStorage field), and the mine/team toggle
+    // is held as pendingMode until "Mint the first card" advances.
+    @State private var deckName = ""
+    @State private var pendingMode: AppMode = .athlete
+    @State private var seededCover = false
 
     // Step 0 — save/restore. Front-loaded on purpose: signing in here is the
     // ONLY path that RESTORES a previous install's folders, because
@@ -82,6 +92,11 @@ struct OnboardingView: View {
     @State private var practiceGroup: StuntGroup?
     @State private var practiceSession: PracticeSession?
     @State private var practiceTaps = 0
+    /// Per-outcome tally + a brief flash on the tile just tapped — the first
+    /// tap in the app has to visibly land.
+    @State private var practiceCounts: [Int: Int] = [:]
+    @State private var practiceFlash: Int?
+    @State private var practiceFlashTask: Task<Void, Never>?
 
     /// Names already on the current roster — on an intro replay the chips
     /// shouldn't offer buckets the user already has.
@@ -105,7 +120,7 @@ struct OnboardingView: View {
             } else if let mode {
                 setup(mode)
             } else {
-                chooser
+                deckCover
             }
         }
         .animation(.easeOut(duration: 0.25), value: mode)
@@ -204,75 +219,133 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: Step 1 — who's counting
+    // MARK: Step 1 — the deck cover
 
-    private var chooser: some View {
+    /// One screen instead of the old chooser+identity pair: name the deck,
+    /// say whose it is (which quietly IS the athlete/coach mode choice — it
+    /// only changes vocabulary and whose name rides the cards), and go mint.
+    private var deckCover: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer()
             IconWordmark(size: 34, rateFill: Theme.navy, dotSize: 15)
                 .padding(.bottom, 2)
-            Text("Who's counting?")
+            Text("Start your deck")
                 .font(Theme.grotesk(30))
                 .foregroundStyle(.white)
-            Text("Every stunt rep gets logged. Pick how you'll use it — you can switch later.")
+            Text("Every skill you track gets its own card — blank on day one, filled in by reps. It all lives in this deck.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.6))
-                .padding(.bottom, 10)
+                .padding(.bottom, 6)
 
-            modeCard(
-                icon: "figure.gymnastics", tint: Theme.electric,
-                title: "Just me",
-                sub: "Track my own skills — every hit, bobble, and fall."
-            ) { mode = .athlete }
+            deckBox
 
-            modeCard(
-                icon: "person.3.fill", tint: Theme.coral,
-                title: "I coach a team",
-                sub: "Track multiple stunt groups across the floor."
-            ) { mode = .coach }
+            glassField("Name your deck (e.g. Ravens Black)", text: $deckName)
+
+            HStack(spacing: 8) {
+                ownershipPill(.coach, "My team's deck", icon: "person.3.fill")
+                ownershipPill(.athlete, "Just mine", icon: "figure.gymnastics")
+            }
+
+            // The one identity the cards actually print — contextual, on the
+            // same screen, no second form.
+            if pendingMode == .athlete {
+                glassField("Your name (goes on your cards)", text: $athleteName)
+            } else {
+                glassField("Program (e.g. Cheer Force)", text: $orgName)
+            }
+
+            Button {
+                mode = pendingMode
+            } label: {
+                HStack(spacing: 9) {
+                    BrandSignalDot(size: 9, color: Theme.accentText, shadowOpacity: 0)
+                    Text("Mint the first card")
+                        .font(Theme.grotesk(16))
+                }
+                .foregroundStyle(Theme.accentText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(.white.opacity(0.24), lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
 
             Spacer()
             Spacer()
         }
         .padding(.horizontal, 24)
+        .onAppear {
+            guard !seededCover else { return }
+            seededCover = true
+            pendingMode = AppMode(rawValue: appModeRaw) ?? .athlete
+            // Intro replay: the deck already exists — show its name, don't
+            // pretend it's a fresh mint.
+            if deckName.isEmpty, replayingIntro,
+               let existing = teams.current(id: currentTeamID) ?? teams.first {
+                deckName = existing.name
+            }
+        }
     }
 
-    private func modeCard(icon: String, tint: Color, title: String, sub: String,
-                          action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 13) {
+    /// The live deck-box preview — types along with the name field.
+    private var deckBox: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("DECK")
+                .font(Theme.grotesk(9))
+                .tracking(1.8)
+                .foregroundStyle(Theme.coral)
+            Text(deckName.isEmpty ? "Your deck" : deckName)
+                .font(Theme.grotesk(21))
+                .foregroundStyle(.white.opacity(deckName.isEmpty ? 0.4 : 1))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Rectangle()
+                .fill(.white.opacity(0.14))
+                .frame(height: 1)
+            Text("\(existingNames.count) card\(existingNames.count == 1 ? "" : "s") · \(seasonString())")
+                .font(Theme.grotesk(9))
+                .tracking(1.3)
+                .foregroundStyle(.white.opacity(0.5))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(
+            colors: [Color(hex: 0x141A2B), Color(hex: 0x0D1322)],
+            startPoint: .topLeading, endPoint: .bottomTrailing))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .stroke(Theme.electric.opacity(0.5), lineWidth: 1.2))
+    }
+
+    private func ownershipPill(_ m: AppMode, _ title: String, icon: String) -> some View {
+        let on = pendingMode == m
+        return Button {
+            pendingMode = m
+        } label: {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(tint.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .shadow(color: tint.opacity(0.45), radius: 9, y: 5)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(Theme.grotesk(18))
-                        .foregroundStyle(.white)
-                    Text(sub)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(15)
-            .background(Theme.iconTile.opacity(0.74))
-            .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(Theme.iconTileEdge.opacity(0.95), lineWidth: 1))
-            .contentShape(Rectangle())
+            .foregroundStyle(on ? Theme.navy : .white.opacity(0.7))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(on ? .white : .white.opacity(0.06))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(.white.opacity(on ? 0 : 0.14), lineWidth: 1))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: Step 2 — identity + first buckets
+    // MARK: Step 2 — mint the first cards
 
     private func setup(_ mode: AppMode) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -294,80 +367,22 @@ struct OnboardingView: View {
             IconWordmark(size: 15, rateFill: Theme.navy, dotSize: 7)
                 .padding(.top, 2)
 
-            Text(mode == .athlete ? "Make it yours" : "Set up your floor")
+            Text("Mint your cards")
                 .font(Theme.grotesk(22))
                 .foregroundStyle(.white)
-            Text(mode == .athlete
-                 ? "Your name goes on your cards."
-                 : "Your program goes on the cards.")
+            Text("A card for everything you'd change practice over — blank until reps fill it in. Pick a focus, tap to mint. You can mint more anytime.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.6))
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    if mode == .athlete {
-                        glassField("Your name", text: $athleteName)
-                    } else {
-                        glassField("Program (e.g. Cheer Force)", text: $orgName)
-                        glassField("Team (e.g. Senior Coed)", text: $teamName)
-                    }
-
-                    // The headline ask — big and bold, not a faint caption.
-                    Text("What skills do you want to track?")
-                        .font(Theme.grotesk(22))
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
-                    Text("Pick a focus, then tap the skills you do. You can add more anytime.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
-
                     focusPicker
 
-                    ForEach(Array(pending.enumerated()), id: \.offset) { i, item in
-                        HStack(spacing: 10) {
-                            Text("\(i + 1)")
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(width: 24, height: 24)
-                                .background(Theme.groupColor(i))
-                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                            Text(item.name)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                            HStack(spacing: 4) {
-                                Image(systemName: item.focus.icon)
-                                    .font(.system(size: 8, weight: .semibold))
-                                Text(item.focus.label.uppercased())
-                            }
-                            .font(Theme.grotesk(8))
-                            .tracking(1.2)
-                            .foregroundStyle(.white.opacity(0.45))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.07))
-                            .clipShape(Capsule())
-                            Spacer()
-                            Button {
-                                pending.remove(at: i)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.4))
-                                    .frame(width: 28, height: 28)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 8)
-                        .background(.white.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
+                    if !pending.isEmpty { mintedRail }
 
                     HStack(spacing: 10) {
                         TextField("", text: $draft,
-                                  prompt: Text("Add your own \(focus.label.lowercased()) skill")
+                                  prompt: Text("Mint your own \(focus.label.lowercased()) card")
                                     .foregroundStyle(.white.opacity(0.35)))
                             .font(.system(size: 15))
                             .foregroundStyle(.white)
@@ -441,6 +456,80 @@ struct OnboardingView: View {
                 .stroke(.white.opacity(0.14), lineWidth: 1))
     }
 
+    // MARK: The minted cards
+
+    /// Cards you've minted so far, as the CARDS they will be — not list rows.
+    /// Rendered through the real `HoloCardView` at MINTED stage (no reps yet),
+    /// never a second card view: one renderer is why the deck and this screen
+    /// can't drift apart. Horizontal because 290×430 doesn't stack.
+    private var mintedRail: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(pending.enumerated()), id: \.offset) { i, item in
+                        mintedCard(item, index: i)
+                            .id(i)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            // Ride to the card just minted — past three cards the newest one
+            // lands off the rail, and an unseen card reads as a dropped tap.
+            .onChange(of: pending.count) { _, count in
+                guard count > 0 else { return }
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(count - 1, anchor: .trailing) }
+            }
+        }
+        .frame(height: 430 * Self.mintScale + 4)
+    }
+
+    private static let mintScale: CGFloat = 0.42
+
+    private func mintedCard(_ item: (name: String, focus: OnboardingFocus), index: Int) -> some View {
+        let scale = Self.mintScale
+        // No per-card rainbow color and no card NUMBER — a fresh card is known
+        // by its name; the pip is a neutral mint mark until reps arrive.
+        let spec = CardSpec(id: index + 1,
+                            kicker: item.focus.label.uppercased(),
+                            name: item.name,
+                            badge: "◆",
+                            color: Theme.electric,
+                            rate: 0, counts: [0, 0, 0, 0], total: 0, delta: nil,
+                            kind: item.focus.category.hitRateKind,
+                            category: item.focus.category,
+                            outcomeDefs: item.focus.category.defaultOutcomeDefs,
+                            standing: CardStanding(reps: 0, badges: []))
+        return HoloCardView(card: DeckCard(id: index, content: .stats(spec)),
+                            index: index, count: pending.count,
+                            orgName: cardOrgName, isSnapshot: true)
+            .scaleEffect(scale)
+            .frame(width: 290 * scale, height: 430 * scale)
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) { pending.remove(at: index) }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(.black.opacity(0.55)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .offset(x: 6, y: -6)
+                .accessibilityLabel("Remove \(item.name)")
+            }
+            .transition(.scale.combined(with: .opacity))
+    }
+
+    /// Whose deck these cards belong to — the footer monogram.
+    private var cardOrgName: String {
+        let deck = deckName.trimmingCharacters(in: .whitespaces)
+        if !deck.isEmpty { return deck }
+        let identity = pendingMode == .coach ? orgName : athleteName
+        return identity.isEmpty ? "My Deck" : identity
+    }
+
     private func suggestionHeader(_ title: String) -> some View {
         Text(title)
             .font(Theme.grotesk(9))
@@ -489,19 +578,30 @@ struct OnboardingView: View {
     /// first-rep practice step (if any skill was added) or completes
     /// onboarding outright.
     private func startCounting(_ mode: AppMode) {
-        // Every bucket lives under a team. First launch creates it; an intro
-        // REPLAY (Manage Data → Replay intro) keeps the existing roster and
-        // tops it up instead — replaying must never fork a duplicate team.
+        // Every card lives under a team (the deck). First launch creates it;
+        // an intro REPLAY (Manage Data → Replay intro) keeps the existing
+        // roster and tops it up instead — replaying must never fork a
+        // duplicate team.
+        let namedDeck = deckName.trimmingCharacters(in: .whitespaces)
         let team: Team
         if let existing = teams.current(id: currentTeamID) ?? teams.first {
             team = existing
+            // A REPLAY that retitled the deck cover renames the folder — it's
+            // the same deck, not a new one. Gated on replayingIntro: outside a
+            // replay, an existing team here means a cloud restore landed
+            // mid-onboarding, and a blind-typed deck name must not clobber
+            // the restored folder's real name.
+            if replayingIntro, !namedDeck.isEmpty { team.name = namedDeck }
         } else {
-            let firstTeamName = mode == .coach
+            let fallback = mode == .coach
                 ? (teamName.isEmpty ? "My Team" : teamName)
                 : (athleteName.isEmpty ? "My Skills" : "\(athleteName)'s Skills")
-            team = Team(name: firstTeamName, orderIndex: 0)
+            team = Team(name: namedDeck.isEmpty ? fallback : namedDeck, orderIndex: 0)
             context.insert(team)
         }
+        // Keep the legacy teamName key in step for coach installs — folder
+        // migration and the editor's identity section still read it.
+        if mode == .coach, !namedDeck.isEmpty { teamName = namedDeck }
         let base = allGroups.filter { $0.team?.id == team.id }.count
         var created: [StuntGroup] = []
         for (i, item) in pending.enumerated() {
@@ -551,33 +651,19 @@ struct OnboardingView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.6))
 
-            HStack(spacing: 10) {
-                Text("\(group.number)")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 24, height: 24)
-                    .background(group.color)
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                Text(group.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .padding(.top, 6)
+            Text(group.name)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 6)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(Array(group.outcomeDefs.enumerated()), id: \.offset) { slot, def in
                     Button {
                         logPracticeTap(slot: slot, def: def, group: group, session: session)
                     } label: {
-                        Text(def.label)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                            .background(def.color.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        practiceTile(slot: slot, def: def)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PracticeTileStyle())
                 }
             }
             .padding(.top, 8)
@@ -614,11 +700,58 @@ struct OnboardingView: View {
         .padding(.horizontal, 24)
     }
 
+    /// One outcome tile. The running tally per outcome is the proof the rep
+    /// LANDED (the caption at the bottom is too far from the thumb to read as
+    /// confirmation); the flash ring is the moment it registers.
+    private func practiceTile(slot: Int, def: OutcomeDef) -> some View {
+        let count = practiceCounts[slot] ?? 0
+        let flashing = practiceFlash == slot
+        return ZStack(alignment: .topTrailing) {
+            Text(def.label)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(def.color.opacity(flashing ? 1 : 0.85))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(.white.opacity(flashing ? 0.95 : 0), lineWidth: 2.5))
+
+            if count > 0 {
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(def.color)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(.white))
+                    .padding(7)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .accessibilityLabel(count > 0 ? "\(def.label), \(count) logged" : def.label)
+    }
+
     private func logPracticeTap(slot: Int, def: OutcomeDef, group: StuntGroup, session: PracticeSession) {
         context.insert(Attempt(slot: slot, group: group, session: session))
         try? context.save()
+        // Haptics first and always: tap sounds follow the ring/silent switch,
+        // so on a silenced phone the sound alone left the very first tap in the
+        // app with no feedback at all.
+        Haptics.shared.play(def.soundOutcome)
         Sounds.shared.play(.outcome(def.soundOutcome))
-        withAnimation { practiceTaps += 1 }
+        withAnimation(.spring(duration: 0.28)) {
+            practiceTaps += 1
+            practiceCounts[slot, default: 0] += 1
+            practiceFlash = slot
+        }
+        practiceFlashTask?.cancel()
+        practiceFlashTask = Task {
+            try? await Task.sleep(for: .milliseconds(320))
+            if !Task.isCancelled {
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.2)) { practiceFlash = nil }
+                }
+            }
+        }
     }
 
     private func finishPractice() {
@@ -626,6 +759,18 @@ struct OnboardingView: View {
         try? context.save()
         guard let mode else { return }
         completeOnboarding(mode)
+    }
+}
+
+/// Press feedback for the intro's outcome tiles. `.plain` gives none at all,
+/// and this is the first thing anyone taps in the app — it has to feel like a
+/// button going down, not a label.
+private struct PracticeTileStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .brightness(configuration.isPressed ? 0.1 : 0)
+            .animation(.spring(duration: 0.18), value: configuration.isPressed)
     }
 }
 

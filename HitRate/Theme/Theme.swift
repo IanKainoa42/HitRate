@@ -136,6 +136,9 @@ struct Rarity {
     static let holoEdge = [0x00D4FF, 0x9775FA, 0xFF4D6D, 0xFFD43B, 0x51FF9F, 0x00D4FF].map { Color(hex: $0) }
     static let navyEdge = [0x22344E, 0x4A6A93, 0x22344E, 0x33506F, 0x22344E].map { Color(hex: $0) }
     static let commonEdge = [0x3A2026, 0x6A2F38, 0x3A2026].map { Color(hex: $0) }
+    /// Card-ladder PROVEN/DECORATED edge — navy pushed toward electric, still
+    /// static (no foil): brighter than the inked navy, quieter than holo.
+    static let provenEdge = [0x2E4E7E, 0x6E96D6, 0x2E4E7E, 0x4A6A9E, 0x2E4E7E].map { Color(hex: $0) }
 
     /// Milestone chrome by difficulty tier (flavor lives on the milestone).
     static func of(tier: Milestone.Tier) -> Rarity {
@@ -170,6 +173,46 @@ struct Rarity {
                edgeColors: navyEdge, foil: .none,
                flavor: statFlavor(rate: rate, noun: noun, category: category,
                                   dominantIssue: dominantIssue, seed: seed))
+    }
+
+    /// Card-ladder chrome for stat cards (see CardStage.swift). Stage is
+    /// bought with reps and badges, NEVER rate — this is a new axis beside
+    /// milestone rarity, not a resurrection of the retired rate-derived
+    /// tiers. Flavor is gated: a card under `provenReps` hasn't earned the
+    /// voice yet, and a minted card gets the mint line.
+    static func staged(_ standing: CardStanding, rate: Int, noun: String = "group",
+                       category: SkillCategory? = nil, dominantIssue: String? = nil,
+                       seed: Int = 0) -> Rarity {
+        let flavor: String
+        switch standing.stage {
+        case .minted:
+            flavor = "Mint condition. Log the first rep."
+        default:
+            flavor = standing.flavorUnlocked
+                ? statFlavor(rate: rate, noun: noun, category: category,
+                             dominantIssue: dominantIssue, seed: seed)
+                : "Warming up — \(CardStanding.provenReps - standing.reps) reps until this card starts talking."
+        }
+        switch standing.stage {
+        case .minted:
+            return Rarity(tier: "MINTED", stars: 0, tag: Color.white.opacity(0.4),
+                          edgeColors: navyEdge, foil: .none, flavor: flavor)
+        case .inked:
+            return Rarity(tier: "INKED", stars: 0, tag: Color.white.opacity(0.55),
+                          edgeColors: navyEdge, foil: .none, flavor: flavor)
+        case .proven:
+            return Rarity(tier: "PROVEN", stars: 0, tag: Color(hex: 0x5AC8FA),
+                          edgeColors: provenEdge, foil: .none, flavor: flavor)
+        case .decorated:
+            return Rarity(tier: "DECORATED", stars: 0, tag: Theme.electric,
+                          edgeColors: provenEdge, foil: .none, flavor: flavor)
+        case .foil:
+            let legendary = standing.maxBadgeTier == .legendary
+            return Rarity(tier: "FOIL", stars: 0,
+                          tag: legendary ? Theme.gold : Theme.electric,
+                          edgeColors: legendary ? legendaryEdge : holoEdge,
+                          foil: legendary ? .legendary : .holo, flavor: flavor)
+        }
     }
 
     /// The stat-card narrative ladder (Ian's voice — sarcastic by default).

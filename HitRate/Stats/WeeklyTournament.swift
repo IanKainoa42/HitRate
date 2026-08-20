@@ -154,6 +154,10 @@ struct WeeklyCup: Identifiable {
     let game: WeeklyGame
     let winnerName: String
     let winnerNumber: Int
+    /// The winning group's stable wire id (StuntGroup.id) so a cup can badge
+    /// the winner's stat card — nil when THE SPIRIT took the week (a name/
+    /// number match breaks on rename and collides across teams; the id can't).
+    var winnerGroupID: UUID? = nil
     let colorIndex: Int
     let score: Int
     var isGhost = false
@@ -478,6 +482,7 @@ enum WeeklyLeague {
                 week: interval, game: game,
                 winnerName: champ.group?.name ?? GhostEntry.name,
                 winnerNumber: champ.group?.number ?? 0,
+                winnerGroupID: champ.group?.id,
                 colorIndex: champ.group.map { ($0.number - 1) % Theme.groupRainbow.count } ?? 0,
                 score: champ.score,
                 isGhost: champ.group == nil))

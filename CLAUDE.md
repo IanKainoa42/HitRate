@@ -57,10 +57,24 @@ Key invariants:
   - Rate band colors (big numbers, ranked %): ≥75 green / 55–74 amber / <55 red
     → `Theme.rateColor`.
   - Card rarity = milestone **difficulty** (`Milestone.Tier` → `Rarity.of(tier:)`),
-    NOT hit rate. Stat cards are deliberately flat (`Rarity.stats`: static navy
-    edge, no foil, no stars; flavor text is the only rate-based remnant). The
-    old rate-derived rarity (≥90/≥78/≥60) was retired with the milestone deck —
+    NOT hit rate. The old rate-derived rarity (≥90/≥78/≥60) stays retired —
     don't reintroduce a `Rarity.of(rate:)`.
+  - **THE CARD LADDER** (2026-08-19, `Stats/CardStage.swift` + `Rarity.staged`)
+    replaced the "stat cards are deliberately flat" law: a stat card's chrome
+    now levels with WORK and ACHIEVEMENTS — never rate. Stage from lifetime
+    reps + badges: MINTED (0 reps, dashed inner rule, "—" number) → INKED
+    (number GREY under 10 reps, then `Theme.rateColor` band) → PROVEN (50+
+    reps: `provenEdge`, flavor voice unlocks — under 50 it's a "warming up"
+    line) → DECORATED (≥1 badge) → FOIL (a holo/legendary badge foils the
+    whole card). Badges (`CardBadge`, pips above the flavor line) = highest
+    volume rung (100/500/1000 on THIS card), best hit run (10/25), the
+    group's mastery milestone, and cups it won (`WeeklyCup.winnerGroupID`,
+    nil for SPIRIT weeks — the ghost never decorates). Team card collects
+    team-wide milestones; TOUGH LOVE never decorates. Pure recompute
+    (`CardStandings.compute`), no storage; a nil `CardSpec.standing` renders
+    the legacy flat card (render harness). The share deck is computed with
+    timeframe `.all` (cards are the season record, not the Home filter) and
+    now INCLUDES zero-rep skills as minted cards. Tests: `CardStageTests`.
 - Outcome enum order is load-bearing: hit, bobble, buildingFall, majorFall —
   `counts` arrays are indexed by `Outcome.rawValue` everywhere.
 - Outcome labels are renameable per skill kind (UserDefaults keys
@@ -111,11 +125,19 @@ Key invariants:
   silently — UNLESS `replayingIntro` (AppStorage) is set: Manage Data →
   "Replay intro" flips `didOnboard` off to re-run the setup, and the flag
   keeps this migration from instantly re-completing it.
-- `Views/Onboarding/OnboardingView.swift` — brand-register (navy) chooser +
-  identity + quick-add first skills/groups. Suggestion chips create buckets;
-  they are not pre-made. On an intro REPLAY, `finish()` reuses the existing
-  current team (new buckets top up the roster, numbering offset past it) —
-  never forks a duplicate team — and chips hide names already rostered.
+- `Views/Onboarding/OnboardingView.swift` — brand-register (navy) DECK-COVER
+  flow (2026-08-19; replaced the chooser+identity screens): step 1 is one
+  screen — name your deck (live deck-box preview; the name becomes the Team
+  name), a "My team's deck / Just mine" pill pair that quietly sets `AppMode`
+  (`pendingMode`, committed on advance), and ONE contextual identity field
+  (athlete name / program). Step 2 is the MINT screen (focus picker +
+  suggestion chips + custom field — chips mint cards, nothing pre-made).
+  The account/restore step 0 and the first-rep practice preview are
+  unchanged and MUST stay (restore is the only path that recovers folders).
+  On an intro REPLAY, `startCounting()` reuses the existing current team
+  (new cards top up the roster, numbering offset past it) — never forks a
+  duplicate team; the cover pre-fills the deck name and a retitle RENAMES
+  the folder; chips hide names already rostered.
 - `Models/Models.swift` — SwiftData: Team, StuntGroup, PracticeSession,
   Attempt. An "active" session is `endedAt == nil`; LogView assumes at most
   one. MULTI-TEAM (both modes): every StuntGroup belongs to a `Team`
@@ -258,23 +280,40 @@ Key invariants:
   top vs. what varies row-by-row (pin a skill → rows are subjects; pin a
   subject → rows are skills). Subjects/skills can be added unnamed
   (capture-first, name-later via suggestion chips or inline `RenameField`).
-  **Wave/routine staging is the ONLY way reps get logged** (as of
-  2026-07-27 — the earlier immediate tap-to-log path and its WAVE/ROUTINE
-  toggle button were removed; there is no non-staged mode and no toggle to
-  find). Every cell always STAGES a rep: tap +1, long-press −1 (`staged`, a
-  per-cell 4-slot count array — one cell can carry several outcomes in a
-  single pass, e.g. 2 hits + a bobble); commit is MANUAL only via Submit in
-  `waveBar` — it never auto-commits, since multi-rep staging has no "everyone
-  staged" finish line. Committed batches share a `waveID` and render as one
-  cluster in the recent ticker; `commitWave()` also clears the active team's
-  `isDemo` flag (moved there from the old immediate-log function) so real
-  usage still resumes sync off a demo team. Cells are gesture views, not
-  Buttons (a Button fires its action on release even after a hold, so a
-  long-press decrement would re-increment on lift). The custom "issues" pad
-  (skill pivot only, user-created outcomes) is a separate, still-immediate
-  tap-to-add-one/hold-to-remove-one tally, NOT part of wave staging.
-  `CaptureView` is the ONLY logger — the old `Views/Log/LogView.swift` (Pad /
-  Grid layouts) went out with the Quick Clinic feature on 2026-08-19.
+  **Logging is 1-TAP DIRECT AUTO-SAVE** (`logDirect` + a 3.5s undo toast) —
+  the wave-staging/Submit system was retired 2026-08-11 (7e20dde,
+  "Streamline capture"); nothing currently writes a non-nil `Attempt.waveID`,
+  though the model/sync round-trip for it survives. `logDirect` clears the
+  active team's `isDemo` flag so real usage resumes sync off a demo team —
+  EVERY logging path must do the same. Cells are gesture views, not Buttons
+  (a Button fires its action on release even after a hold). The custom
+  "issues" pad (skill pivot only, user-created outcomes) is an immediate
+  tap-to-add-one/hold-to-remove-one tally.
+  `CaptureView` and `PageRunView` are the only loggers — the old
+  `Views/Log/LogView.swift` (Pad / Grid layouts) went out with the Quick
+  Clinic feature on 2026-08-19.
+  `Views/Log/PageRunView.swift` + `Views/Log/PracticePages.swift` — the
+  NINE-POCKET PAGES feature (2026-08-19): `PracticePage` (@Model, local-only,
+  soft-delete, slots stored as newline-joined `StuntGroup.id` uuidStrings —
+  NEVER persistentModelIDs; dangling/trashed slots drop at resolve). The
+  practice pill branches: live session → resume into CaptureView; no pages →
+  freeform directly (zero friction preserved); pages exist →
+  `PracticeStartSheet` (freeform / run a page / build-edit pages via
+  `PageBuilderView`). The pill's CONTEXT MENU ("Run or build a page") is the
+  only way to create the FIRST page — a plain tap with zero pages goes
+  straight to freeform by design. A page run shares Home's ONE
+  fullScreenCover (`pendingPage` decides the content) and the same session
+  lifecycle — `endOfPractice` sweeps, `startSession()` carries all four side
+  effects (insert+save, start sound, watch wake, haptic); the delayed
+  sheet→cover handoff guards against re-opened presentations. `PageRunView`
+  logs DIRECT with an ARMED severity: category presets log the armed SLOT
+  (0–3 legacy-aligned); custom-type skills have NO slot contract (built-in
+  "Other" is [Hit, Miss]) so they resolve by CREDIT TIER instead, and a tier
+  the skill lacks no-ops at 40% opacity. Page reps are UNATTRIBUTED
+  (`subject: nil`) — they count in team totals but under no athlete, so the
+  person filter and roster overview won't see them (known v1 gap). Undo
+  pairs `SyncEngine.queueDeletion` with delete. New @Models must be added to
+  BOTH `Schema([...])` lists in HitRateApp.swift.
   **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke

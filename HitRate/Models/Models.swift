@@ -436,6 +436,10 @@ final class Team {
     /// lose attribution (the Attempt.subject relationship nullifies), never delete.
     @Relationship(deleteRule: .cascade, inverse: \Subject.team)
     var subjects: [Subject] = []
+    /// Saved practice pages — nine-pocket lineups of this folder's cards.
+    /// Deleting the folder takes its pages with it.
+    @Relationship(deleteRule: .cascade, inverse: \PracticePage.team)
+    var pages: [PracticePage] = []
 
     init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
@@ -474,6 +478,57 @@ extension Optional where Wrapped == Team {
     func nounPlural(for mode: AppMode) -> String { self?.nounPlural(for: mode) ?? mode.nounPlural }
     func nounTitle(for mode: AppMode) -> String { self?.nounTitle(for: mode) ?? mode.nounTitle }
     func nounPluralTitle(for mode: AppMode) -> String { self?.nounPluralTitle(for: mode) ?? mode.nounPluralTitle }
+}
+
+/// A nine-pocket practice page — a saved lineup of up to nine cards
+/// (skills/groups) run together at practice, like a slotted card-binder page.
+/// Local-only: no cloud fields, so sync never touches it (the same opt-in
+/// precedent as Subject/CustomOutcome). Slots are stored as newline-joined
+/// StuntGroup.id UUID strings in pocket order (wire ids — NEVER SwiftData
+/// persistentModelIDs, which are store-local and have crashed us before when
+/// stranded by a cascade); resolution drops dangling/trashed skills.
+@Model
+final class PracticePage {
+    var id: UUID = UUID()
+    var name: String
+    var orderIndex: Int
+    var createdAt: Date
+    /// Soft-delete tombstone, same convention as Team/StuntGroup.
+    var deletedAt: Date? = nil
+    /// Newline-joined StuntGroup.id uuidStrings, pocket order, max `capacity`.
+    var slotIDsRaw: String = ""
+    var team: Team?
+
+    init(name: String, orderIndex: Int, createdAt: Date = .now) {
+        self.name = name
+        self.orderIndex = orderIndex
+        self.createdAt = createdAt
+    }
+
+    static let capacity = 9
+
+    var slotIDs: [UUID] {
+        get { slotIDsRaw.split(separator: "\n").compactMap { UUID(uuidString: String($0)) } }
+        set { slotIDsRaw = newValue.prefix(Self.capacity).map(\.uuidString).joined(separator: "\n") }
+    }
+
+    /// The page's live cards in pocket order — trashed or deleted skills just
+    /// drop out (the tolerate-dangling-reference pattern, like outcomeDef(at:)).
+    func slots(in groups: [StuntGroup]) -> [StuntGroup] {
+        let live = groups.filter { $0.deletedAt == nil }
+        return slotIDs.compactMap { id in live.first { $0.id == id } }
+    }
+}
+
+extension Array where Element == PracticePage {
+    var active: [PracticePage] { filter { $0.deletedAt == nil } }
+
+    /// Pages scoped to a folder, mirroring `[StuntGroup].inTeam`.
+    func inTeam(_ team: Team?) -> [PracticePage] {
+        let live = active
+        let scoped = team.map { t in live.filter { $0.team?.id == t.id } } ?? live
+        return scoped.sorted { $0.orderIndex < $1.orderIndex }
+    }
 }
 
 @Model

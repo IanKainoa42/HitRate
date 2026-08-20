@@ -72,13 +72,10 @@ struct GroupsEditorView: View {
 
                 Section("\(nounPluralTitle) · \(currentTeam?.name ?? "")") {
                     ForEach(groups) { g in
+                        // No number/color chip: a card is known by its NAME.
+                        // `number` still drives sync, card set numbers, and the
+                        // heatmap key — it's just not shown next to the name.
                         HStack(spacing: 10) {
-                            Text("\(g.number)")
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(width: 24, height: 24)
-                                .background(g.color)
-                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                             RenameField(prompt: "Name", value: g.name) { new in
                                 g.name = new
                                 try? context.save()
