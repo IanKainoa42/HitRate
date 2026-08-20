@@ -10,6 +10,7 @@ struct HomeView: View {
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
     @Query(sort: \Subject.orderIndex) private var allSubjects: [Subject]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
+    @Query private var allAssignments: [Assignment]
     @Query private var unlockedMilestones: [UnlockedMilestone]
 
     /// Co-logging: needed to tell the folder owner's reps from a member's.
@@ -41,6 +42,10 @@ struct HomeView: View {
     @State private var showIconGuide = false
     @State private var logSession: PracticeSession?   // non-nil = counter cover up
     @State private var hapticTrigger = 0
+    /// Coach-set homework: the opened assignment's receipts, and the editor.
+    @State private var openedAssignment: Assignment?
+    @State private var assignOpen = false
+    @State private var editingAssignment: Assignment?
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -155,6 +160,45 @@ struct HomeView: View {
     /// Whether the active team has any buckets to log into yet.
     private var hasRoster: Bool { !groups.isEmpty }
 
+    // MARK: Homework (coach-set weekly rep targets)
+
+    /// This folder's live homework. Deliberately NOT scoped by `timeframe` or
+    /// the review filters: an assignment is a calendar-week commitment, and
+    /// reading it through a "today" lens would reset every athlete's bar each
+    /// morning.
+    private var assignments: [Assignment] { allAssignments.inTeam(currentTeam) }
+
+    /// Only the folder owner assigns. A local-only folder (never pushed, so no
+    /// `ownerUID` yet) belongs to whoever is holding the phone.
+    private var isFolderOwner: Bool {
+        guard let owner = currentTeam?.ownerUID, !owner.isEmpty else { return true }
+        return owner == auth.uid
+    }
+
+    /// Show the homework well when there's homework to show, or when a coach has
+    /// a roster to assign to. A solo athlete with no roster never sees it —
+    /// nobody is assigning them anything.
+    private var showsHomework: Bool {
+        !assignments.isEmpty || (isFolderOwner && !subjects.isEmpty && hasRoster)
+    }
+
+    /// The owner uid the homework receipts read attribution against — nil on a
+    /// SOLO folder, where the owner is also the athlete and every rep would
+    /// otherwise be reported as "coach-logged".
+    private var homeworkOwnerUID: String? {
+        isCoLogged ? currentTeam?.ownerUID : nil
+    }
+
+    private var homeworkCard: some View {
+        HomeworkCard(assignments: assignments,
+                     roster: subjects,
+                     teamOwnerUID: homeworkOwnerUID,
+                     currentUID: auth.uid,
+                     canAssign: isFolderOwner,
+                     onAssign: { assignOpen = true },
+                     onOpen: { openedAssignment = $0 })
+    }
+
     /// True once this team has logged a rep — distinguishes a team that's never
     /// been practiced (show the big empty state) from a timeframe that's just
     /// quiet. Scoped to the active team's groups.
@@ -179,6 +223,13 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 9) {
+                    // What you owe this week, above the numbers. Outside the
+                    // `hasData` branch on purpose — the athlete who hasn't
+                    // started is exactly who needs to see the target — and
+                    // outside `dashboardCards` so the kind split doesn't render
+                    // three copies of it.
+                    if showsHomework { homeworkCard }
+
                     // The weekly game + league live in the Trophy Room (header
                     // trophy button), kept separate from the analytics here.
                     if d.hasData {
@@ -260,6 +311,30 @@ struct HomeView: View {
         }
         .sheet(isPresented: $editorOpen) {
             GroupsEditorView()
+        }
+        .fullScreenCover(item: $openedAssignment) { assignment in
+            HomeworkDetailSheet(assignment: assignment,
+                                roster: subjects,
+                                teamOwnerUID: homeworkOwnerUID,
+                                currentUID: auth.uid,
+                                canManage: isFolderOwner,
+                                onEdit: {
+                                    openedAssignment = nil
+                                    // Let the cover finish dismissing before the
+                                    // editor presents, or the sheet is dropped.
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                        editingAssignment = assignment
+                                    }
+                                })
+        }
+        .sheet(isPresented: $assignOpen) {
+            AssignmentEditorSheet(team: currentTeam, skills: groups,
+                                  roster: subjects, createdByUID: auth.uid ?? "")
+        }
+        .sheet(item: $editingAssignment) { assignment in
+            AssignmentEditorSheet(existing: assignment, team: currentTeam,
+                                  skills: groups, roster: subjects,
+                                  createdByUID: auth.uid ?? "")
         }
         .sheet(isPresented: $watchOpen) {
             WatchLoggingSheet(status: WatchSessionBridge.shared.status,

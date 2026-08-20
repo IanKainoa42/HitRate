@@ -7,13 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		012E5E8BD75645838ED7845E /* AssignmentEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */; };
+		01D8CC26007D6735221DD2AB /* HomeworkEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */; };
 		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0545801EE9DA971ED89EDBCD /* ExecutionSheet.swift */; };
 		17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */; };
 		18A3263E1908E1F473615478 /* SyncPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B271F43B06539CD8C90123E /* SyncPolicyTests.swift */; };
+		1A7F98E7C46D927597534F8B /* HomeworkEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */; };
 		226DD6B7AC3D3E7DCA340B3F /* RosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D5351887DF8EBB491B3E2F /* RosterView.swift */; };
 		28FD9D81F65E7FA21A56D4E9 /* ShareCardsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */; };
+		2BEA747F82A42596C749EB33 /* HomeworkDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10D80170A14AF97590DC817 /* HomeworkDetailSheet.swift */; };
 		2CACF8CAEAF3750A28C25CC1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 370E93B7A33E3347D40365F5 /* GoogleService-Info.plist */; };
 		309A796199AA1C6AFDAA7C9C /* WatchPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */; };
 		32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD1AA942B68F4E661CF6471 /* HomeView.swift */; };
@@ -76,6 +80,7 @@
 		EC00C955A569AD7AA035AD1A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0A32BDE8F4EA8761F39A65B /* GoogleSignInSwift */; };
 		EDB936B689DBBD05F07951D4 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */; };
 		F2EDDEBA74489B4BE59600AC /* AccountSignInButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */; };
+		F6632A513C1ED0D3AF479D35 /* HomeworkCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59EECE496C87EF4CA4E1FA24 /* HomeworkCard.swift */; };
 		F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */; };
 		FC5A1CD3C57F2141F626CE78 /* GroupsEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */; };
 		FEA8C71D16C4F9A5C7486429 /* TakeawaysCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */; };
@@ -135,6 +140,7 @@
 		3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveCardView.swift; sourceTree = "<group>"; };
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		404429588572142C218018D5 /* FolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderListView.swift; sourceTree = "<group>"; };
+		41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkEngine.swift; sourceTree = "<group>"; };
 		479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveAccountPrompt.swift; sourceTree = "<group>"; };
@@ -143,7 +149,9 @@
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		586650A35C72581E8A6203A1 /* BarlowCondensed-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BarlowCondensed-SemiBold.ttf"; sourceTree = "<group>"; };
+		59EECE496C87EF4CA4E1FA24 /* HomeworkCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkCard.swift; sourceTree = "<group>"; };
 		5A045A4C0AD128053642B9C0 /* GroupsEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsEditorView.swift; sourceTree = "<group>"; };
+		5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkEngineTests.swift; sourceTree = "<group>"; };
 		5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLink.swift; sourceTree = "<group>"; };
 		5FE81BC10D92D4819397B32D /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
 		63F298FD21B0F9D975766C0E /* MinBuildGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinBuildGate.swift; sourceTree = "<group>"; };
@@ -180,8 +188,10 @@
 		DA1D8D88E388C1695A810593 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesTests.swift; sourceTree = "<group>"; };
+		E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentEditorSheet.swift; sourceTree = "<group>"; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
+		F10D80170A14AF97590DC817 /* HomeworkDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkDetailSheet.swift; sourceTree = "<group>"; };
 		F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogStore.swift; sourceTree = "<group>"; };
 		FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngine.swift; sourceTree = "<group>"; };
 		FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsCard.swift; sourceTree = "<group>"; };
@@ -230,10 +240,13 @@
 		2536EE1F284E212EB3F82F36 /* Home */ = {
 			isa = PBXGroup;
 			children = (
+				E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */,
 				9C7E3006F9D9D6763DFA5E8D /* ExecutionCard.swift */,
 				404429588572142C218018D5 /* FolderListView.swift */,
 				FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */,
 				BCD1AA942B68F4E661CF6471 /* HomeView.swift */,
+				59EECE496C87EF4CA4E1FA24 /* HomeworkCard.swift */,
+				F10D80170A14AF97590DC817 /* HomeworkDetailSheet.swift */,
 				C1D5351887DF8EBB491B3E2F /* RosterView.swift */,
 				3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */,
 				245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */,
@@ -328,6 +341,7 @@
 		9FC837BD20A319DFA22D982D /* Stats */ = {
 			isa = PBXGroup;
 			children = (
+				41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */,
 				D8957D930EDEABBAF6E32BF0 /* Milestones.swift */,
 				FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */,
 				1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */,
@@ -359,6 +373,7 @@
 		D1E2326231807F8A6765157B /* HitRateTests */ = {
 			isa = PBXGroup;
 			children = (
+				5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */,
 				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
 				8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */,
 				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
@@ -578,6 +593,7 @@
 			files = (
 				F2EDDEBA74489B4BE59600AC /* AccountSignInButtons.swift in Sources */,
 				E9A8CB07B70E0CCDE117910A /* AccountView.swift in Sources */,
+				012E5E8BD75645838ED7845E /* AssignmentEditorSheet.swift in Sources */,
 				5069C1AD971B8FF63B7647A1 /* AuthViewModel.swift in Sources */,
 				86108021BF9DCD7EF4F3F252 /* CSVExport.swift in Sources */,
 				977B508665FEF8C1BF9C2188 /* CaptureView.swift in Sources */,
@@ -594,6 +610,9 @@
 				CA745130292CAC719774B178 /* HitRateApp.swift in Sources */,
 				E8FC270E6F7AA1C5D8DA728A /* HoloCardView.swift in Sources */,
 				32A29C9D8A74303C7986B2DF /* HomeView.swift in Sources */,
+				F6632A513C1ED0D3AF479D35 /* HomeworkCard.swift in Sources */,
+				2BEA747F82A42596C749EB33 /* HomeworkDetailSheet.swift in Sources */,
+				01D8CC26007D6735221DD2AB /* HomeworkEngine.swift in Sources */,
 				93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */,
 				8472DF181A48BC7407E5698A /* Milestones.swift in Sources */,
 				8F886ACBD963B15BCBB4EB86 /* MinBuildGate.swift in Sources */,
@@ -629,6 +648,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A7F98E7C46D927597534F8B /* HomeworkEngineTests.swift in Sources */,
 				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
 				C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */,
 				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,

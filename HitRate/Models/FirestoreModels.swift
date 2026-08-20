@@ -55,6 +55,25 @@ struct FTemplate: Codable {
     var updatedAt: Date
 }
 
+/// Coach-set rep homework (`Assignment`). Owner-authoritative like the rest of
+/// the roster: the folder owner writes, everyone in the folder reads. No
+/// progress field by design — completion is recomputed from the attempts on
+/// every device, so there is nothing here to fall out of sync.
+struct FAssignment: Codable {
+    @DocumentID var id: String?
+    var teamId: String
+    var groupId: String
+    var targetReps: Int
+    var note: String
+    /// Newline-joined subject uuidStrings; empty = the whole roster.
+    var subjectIdsRaw: String
+    var startedAt: Date
+    var archivedAt: Date?
+    var createdBy: String
+    var deletedAt: Date?
+    var updatedAt: Date
+}
+
 struct FSession: Codable {
     @DocumentID var id: String?
     var teamId: String
