@@ -112,7 +112,7 @@ final class StatsEngineTests: XCTestCase {
         let schema = Schema([
             Team.self, StuntGroup.self, PracticeSession.self, Attempt.self,
             PendingCloudDeletion.self, UnlockedMilestone.self, CustomOutcome.self,
-            CustomTally.self, Subject.self, OutcomeTemplate.self
+            CustomTally.self, Subject.self, OutcomeTemplate.self, Assignment.self
         ])
         return try ModelContainer(
             for: schema,

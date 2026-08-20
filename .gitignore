@@ -17,6 +17,8 @@ firestore-debug.log
 ui-debug.log
 
 # Agent scratch — never commit
+.agents/
+ORIGINAL_REQUEST.md
 plan.md
 TECHNICAL_DEBT_LOG.md
 pr_description.txt

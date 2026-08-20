@@ -10,6 +10,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -26,6 +27,7 @@ const ownerId = "owner-uid";
 const memberAId = "member-a-uid";
 const memberBId = "member-b-uid";
 const joiningId = "joining-uid";
+const assignmentId = "5C1B9E44-7A21-4D6E-9C10-9F0B3A2E7C55";
 
 let testEnv;
 
@@ -76,6 +78,16 @@ describe("HitRate Firestore team authorization", () => {
         timestamp: new Date("2026-08-11T00:01:00Z"),
         updatedAt: new Date("2026-08-11T00:01:00Z"),
       });
+      await setDoc(doc(db, "teams", teamId, "assignments", assignmentId), {
+        teamId,
+        groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+        targetReps: 50,
+        note: "chest up out of the set",
+        subjectIdsRaw: "",
+        startedAt: new Date("2026-08-11T00:00:00Z"),
+        createdBy: ownerId,
+        updatedAt: new Date("2026-08-11T00:00:00Z"),
+      });
     });
   });
 
@@ -96,6 +108,45 @@ describe("HitRate Firestore team authorization", () => {
     assert.equal(session.data().loggerId, memberBId);
     assert.equal(attempt.exists(), true);
     assert.equal(attempt.data().loggerId, memberBId);
+  });
+
+  it("lets an athlete read the homework assigned to them", async () => {
+    const db = firestoreFor(memberAId);
+    const assignment = await getDoc(doc(db, "teams", teamId, "assignments", assignmentId));
+    assert.equal(assignment.exists(), true);
+    assert.equal(assignment.data().targetReps, 50);
+  });
+
+  it("lets the coach assign homework", async () => {
+    const db = firestoreFor(ownerId);
+    await assertSucceeds(setDoc(doc(db, "teams", teamId, "assignments", "new-assignment"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      targetReps: 100,
+      note: "",
+      subjectIdsRaw: "",
+      startedAt: new Date("2026-08-18T00:00:00Z"),
+      createdBy: ownerId,
+      updatedAt: new Date("2026-08-18T00:00:00Z"),
+    }));
+  });
+
+  it("denies an athlete lowering their own rep target", async () => {
+    const db = firestoreFor(memberAId);
+    await assertFails(updateDoc(doc(db, "teams", teamId, "assignments", assignmentId), {
+      targetReps: 1,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("denies an athlete deleting their homework", async () => {
+    const db = firestoreFor(memberAId);
+    await assertFails(deleteDoc(doc(db, "teams", teamId, "assignments", assignmentId)));
+  });
+
+  it("denies a nonmember reading the folder's homework", async () => {
+    const db = firestoreFor(joiningId);
+    await assertFails(getDoc(doc(db, "teams", teamId, "assignments", assignmentId)));
   });
 
   it("allows a signed-in user to resolve one exact join code", async () => {

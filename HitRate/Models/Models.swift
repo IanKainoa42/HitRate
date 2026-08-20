@@ -440,6 +440,10 @@ final class Team {
     /// Deleting the folder takes its pages with it.
     @Relationship(deleteRule: .cascade, inverse: \PracticePage.team)
     var pages: [PracticePage] = []
+    /// Rep homework the folder owner assigned (see `Assignment`). Deleting the
+    /// folder removes them — an assignment has no meaning without its roster.
+    @Relationship(deleteRule: .cascade, inverse: \Assignment.team)
+    var assignments: [Assignment] = []
 
     init(name: String, orderIndex: Int, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
@@ -575,6 +579,11 @@ final class StuntGroup {
     var attempts: [Attempt] = []
     @Relationship(deleteRule: .cascade, inverse: \CustomTally.group)
     var customTallies: [CustomTally] = []
+    /// Homework assigned on this skill. Nullify (not cascade) on delete: an
+    /// assignment whose skill is gone just goes inert and is filtered out, so
+    /// deleting a skill can't strand rows other code is holding identifiers for.
+    @Relationship(deleteRule: .nullify, inverse: \Assignment.group)
+    var assignments: [Assignment] = []
 
     init(name: String, number: Int, orderIndex: Int, kind: SkillKind = .stunt,
          id: UUID = UUID(),
@@ -1090,6 +1099,106 @@ extension Array where Element == Subject {
     }
 }
 
+// MARK: - Assignment (coach-set rep homework)
+
+/// A weekly rep target a coach sets on one skill for some (or all) of the
+/// roster — the offseason answer to "they're not in my gym, are they working?".
+///
+/// DELIBERATELY STORAGE-FREE ON PROGRESS: like Milestones and the weekly
+/// tournament, "did they do it" is recomputed from the attempts every render
+/// (see `HomeworkEngine`). Nothing here records completion, so a rep deleted or
+/// synced in later always re-reads correctly, and there's no second source of
+/// truth to drift.
+///
+/// Owner-authoritative like the rest of the roster: only the folder owner
+/// writes assignments, everyone in the folder reads them.
+@Model
+final class Assignment {
+    /// Stable cross-device id (the Firestore document id), like StuntGroup/Subject.
+    var id: UUID = UUID()
+    /// The folder this homework belongs to.
+    var team: Team?
+    /// The skill being assigned. Nil (skill hard-deleted, or not yet pulled
+    /// down) = inert, filtered out of every view until it resolves.
+    var group: StuntGroup?
+    /// The assigned skill's stable id, kept ALONGSIDE the relationship.
+    ///
+    /// Load-bearing for sync: the assignments and groups listeners are siblings
+    /// with no delivery ordering between them, and Firestore hands a document to
+    /// a listener as `.added` exactly ONCE. On a fresh join the assignment can
+    /// therefore arrive before its skill — and if we dropped it for having no
+    /// resolvable group, the athlete would never see that homework again on that
+    /// install. Storing the raw id lets the doc land unlinked and heal the moment
+    /// its group shows up (`SyncEngine.applyGroup`).
+    var groupIDRaw: String = ""
+    /// Reps expected per calendar week. The bar's denominator.
+    var targetReps: Int = 0
+    /// The coach's note ("chest up out of the set" …). Optional flavor.
+    var note: String = ""
+    /// Newline-joined `Subject.id` uuidStrings this is assigned to. EMPTY = the
+    /// whole roster, so a later-added athlete inherits standing homework instead
+    /// of silently escaping it. Ids are resolved against LIVE subjects at read
+    /// time (`assignees(from:)`) — a trashed athlete just drops off.
+    var subjectIDsRaw: String = ""
+    var createdAt: Date = Date.now
+    /// The week this starts counting from — history never reaches back past it.
+    var startedAt: Date = Date.now
+    /// Non-nil = retired: kept for its history, no longer on the card.
+    var archivedAt: Date? = nil
+    /// Soft-delete tombstone, mirroring the rest of the roster.
+    var deletedAt: Date? = nil
+    /// Firebase uid of the coach who set it (attribution, like Attempt.loggerID).
+    var createdByUID: String = ""
+
+    init(group: StuntGroup?, targetReps: Int, subjectIDs: [UUID] = [],
+         note: String = "", createdByUID: String = "",
+         id: UUID = UUID(), createdAt: Date = .now, startedAt: Date = .now) {
+        self.id = id
+        self.group = group
+        self.groupIDRaw = group?.id.uuidString ?? ""
+        self.targetReps = targetReps
+        self.note = note
+        self.createdByUID = createdByUID
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+        self.subjectIDs = subjectIDs
+    }
+
+    /// Point this homework at a skill, keeping the stored id in step with the
+    /// relationship. Always assign through this, never `group` directly.
+    func link(_ skill: StuntGroup?) {
+        group = skill
+        if let skill { groupIDRaw = skill.id.uuidString }
+    }
+
+    /// The assigned subjects' ids; empty = the whole roster.
+    var subjectIDs: [UUID] {
+        get {
+            subjectIDsRaw.isEmpty ? [] :
+                subjectIDsRaw.components(separatedBy: "\n").compactMap(UUID.init(uuidString:))
+        }
+        set { subjectIDsRaw = newValue.map(\.uuidString).joined(separator: "\n") }
+    }
+
+    /// Live and on the card: not archived, not trashed, and its skill still exists.
+    var isLive: Bool {
+        archivedAt == nil && deletedAt == nil && group?.deletedAt == nil && group != nil
+    }
+
+    /// Who this is assigned to, resolved against the CURRENT roster: an empty id
+    /// list means everyone, and a stale/trashed id is dropped rather than
+    /// rendered as a ghost row.
+    func assignees(from roster: [Subject]) -> [Subject] {
+        let ids = subjectIDs
+        guard !ids.isEmpty else { return roster }
+        let wanted = Set(ids)
+        return roster.filter { wanted.contains($0.id) }
+    }
+
+    /// True when this is a whole-roster assignment (no explicit id list).
+    var coversWholeRoster: Bool { subjectIDs.isEmpty }
+}
+
 // MARK: - Team scoping helpers
 
 extension Array where Element == Team {
@@ -1144,6 +1253,16 @@ extension Array where Element == StuntGroup {
         let live = active
         let scoped = team.map { t in live.filter { $0.team?.id == t.id } } ?? live
         return scoped.sorted { $0.orderIndex < $1.orderIndex }
+    }
+}
+
+extension Array where Element == Assignment {
+    /// Live homework for one folder, newest first. A trashed/archived assignment,
+    /// or one whose skill is gone, never appears.
+    func inTeam(_ team: Team?) -> [Assignment] {
+        let live = filter(\.isLive)
+        let scoped = team.map { t in live.filter { $0.team?.id == t.id } } ?? live
+        return scoped.sorted { $0.createdAt > $1.createdAt }
     }
 }
 

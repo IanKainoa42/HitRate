@@ -7,6 +7,7 @@ rules_version = '2';
 //   teams/{teamId}/subjects/{id}            FSubject   (owner writes, members read)
 //   teams/{teamId}/groups/{id}              FGroup     (owner writes, members read)
 //   teams/{teamId}/templates/{id}           FTemplate  (owner writes, members read)
+//   teams/{teamId}/assignments/{id}         FAssignment (owner writes, members read)
 //   teams/{teamId}/sessions/{id}            FSession   (logger-owned)
 //   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps)
 //   joinCodes/{code}                        { teamId } — public code→team lookup
@@ -80,6 +81,14 @@ service cloud.firestore {
         allow write: if ownsTeam(teamId);
       }
       match /templates/{docId} {
+        allow read:  if inTeam(teamId);
+        allow write: if ownsTeam(teamId);
+      }
+      // Coach-set rep homework. Owner-authoritative like the rest of the
+      // roster: only the coach assigns, everyone in the folder reads. Progress
+      // is never stored here — it's recomputed from attempts client-side — so
+      // an athlete has no legitimate reason to write these docs.
+      match /assignments/{docId} {
         allow read:  if inTeam(teamId);
         allow write: if ownsTeam(teamId);
       }

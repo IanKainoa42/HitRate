@@ -33,6 +33,7 @@ enum SyncAttemptBatchPlanner {
 ///   teams/{teamId}/subjects/{subjectId}    → FSubject
 ///   teams/{teamId}/groups/{groupId}        → FGroup
 ///   teams/{teamId}/templates/{templateId}  → FTemplate
+///   teams/{teamId}/assignments/{id}        → FAssignment (coach-set homework)
 ///   teams/{teamId}/sessions/{sessionId}    → FSession
 ///   teams/{teamId}/attempts/{attemptId}    → FAttempt
 ///
@@ -256,6 +257,7 @@ final class SyncEngine: ObservableObject {
                 for subject in team.subjects { _ = pushSubject(subject, teamID: teamID) }
                 for group in team.groups { _ = pushGroup(group, teamID: teamID) }
                 for template in team.outcomeTemplates { _ = pushTemplate(template, teamID: teamID) }
+                for assignment in team.assignments { _ = pushAssignment(assignment, teamID: teamID) }
             }
             if context.hasChanges { try context.save() }
         } catch {
@@ -287,6 +289,9 @@ final class SyncEngine: ObservableObject {
                     }
                     for template in team.outcomeTemplates {
                         wroteDocument = pushTemplate(template, teamID: teamID) || wroteDocument
+                    }
+                    for assignment in team.assignments {
+                        wroteDocument = pushAssignment(assignment, teamID: teamID) || wroteDocument
                     }
                 }
             }
@@ -358,6 +363,11 @@ final class SyncEngine: ObservableObject {
                 guard let team = template.team, !team.isDemo,
                       team.ownerUID == nil || team.ownerUID == uid else { continue }
                 wroteDocument = pushTemplate(template, teamID: team.id.uuidString) || wroteDocument
+
+            case let assignment as Assignment:
+                guard let team = assignment.team, !team.isDemo,
+                      team.ownerUID == nil || team.ownerUID == uid else { continue }
+                wroteDocument = pushAssignment(assignment, teamID: team.id.uuidString) || wroteDocument
 
             case let attempt as Attempt:
                 guard let team = attempt.group?.team else { continue }
@@ -440,6 +450,27 @@ final class SyncEngine: ObservableObject {
         )
         return setDoc(teamDoc(teamID).collection("templates").document(id), doc,
                       key: templateKey(teamID, id), fingerprint: templateFingerprint(template, teamID: teamID))
+    }
+
+    @discardableResult
+    private func pushAssignment(_ assignment: Assignment, teamID: String) -> Bool {
+        // A homework doc is meaningless without its skill. Fall back to the
+        // stored id so an assignment still awaiting its skill (fresh join) keeps
+        // round-tripping instead of being dropped from the cloud.
+        let groupID = assignment.group?.id.uuidString ?? assignment.groupIDRaw
+        guard !groupID.isEmpty else { return false }
+        let id = assignment.id.uuidString
+        let doc = FAssignment(
+            id: id, teamId: teamID, groupId: groupID,
+            targetReps: assignment.targetReps, note: assignment.note,
+            subjectIdsRaw: assignment.subjectIDsRaw,
+            startedAt: assignment.startedAt, archivedAt: assignment.archivedAt,
+            createdBy: assignment.createdByUID,
+            deletedAt: assignment.deletedAt, updatedAt: .now
+        )
+        return setDoc(teamDoc(teamID).collection("assignments").document(id), doc,
+                      key: assignmentKey(teamID, id),
+                      fingerprint: assignmentFingerprint(assignment, teamID: teamID))
     }
 
     @discardableResult
@@ -800,6 +831,19 @@ final class SyncEngine: ObservableObject {
             }
             if let snap { self.markServerReady(teamID: teamID, collection: "templates", metadata: snap.metadata) }
         })
+        // Homework rides with the roster listeners (small, owner-written).
+        // Deliberately NOT part of `requiredServerCollections`: that set gates
+        // whether ATTEMPTS may push, and adding a name to it that never gets
+        // marked ready would silently stop every rep in the app from syncing.
+        registrations.append(base.collection("assignments").addSnapshotListener(includeMetadataChanges: true) { [weak self] snap, error in
+            guard let self else { return }
+            if let error { self.lastError = "Homework sync failed: \(error.localizedDescription)"; return }
+            snap?.documentChanges.forEach { c in
+                if let a = try? c.document.data(as: FAssignment.self) {
+                    self.applyAssignment(a, acknowledged: !c.document.metadata.hasPendingWrites)
+                }
+            }
+        })
         teamListeners[teamID] = registrations
     }
 
@@ -977,10 +1021,26 @@ final class SyncEngine: ObservableObject {
         if g.outcomeOverridesRaw != remote.outcomeOverridesRaw { g.outcomeOverridesRaw = remote.outcomeOverridesRaw; changed = true }
         if g.deletedAt != remote.deletedAt { g.deletedAt = remote.deletedAt; changed = true }
         if g.team?.id != team.id { g.team = team; changed = true }
+        // Adopt any homework that arrived ahead of this skill (see applyAssignment).
+        changed = linkPendingAssignments(to: g, in: context) || changed
         if acknowledged {
             syncedFingerprints[groupKey(remote.teamId, idStr)] = groupFingerprint(g, teamID: remote.teamId)
         }
         if changed { try? context.save() }
+    }
+
+    /// Attach assignments that named this skill before it existed locally.
+    /// Returns true when anything was linked.
+    private func linkPendingAssignments(to group: StuntGroup, in context: ModelContext) -> Bool {
+        let raw = group.id.uuidString
+        let orphans = (try? context.fetch(FetchDescriptor<Assignment>(
+            predicate: #Predicate { $0.groupIDRaw == raw }))) ?? []
+        var linked = false
+        for assignment in orphans where assignment.group == nil {
+            assignment.link(group)
+            linked = true
+        }
+        return linked
     }
 
     private func applyTemplate(_ remote: FTemplate, acknowledged: Bool) {
@@ -997,6 +1057,42 @@ final class SyncEngine: ObservableObject {
         if template.team?.id != team.id { template.team = team; changed = true }
         if acknowledged {
             syncedFingerprints[templateKey(remote.teamId, idStr)] = templateFingerprint(template, teamID: remote.teamId)
+        }
+        if changed { try? context.save() }
+    }
+
+    private func applyAssignment(_ remote: FAssignment, acknowledged: Bool) {
+        guard let context = modelContext, let idStr = remote.id,
+              let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
+        // The skill may not have landed yet: groups and assignments are SIBLING
+        // listeners with no delivery order between them, and Firestore delivers
+        // a document as `.added` exactly once. Dropping the doc here would lose
+        // this homework for good on this install, so store it unlinked and let
+        // `applyGroup` heal it when the skill arrives.
+        let groupUUID = UUID(uuidString: remote.groupId)
+        let group = groupUUID.flatMap { id in
+            (try? context.fetch(FetchDescriptor<StuntGroup>(
+                predicate: #Predicate { $0.id == id })))?.first
+        }
+        let existing = (try? context.fetch(FetchDescriptor<Assignment>(
+            predicate: #Predicate { $0.id == uuid })))?.first
+        let assignment = existing ?? Assignment(group: group, targetReps: remote.targetReps,
+                                                id: uuid, startedAt: remote.startedAt)
+        if existing == nil { assignment.team = team; context.insert(assignment) }
+        var changed = existing == nil
+        if assignment.targetReps != remote.targetReps { assignment.targetReps = remote.targetReps; changed = true }
+        if assignment.note != remote.note { assignment.note = remote.note; changed = true }
+        if assignment.subjectIDsRaw != remote.subjectIdsRaw { assignment.subjectIDsRaw = remote.subjectIdsRaw; changed = true }
+        if assignment.startedAt != remote.startedAt { assignment.startedAt = remote.startedAt; changed = true }
+        if assignment.archivedAt != remote.archivedAt { assignment.archivedAt = remote.archivedAt; changed = true }
+        if assignment.deletedAt != remote.deletedAt { assignment.deletedAt = remote.deletedAt; changed = true }
+        if assignment.createdByUID != remote.createdBy { assignment.createdByUID = remote.createdBy; changed = true }
+        if assignment.groupIDRaw != remote.groupId { assignment.groupIDRaw = remote.groupId; changed = true }
+        if let group, assignment.group?.id != group.id { assignment.link(group); changed = true }
+        if assignment.team?.id != team.id { assignment.team = team; changed = true }
+        if acknowledged {
+            syncedFingerprints[assignmentKey(remote.teamId, idStr)] =
+                assignmentFingerprint(assignment, teamID: remote.teamId)
         }
         if changed { try? context.save() }
     }
@@ -1190,7 +1286,7 @@ final class SyncEngine: ObservableObject {
                 .whereField("ownerUID", isEqualTo: uid).getDocuments()
             for teamDoc in owned.documents {
                 let base = teamDoc.reference
-                for sub in ["subjects", "groups", "templates"] {
+                for sub in ["subjects", "groups", "templates", "assignments"] {
                     await deleteAllDocuments(matching: base.collection(sub))
                 }
                 // Rules only let us delete sessions/attempts we logged; query
@@ -1496,6 +1592,7 @@ final class SyncEngine: ObservableObject {
     private func subjectKey(_ teamID: String, _ id: String) -> String { "\(teamID):subject:\(id)" }
     private func groupKey(_ teamID: String, _ id: String) -> String { "\(teamID):group:\(id)" }
     private func templateKey(_ teamID: String, _ id: String) -> String { "\(teamID):template:\(id)" }
+    private func assignmentKey(_ teamID: String, _ id: String) -> String { "\(teamID):assignment:\(id)" }
     private func sessionKey(_ teamID: String, _ id: String) -> String { "\(teamID):session:\(id)" }
     private func attemptKey(_ teamID: String, _ id: String) -> String { "\(teamID):attempt:\(id)" }
 
@@ -1516,6 +1613,13 @@ final class SyncEngine: ObservableObject {
 
     private func templateFingerprint(_ template: OutcomeTemplate, teamID: String) -> String {
         stamp(teamID, template.name, template.defsRaw, template.orderIndex)
+    }
+
+    private func assignmentFingerprint(_ assignment: Assignment, teamID: String) -> String {
+        stamp(teamID, assignment.group?.id.uuidString ?? assignment.groupIDRaw,
+              assignment.targetReps,
+              assignment.note, assignment.subjectIDsRaw, assignment.startedAt,
+              assignment.archivedAt, assignment.deletedAt, assignment.createdByUID)
     }
 
     private func sessionFingerprint(_ session: PracticeSession, teamID: String,

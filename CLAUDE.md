@@ -229,6 +229,35 @@ Key invariants:
   scored-reps-only, so an untracked practice can't inflate a driver to 100%);
   `ExecutionCard` renders it BELOW the analytics cards, hidden unless
   `stats.hasExecution`.
+- **HOMEWORK (coach-assigned rep targets)** — `Assignment` (@Model) +
+  `Stats/HomeworkEngine.swift` + `Views/Home/HomeworkCard.swift` /
+  `HomeworkDetailSheet.swift` / `AssignmentEditorSheet.swift`. A coach sets a
+  WEEKLY rep target on one skill for some (or all) of the roster; pro squads
+  don't train together year-round, so this is how the work between practices
+  gets seen. Like Milestones and the tournament it stores NO PROGRESS —
+  completion is recomputed from attempts every render, so a late-syncing or
+  deleted rep is always reflected. Reps are bucketed by the ATTEMPT's own
+  timestamp (never its session's `startedAt`, which mis-buckets a practice
+  spanning midnight) into `Calendar.current` weeks — the same boundary
+  `WeeklyLeague` uses. VOLUME counts (any outcome advances the bar; clean rate
+  rides alongside) and VERIFICATION IS RECEIPTS, not proof: per-day rep counts,
+  last-rep time, and the self-vs-coach logger split (`Attempt.isCoachLogged`,
+  passed a nil ownerUID on a solo folder so the owner's own reps don't all read
+  as "coach"). `subjectIDsRaw` empty = the whole roster, including athletes
+  added later; ids resolve against LIVE subjects so a trashed athlete drops off.
+  The card sits in Home's scroll OUTSIDE `dashboardCards(_:)` (which renders 3×
+  under the kind split) and outside the `hasData` branch (the athlete who hasn't
+  started is exactly who needs the target), and ignores the timeframe filter.
+  Owner-authoritative in sync: `teams/{id}/assignments` — coach writes, folder
+  reads. Two sync invariants: (1) its listener is deliberately NOT in
+  `requiredServerCollections`, which gates ATTEMPT pushes — adding a
+  never-marked name there silently stops every rep in the app from syncing; and
+  (2) assignments and groups are SIBLING listeners with no delivery order, and
+  Firestore delivers a doc as `.added` exactly once per listener lifetime, so an
+  assignment arriving before its skill is stored UNLINKED (`groupIDRaw`, always
+  set via `Assignment.link(_:)`) and adopted later by `applyGroup`. Dropping it
+  instead would lose that homework permanently on a fresh join — and would still
+  pass a relaunch test, since the group is local by then.
 - `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
   fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`
@@ -384,6 +413,10 @@ Key invariants:
 - `figure.cheerleading` SF Symbol doesn't exist; use `figure.gymnastics`.
 - Latest-session snapshot must skip attempt-less sessions or an ended empty
   session hides the tape card.
+- Firestore rules tests (`npm run test:firestore-rules`) need a JVM the
+  emulator can find. `openjdk@21` is installed but keg-only, so plain `npm run`
+  fails with "Unable to locate a Java Runtime" — run it as
+  `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run test:firestore-rules`.
 - WatchConnectivity is force-disabled on the simulator (`WatchLogStore.session`
   returns nil under `targetEnvironment(simulator)`) — `WCSession` has an XPC/IPC
   bug on iOS 18 / watchOS 11 paired simulators that crashes in
