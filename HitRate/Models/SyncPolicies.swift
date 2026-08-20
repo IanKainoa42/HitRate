@@ -170,6 +170,24 @@ enum AttemptCacheInvalidation {
     }
 }
 
+/// The debounced push queue holds identifiers between a save and the flush
+/// 0.6s later — and every save RESTARTS that debounce, so a burst of logging
+/// can hold ids for as long as the burst lasts.
+///
+/// A row deleted inside that window must be dropped from the queue, never
+/// pushed: SwiftData hands `model(for:)` an invalidated instance for a deleted
+/// row and TRAPS the moment a relationship is read off it. Undo is the
+/// everyday path in — log reps quickly, undo the last one, and the flush reads
+/// `attempt.group` on a dead row and kills the app (device crash 2026-08-19,
+/// EXC_BREAKPOINT in `SyncEngine.pushLocalChanges` → `Attempt.group.getter`).
+/// The tombstone survives regardless: it's a separate `PendingCloudDeletion`
+/// row with its own identifier, queued before the delete.
+enum PendingPushQueue {
+    static func prune<ID: Hashable>(_ pending: Set<ID>, deleted: [ID]) -> Set<ID> {
+        deleted.isEmpty ? pending : pending.subtracting(deleted)
+    }
+}
+
 /// When to offer "save your account". Anonymous users are device-bound, so a
 /// reinstall orphans their cloud folders — but the app works fully offline, and
 /// App Review 5.1.1(i) doesn't allow gating that behind a login. So every

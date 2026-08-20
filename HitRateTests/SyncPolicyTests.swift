@@ -222,6 +222,28 @@ final class AttemptCacheInvalidationTests: XCTestCase {
     }
 }
 
+final class PendingPushQueueTests: XCTestCase {
+    func testUndoDropsTheQueuedRepInsteadOfPushingIt() {
+        // The shipped crash: a rep is logged (id 7 queued for push), undone
+        // inside the debounce window, and the flush read `attempt.group` off
+        // the now-dead row — EXC_BREAKPOINT inside SwiftData.
+        let pending: Set<Int> = [7, 8]
+        XCTAssertEqual(PendingPushQueue.prune(pending, deleted: [7]), [8])
+    }
+
+    func testACascadeDropsEveryRowItTookWithIt() {
+        // Deleting a skill takes its whole rep history; each of those ids is
+        // just as dead as the one the user asked to remove.
+        let pending: Set<Int> = [1, 2, 3, 4]
+        XCTAssertEqual(PendingPushQueue.prune(pending, deleted: [2, 3, 4, 99]), [1])
+    }
+
+    func testASaveWithNoDeletesLeavesTheQueueAlone() {
+        let pending: Set<Int> = [1, 2]
+        XCTAssertEqual(PendingPushQueue.prune(pending, deleted: []), pending)
+    }
+}
+
 final class AccountPromptPolicyTests: XCTestCase {
     func testOnboardingStepLeadsAFreshInstall() {
         XCTAssertTrue(AccountPromptPolicy.showsOnboardingStep(
