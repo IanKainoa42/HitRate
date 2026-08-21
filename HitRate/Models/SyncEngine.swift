@@ -390,18 +390,25 @@ final class SyncEngine: ObservableObject {
     @discardableResult
     private func pushTeamMeta(_ team: Team) -> Bool {
         let id = team.id.uuidString
-        let doc = FTeam(
-            id: id,
+        let doc = firestoreTeam(team)
+        return setDoc(teamDoc(id), doc, key: teamKey(id), fingerprint: teamFingerprint(team))
+    }
+
+    /// One encoder path for ordinary sync writes and the atomic folder+code
+    /// publication. The override lets a brand-new code land on the team in the
+    /// same batch before it is stamped into SwiftData locally.
+    private func firestoreTeam(_ team: Team, joinCode: String? = nil) -> FTeam {
+        FTeam(
+            id: team.id.uuidString,
             name: team.name,
             ownerUID: team.ownerUID ?? uid ?? "",
             memberIds: team.memberIds,
             orderIndex: team.orderIndex,
             itemNoun: team.itemNoun,
-            joinCode: team.joinCode,
+            joinCode: joinCode ?? (team.joinCodeIsVerified ? team.joinCode : nil),
             deletedAt: team.deletedAt,
             updatedAt: .now
         )
-        return setDoc(teamDoc(id), doc, key: teamKey(id), fingerprint: teamFingerprint(team))
     }
 
     @discardableResult
@@ -728,9 +735,15 @@ final class SyncEngine: ObservableObject {
                                              metadata: snap.metadata)
                     }
                 }
-                // Metadata-only snapshots have no document changes. Mark every
-                // visible team represented by the snapshot in that case.
+                // A late batch acknowledgement may arrive as metadata-only and
+                // therefore produce no document change. Re-apply every settled
+                // document so a timed-out pending code is promoted only after
+                // Firestore clears `hasPendingWrites`.
                 for document in snap.documents {
+                    if !document.metadata.hasPendingWrites,
+                       let team = try? document.data(as: FTeam.self) {
+                        self.applyTeam(team, acknowledged: true)
+                    }
                     self.markServerReady(teamID: document.documentID, collection: "team",
                                          metadata: snap.metadata)
                 }
@@ -939,8 +952,36 @@ final class SyncEngine: ObservableObject {
             if local.itemNoun != remote.itemNoun { local.itemNoun = remote.itemNoun; changed = true }
             if local.orderIndex != remote.orderIndex { local.orderIndex = remote.orderIndex; changed = true }
             if local.memberIds != remote.memberIds { local.memberIds = remote.memberIds; changed = true }
-            let mergedCode = SyncJoinCodePolicy.merged(local: local.joinCode, remote: remote.joinCode)
-            if local.joinCode != mergedCode { local.joinCode = mergedCode; changed = true }
+            let priorCodeState = SyncJoinCodePolicy.LocalState(
+                acknowledged: local.joinCode,
+                pending: local.pendingJoinCode
+            )
+            let remoteCodeIsVerified = SyncJoinCodePolicy.remoteCodeIsVerified(
+                remote.joinCode,
+                prior: priorCodeState,
+                priorWasVerified: local.joinCodeIsVerified,
+                snapshotAcknowledged: acknowledged
+            )
+            let codeState = SyncJoinCodePolicy.mergingRemote(
+                remote.joinCode,
+                into: priorCodeState,
+                acknowledged: acknowledged
+            )
+            if local.joinCode != codeState.acknowledged {
+                local.joinCode = codeState.acknowledged
+                changed = true
+            }
+            if local.pendingJoinCode != codeState.pending {
+                local.pendingJoinCode = codeState.pending
+                changed = true
+            }
+            if acknowledged,
+               let remoteCode = remote.joinCode,
+               !remoteCode.isEmpty,
+               local.joinCodeIsVerified != remoteCodeIsVerified {
+                local.joinCodeIsVerified = remoteCodeIsVerified
+                changed = true
+            }
             if local.deletedAt != remote.deletedAt { local.deletedAt = remote.deletedAt; changed = true }
             if local.ownerUID == nil { local.ownerUID = remote.ownerUID; changed = true }
         } else {
@@ -948,7 +989,14 @@ final class SyncEngine: ObservableObject {
             t.itemNoun = remote.itemNoun
             t.ownerUID = remote.ownerUID
             t.memberIds = remote.memberIds
-            t.joinCode = remote.joinCode
+            t.joinCode = acknowledged ? remote.joinCode : nil
+            t.pendingJoinCode = acknowledged ? nil : remote.joinCode
+            t.joinCodeIsVerified = SyncJoinCodePolicy.remoteCodeIsVerified(
+                remote.joinCode,
+                prior: .init(acknowledged: nil, pending: nil),
+                priorWasVerified: false,
+                snapshotAcknowledged: acknowledged
+            )
             t.deletedAt = remote.deletedAt
             context.insert(t)
             changed = true
@@ -1145,7 +1193,7 @@ final class SyncEngine: ObservableObject {
     /// calls — a hung continuation here has no other way to surface.
     private func withTimeout<T: Sendable>(
         seconds: TimeInterval = 12,
-        _ operation: @escaping @Sendable () async throws -> T
+        _ operation: @escaping () async throws -> T
     ) async throws -> T {
         let guardian = ResumeOnce()
         return try await withCheckedThrowingContinuation { continuation in
@@ -1181,46 +1229,105 @@ final class SyncEngine: ObservableObject {
         guard let uid else { lastError = "Not signed in."; return nil }
         // Claim ownership of a not-yet-synced local team so the code is valid.
         if team.ownerUID == nil { team.ownerUID = uid }
-        let teamID = team.id.uuidString
 
-        // Re-share RE-PUBLISHES instead of trusting that the first write landed.
-        // A code is stamped locally while its directory entry may still be
-        // unacknowledged, so a blind early return could hand out a code that
-        // never made it to the server.
+        let normalizedCodeState = SyncJoinCodePolicy.normalizedForRetry(
+            .init(
+                acknowledged: team.joinCode,
+                pending: team.pendingJoinCode
+            ),
+            isAcknowledged: team.joinCodeIsVerified
+        )
+        if normalizedCodeState.acknowledged != team.joinCode
+            || normalizedCodeState.pending != team.pendingJoinCode {
+            team.joinCode = normalizedCodeState.acknowledged
+            team.pendingJoinCode = normalizedCodeState.pending
+            team.joinCodeIsVerified = false
+            try? modelContext?.save()
+        }
+
+        // Re-share re-publishes a confirmed code, while a timed-out code retries
+        // from its separate, invisible pending slot. That distinction prevents
+        // both false sharing (showing an unconfirmed code) and false unsharing
+        // (hiding a code that the server already acknowledged).
         if let existing = team.joinCode, !existing.isEmpty {
-            if case .write(let outcome, let message) = await publishCode(existing, teamID: teamID,
-                                                                        uid: uid),
-               !SyncJoinCodePolicy.keepsCode(after: outcome) {
+            guard case .write(let outcome, let message) = await publishCode(
+                existing, team: team, uid: uid
+            ) else { return nil }
+            applyShareWrite(outcome, code: existing, to: team)
+            switch outcome {
+            case .acknowledged, .timedOut:
+                // This code was acknowledged before the republish. A transient
+                // retry timeout does not make that server fact false.
+                lastError = nil
+                return existing
+            case .failed:
                 lastError = "Share failed: \(message)"
                 return nil
             }
-            pushTeamMeta(team)
-            lastError = nil
-            return existing
+        }
+
+        if let pending = team.pendingJoinCode, !pending.isEmpty {
+            switch await publishCode(pending, team: team, uid: uid, rejectingCollision: true) {
+            case .taken:
+                team.pendingJoinCode = nil
+                try? modelContext?.save()
+            case .write(let outcome, let message):
+                applyShareWrite(outcome, code: pending, to: team)
+                switch outcome {
+                case .acknowledged:
+                    lastError = nil
+                    return pending
+                case .timedOut:
+                    lastError = "Couldn’t confirm the code reached the server. Try again."
+                    return nil
+                case .failed:
+                    lastError = "Share failed: \(message)"
+                    return nil
+                }
+            }
         }
 
         for _ in 0..<5 {
             let code = generateCode()
-            switch await publishCode(code, teamID: teamID, uid: uid, rejectingCollision: true) {
+            switch await publishCode(code, team: team, uid: uid, rejectingCollision: true) {
             case .taken:
                 continue   // extremely unlikely; try another
             case .write(let outcome, let message):
-                guard SyncJoinCodePolicy.keepsCode(after: outcome) else {
+                applyShareWrite(outcome, code: code, to: team)
+                switch outcome {
+                case .acknowledged:
+                    lastError = nil
+                    return code
+                case .timedOut:
+                    lastError = "Couldn’t confirm the code reached the server. Try again."
+                    return nil
+                case .failed:
                     lastError = "Share failed: \(message)"
                     return nil
                 }
-                // Stamped even when the publish only TIMED OUT — the write is
-                // still queued, and dropping the code here is what orphaned the
-                // published entry and minted a fresh code on every retry.
-                team.joinCode = code
-                try? modelContext?.save()
-                pushTeamMeta(team)   // propagate the code onto the team doc
-                lastError = nil
-                return code
             }
         }
         lastError = "Couldn't allocate a code — try again."
         return nil
+    }
+
+    private func applyShareWrite(
+        _ write: SyncJoinCodePolicy.ShareWrite,
+        code: String,
+        to team: Team
+    ) {
+        let state = SyncJoinCodePolicy.state(
+            after: write,
+            attemptedCode: code,
+            current: .init(
+                acknowledged: team.joinCode,
+                pending: team.pendingJoinCode
+            )
+        )
+        team.joinCode = state.acknowledged
+        team.pendingJoinCode = state.pending
+        team.joinCodeIsVerified = state.acknowledged != nil
+        try? modelContext?.save()
     }
 
     /// Owner-only access removal. The team document is the only write: sessions
@@ -1339,6 +1446,8 @@ final class SyncEngine: ObservableObject {
         for team in teams where team.ownerUID == oldUID {
             team.ownerUID = nil
             team.joinCode = nil
+            team.pendingJoinCode = nil
+            team.joinCodeIsVerified = false
             team.memberIds = []
         }
         let attempts = (try? context.fetch(FetchDescriptor<Attempt>())) ?? []
@@ -1357,21 +1466,36 @@ final class SyncEngine: ObservableObject {
         case write(SyncJoinCodePolicy.ShareWrite, message: String)
     }
 
-    /// Publishes the public `joinCodes/{code}` directory entry. Both round trips
-    /// share ONE timeout window — two stacked 12s waits (lookup, then write) made
-    /// a single attempt take up to 24s before the user saw anything, which read
-    /// as "spins forever" even though it eventually failed.
-    private func publishCode(_ code: String, teamID: String, uid: String,
+    /// Publishes the folder document and its public `joinCodes/{code}` directory
+    /// entry in one atomic batch. A joiner can therefore never observe the code
+    /// before its target exists. Collision lookup + batch commit share one timeout.
+    private func publishCode(_ code: String, team: Team, uid: String,
                              rejectingCollision: Bool = false) async -> CodePublish {
+        let teamID = team.id.uuidString
         let ref = db.collection("joinCodes").document(code)
         do {
             let taken = try await withTimeout(seconds: 10) { () async throws -> Bool in
-                if rejectingCollision, try await ref.getDocument().exists { return true }
-                try await ref.setData([
+                if rejectingCollision {
+                    let snapshot = try await ref.getDocument()
+                    if snapshot.exists {
+                        let data = snapshot.data()
+                        let isOurPendingPublication = data?["teamId"] as? String == teamID
+                            && data?["ownerUID"] as? String == uid
+                        if !isOurPendingPublication { return true }
+                    }
+                }
+                let batch = self.db.batch()
+                try batch.setData(
+                    from: self.firestoreTeam(team, joinCode: code),
+                    forDocument: self.teamDoc(teamID),
+                    merge: true
+                )
+                batch.setData([
                     "teamId": teamID,
                     "ownerUID": uid,
                     "createdAt": FieldValue.serverTimestamp()
-                ], merge: true)
+                ], forDocument: ref, merge: true)
+                try await batch.commit()
                 return false
             }
             return taken ? .taken : .write(.acknowledged, message: "")

@@ -60,6 +60,29 @@ service cloud.firestore {
         || resource.data.deletedAt == null;
     }
 
+    // A directory entry is valid only when its target folder exists after this
+    // write, belongs to the same owner, and is still active. `getAfter` keeps
+    // atomic folder+code batches valid while rejecting orphan or retargeted
+    // codes. Older clients that publish against an existing folder still work.
+    function joinCodeTargetsOwnedTeam() {
+      let target = /databases/$(database)/documents/teams/$(request.resource.data.teamId);
+      let targetData = getAfter(target).data;
+      return request.resource.data.teamId is string
+        && existsAfter(target)
+        && targetData.ownerUID == uid()
+        && (!targetData.keys().hasAny(['deletedAt']) || targetData.deletedAt == null);
+    }
+
+    // Exact lookups must not reveal stale or corrupted directory entries.
+    function joinCodeTargetIsJoinable() {
+      let target = /databases/$(database)/documents/teams/$(resource.data.teamId);
+      let targetData = get(target).data;
+      return resource.data.teamId is string
+        && exists(target)
+        && targetData.ownerUID == resource.data.ownerUID
+        && (!targetData.keys().hasAny(['deletedAt']) || targetData.deletedAt == null);
+    }
+
     match /teams/{teamId} {
       allow read:   if signedIn() && (resource.data.ownerUID == uid()
                                        || uid() in resource.data.memberIds);
@@ -68,7 +91,8 @@ service cloud.firestore {
       // Owner: full update. Non-owner: may add/remove only their own uid (or
       // idempotently rejoin), while preserving every other member and field.
       allow update: if signedIn() && (
-        resource.data.ownerUID == uid()
+        (resource.data.ownerUID == uid()
+          && request.resource.data.ownerUID == resource.data.ownerUID)
         || changesOnlyOwnMembership()
       );
 
@@ -124,10 +148,22 @@ service cloud.firestore {
     // they're a member. Listing is forbidden: the directory is not an invite
     // catalog. Owner-written; exact documents hold only { teamId, ownerUID }.
     match /joinCodes/{code} {
-      allow get:    if signedIn();
+      // Collision preflights must be able to observe that an exact candidate is
+      // unused. Existing entries are readable only when their target is valid.
+      allow get:    if signedIn() && (
+        !exists(/databases/$(database)/documents/joinCodes/$(code))
+        || joinCodeTargetIsJoinable()
+      );
       allow list:   if false;
-      allow create: if signedIn() && request.resource.data.ownerUID == uid();
-      allow update, delete: if signedIn() && resource.data.ownerUID == uid();
+      allow create: if signedIn()
+        && request.resource.data.ownerUID == uid()
+        && joinCodeTargetsOwnedTeam();
+      allow update: if signedIn()
+        && resource.data.ownerUID == uid()
+        && request.resource.data.ownerUID == uid()
+        && request.resource.data.teamId == resource.data.teamId
+        && joinCodeTargetsOwnedTeam();
+      allow delete: if signedIn() && resource.data.ownerUID == uid();
     }
   }
 }

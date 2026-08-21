@@ -62,6 +62,11 @@ enum SyncSessionIdentity {
 /// completion handler simply never fires. Dropping the code in that window orphans
 /// the directory entry that did land and mints a brand-new code on the next share.
 enum SyncJoinCodePolicy {
+    struct LocalState: Equatable {
+        var acknowledged: String?
+        var pending: String?
+    }
+
     enum ShareWrite {
         case acknowledged
         /// Unacknowledged, not failed: the write stays in Firestore's local
@@ -70,35 +75,90 @@ enum SyncJoinCodePolicy {
         case failed
     }
 
-    static func keepsCode(after write: ShareWrite) -> Bool {
+    /// Apply one publication result without presenting an unconfirmed code as
+    /// shareable. A timeout keeps a new code in the durable retry slot, while a
+    /// previously acknowledged code remains visible because it is already a
+    /// known server fact.
+    static func state(
+        after write: ShareWrite,
+        attemptedCode: String,
+        current: LocalState
+    ) -> LocalState {
         switch write {
-        case .acknowledged, .timedOut: return true
-        case .failed: return false
+        case .acknowledged:
+            return LocalState(acknowledged: attemptedCode, pending: nil)
+        case .timedOut:
+            if current.acknowledged == attemptedCode { return current }
+            return LocalState(acknowledged: current.acknowledged, pending: attemptedCode)
+        case .failed:
+            return LocalState(
+                // A failed republish does not prove an established directory
+                // entry disappeared. Preserve confirmed sharing and clear only
+                // an unconfirmed attempt.
+                acknowledged: current.acknowledged,
+                pending: current.pending == attemptedCode ? nil : current.pending
+            )
         }
+    }
+
+    /// Older app builds stored timed-out publications in `joinCode`, so an
+    /// additive verification marker must treat every migrated value as unknown.
+    /// Move that value into the invisible retry slot until an atomic republish
+    /// or acknowledged remote snapshot proves it is usable.
+    static func normalizedForRetry(
+        _ current: LocalState,
+        isAcknowledged: Bool
+    ) -> LocalState {
+        guard !isAcknowledged, let legacy = current.acknowledged else { return current }
+        return LocalState(
+            acknowledged: nil,
+            pending: current.pending ?? legacy
+        )
     }
 
     /// The code to keep when a remote team document arrives. The owner is
     /// authoritative whenever it publishes a code, but nothing ever un-shares a
     /// folder, so a nil from the server only means our own push has not landed
     /// yet — it must never erase a code we already minted.
-    static func merged(local: String?, remote: String?) -> String? {
-        guard let remote, !remote.isEmpty else { return local }
-        return remote
+    static func mergingRemote(
+        _ remote: String?,
+        into current: LocalState,
+        acknowledged: Bool
+    ) -> LocalState {
+        guard acknowledged, let remote, !remote.isEmpty else { return current }
+        // The team document is one half of the atomic publication and cannot
+        // prove the directory half landed. Keep a matching pending code pending;
+        // only `batch.commit()` returning successfully promotes it.
+        if current.pending == remote { return current }
+        return LocalState(acknowledged: remote, pending: nil)
+    }
+
+    /// A team document can carry a code even when its public directory entry is
+    /// missing, so it can only retain proof for the identical code that was
+    /// already verified by a successful batch completion.
+    static func remoteCodeIsVerified(
+        _ remote: String?,
+        prior: LocalState,
+        priorWasVerified: Bool,
+        snapshotAcknowledged: Bool
+    ) -> Bool {
+        guard snapshotAcknowledged, let remote, !remote.isEmpty else { return false }
+        return priorWasVerified && prior.acknowledged == remote
     }
 }
 
 /// A join-code document can outlive the folder it names. Firestore reports a
-/// missing team as NOT_FOUND and a soft-deleted team as PERMISSION_DENIED (the
-/// rules reject new membership). Both mean the code has no joinable target;
-/// transport failures remain retryable errors instead of being mislabeled.
+/// missing team as NOT_FOUND, which means the code has no joinable target.
+/// PERMISSION_DENIED is deliberately not treated as "missing": it can also mean
+/// a live folder hit a rules/configuration regression, and calling that an
+/// invalid code hides the real failure from both the user and diagnostics.
 enum SyncJoinTargetPolicy {
     private static let firestoreErrorDomain = "FIRFirestoreErrorDomain"
     private static let notFoundCode = 5
-    private static let permissionDeniedCode = 7
 
     static func isStaleTarget(errorDomain: String, errorCode: Int) -> Bool {
         errorDomain == firestoreErrorDomain
-            && (errorCode == notFoundCode || errorCode == permissionDeniedCode)
+            && errorCode == notFoundCode
     }
 }
 

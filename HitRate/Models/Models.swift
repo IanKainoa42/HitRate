@@ -404,9 +404,17 @@ final class Team {
     /// Cloud sync / team sharing (Firebase). `ownerUID` = the Firebase uid that
     /// owns this folder in the cloud (nil = local-only, never pushed). `joinCode`
     /// = the 6-digit code others enter to join this folder's shared roster (nil
-    /// until first pushed). Both additive with defaults → lightweight migration.
+    /// until its publication is acknowledged). `pendingJoinCode` is local-only:
+    /// it preserves an unconfirmed timed-out publication for retry without ever
+    /// showing it to another person. All are additive with defaults → lightweight
+    /// migration.
     var ownerUID: String? = nil
     var joinCode: String? = nil
+    var pendingJoinCode: String? = nil
+    /// Local proof that `joinCode` was acknowledged by Firestore. Defaults false
+    /// so codes migrated from older builds are atomically revalidated before the
+    /// app shows them again.
+    var joinCodeIsVerified: Bool = false
     /// True while this team's roster is sample data from "Load demo data"
     /// (`DemoData.seed`), not something the user actually built. Sync must
     /// never push it — the demo set is ~1,571 Attempt rows, and the button

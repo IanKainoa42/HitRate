@@ -92,30 +92,169 @@ final class SyncSessionIdentityTests: XCTestCase {
 }
 
 final class SyncJoinCodePolicyTests: XCTestCase {
-    func testTimedOutShareKeepsTheCodeItAlreadyPublished() {
-        XCTAssertTrue(SyncJoinCodePolicy.keepsCode(after: .acknowledged))
-        XCTAssertTrue(SyncJoinCodePolicy.keepsCode(after: .timedOut))
-        XCTAssertFalse(SyncJoinCodePolicy.keepsCode(after: .failed))
+    func testNewTimedOutCodeStaysPendingAndInvisible() {
+        let state = SyncJoinCodePolicy.state(
+            after: .timedOut,
+            attemptedCode: "2D6A2N",
+            current: .init(acknowledged: nil, pending: nil)
+        )
+
+        XCTAssertNil(state.acknowledged)
+        XCTAssertEqual(state.pending, "2D6A2N")
+    }
+
+    func testAcknowledgementPromotesPendingCode() {
+        let state = SyncJoinCodePolicy.state(
+            after: .acknowledged,
+            attemptedCode: "2D6A2N",
+            current: .init(acknowledged: nil, pending: "2D6A2N")
+        )
+
+        XCTAssertEqual(state.acknowledged, "2D6A2N")
+        XCTAssertNil(state.pending)
+    }
+
+    func testDefinitiveFailureClearsAttemptedPendingCode() {
+        let state = SyncJoinCodePolicy.state(
+            after: .failed,
+            attemptedCode: "2D6A2N",
+            current: .init(acknowledged: nil, pending: "2D6A2N")
+        )
+
+        XCTAssertNil(state.acknowledged)
+        XCTAssertNil(state.pending)
+    }
+
+    func testTimeoutPreservesAnAlreadyAcknowledgedCode() {
+        let state = SyncJoinCodePolicy.state(
+            after: .timedOut,
+            attemptedCode: "2D6A2N",
+            current: .init(acknowledged: "2D6A2N", pending: nil)
+        )
+
+        XCTAssertEqual(state.acknowledged, "2D6A2N")
+        XCTAssertNil(state.pending)
+    }
+
+    func testRepublishFailurePreservesAnAlreadyAcknowledgedCode() {
+        let state = SyncJoinCodePolicy.state(
+            after: .failed,
+            attemptedCode: "2D6A2N",
+            current: .init(acknowledged: "2D6A2N", pending: nil)
+        )
+
+        XCTAssertEqual(state.acknowledged, "2D6A2N")
+        XCTAssertNil(state.pending)
+    }
+
+    func testLegacyUnverifiedCodeMovesToPendingBeforeItCanBeShown() {
+        XCTAssertEqual(
+            SyncJoinCodePolicy.normalizedForRetry(
+                .init(acknowledged: "2D6A2N", pending: nil),
+                isAcknowledged: false
+            ),
+            .init(acknowledged: nil, pending: "2D6A2N")
+        )
+    }
+
+    func testVerifiedCodeStaysAcknowledged() {
+        let current = SyncJoinCodePolicy.LocalState(
+            acknowledged: "2D6A2N", pending: nil
+        )
+        XCTAssertEqual(
+            SyncJoinCodePolicy.normalizedForRetry(current, isAcknowledged: true),
+            current
+        )
+    }
+
+    func testRemoteTeamSnapshotCannotPromotePendingCodeByItself() {
+        let current = SyncJoinCodePolicy.LocalState(
+            acknowledged: nil, pending: "2D6A2N"
+        )
+        let state = SyncJoinCodePolicy.mergingRemote(
+            "2D6A2N",
+            into: current,
+            acknowledged: true
+        )
+
+        XCTAssertEqual(state, current)
+    }
+
+    func testPendingWriteSnapshotDoesNotPromotePendingCode() {
+        let current = SyncJoinCodePolicy.LocalState(
+            acknowledged: nil, pending: "2D6A2N"
+        )
+
+        XCTAssertEqual(
+            SyncJoinCodePolicy.mergingRemote(
+                "2D6A2N", into: current, acknowledged: false
+            ),
+            current
+        )
+    }
+
+    func testAcknowledgedTeamSnapshotDoesNotVerifyMatchingPendingCode() {
+        XCTAssertFalse(SyncJoinCodePolicy.remoteCodeIsVerified(
+            "2D6A2N",
+            prior: .init(acknowledged: nil, pending: "2D6A2N"),
+            priorWasVerified: false,
+            snapshotAcknowledged: true
+        ))
+    }
+
+    func testTeamDocumentAloneDoesNotVerifyAnUnrelatedLegacyCode() {
+        XCTAssertFalse(SyncJoinCodePolicy.remoteCodeIsVerified(
+            "2D6A2N",
+            prior: .init(acknowledged: nil, pending: nil),
+            priorWasVerified: false,
+            snapshotAcknowledged: true
+        ))
+    }
+
+    func testAcknowledgedSnapshotPreservesProofForTheSameVerifiedCode() {
+        XCTAssertTrue(SyncJoinCodePolicy.remoteCodeIsVerified(
+            "2D6A2N",
+            prior: .init(acknowledged: "2D6A2N", pending: nil),
+            priorWasVerified: true,
+            snapshotAcknowledged: true
+        ))
     }
 
     func testRemoteNilNeverErasesAFreshlyMintedCode() {
-        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: nil), "2D6A2N")
-        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: ""), "2D6A2N")
+        let current = SyncJoinCodePolicy.LocalState(
+            acknowledged: "2D6A2N", pending: nil
+        )
+        XCTAssertEqual(
+            SyncJoinCodePolicy.mergingRemote(nil, into: current, acknowledged: true),
+            current
+        )
+        XCTAssertEqual(
+            SyncJoinCodePolicy.mergingRemote("", into: current, acknowledged: true),
+            current
+        )
     }
 
     func testOwnerPublishedCodeWins() {
-        XCTAssertEqual(SyncJoinCodePolicy.merged(local: nil, remote: "XQ2KUR"), "XQ2KUR")
-        XCTAssertEqual(SyncJoinCodePolicy.merged(local: "2D6A2N", remote: "XQ2KUR"), "XQ2KUR")
-        XCTAssertNil(SyncJoinCodePolicy.merged(local: nil, remote: nil))
+        XCTAssertEqual(
+            SyncJoinCodePolicy.mergingRemote(
+                "XQ2KUR",
+                into: .init(acknowledged: "2D6A2N", pending: "2D6A2N"),
+                acknowledged: true
+            ),
+            .init(acknowledged: "XQ2KUR", pending: nil)
+        )
     }
 }
 
 final class SyncJoinTargetPolicyTests: XCTestCase {
-    func testMissingOrInaccessibleFolderMakesAJoinCodeInvalid() {
+    func testMissingFolderMakesAJoinCodeInvalid() {
         XCTAssertTrue(SyncJoinTargetPolicy.isStaleTarget(
             errorDomain: "FIRFirestoreErrorDomain", errorCode: 5
         ))
-        XCTAssertTrue(SyncJoinTargetPolicy.isStaleTarget(
+    }
+
+    func testPermissionFailureDoesNotMasqueradeAsAnInvalidCode() {
+        XCTAssertFalse(SyncJoinTargetPolicy.isStaleTarget(
             errorDomain: "FIRFirestoreErrorDomain", errorCode: 7
         ))
     }
