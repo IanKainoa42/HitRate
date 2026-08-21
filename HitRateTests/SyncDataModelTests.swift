@@ -99,6 +99,57 @@ final class SyncDataModelTests: XCTestCase {
                       "Reps must not outlive their folder — the cache that named them is now stale")
     }
 
+    /// Deleted-but-not-yet-saved: the registered instance reports itself, which
+    /// is the only case `pushLocalChanges`'s `isDeleted` guard can catch. (Once
+    /// the delete is SAVED it stops reporting — see the test below, which is
+    /// why the queue has to be pruned at the notification instead.)
+    func testARepDeletedButNotYetSavedReportsItselfDeleted() throws {
+        let (container, attempt) = try loggedRep()
+        let context = container.mainContext
+        let id = attempt.persistentModelID
+        context.delete(attempt)
+
+        XCTAssertTrue(context.model(for: id).isDeleted)
+    }
+
+    /// Why the push queue must be pruned at the save notification rather than
+    /// guarded at the flush: once a delete is SAVED, the identifier still
+    /// resolves to a live-looking instance that no longer admits it is deleted.
+    /// Reading a relationship off that instance is what killed the app on
+    /// device (2026-08-19, EXC_BREAKPOINT in `SyncEngine.pushLocalChanges` →
+    /// `Attempt.group.getter`). If this ever starts reporting `isDeleted`, the
+    /// flush guard would cover it — until then `PendingPushQueue.prune` is the
+    /// only thing standing between undo and a crash.
+    func testASavedDeleteNoLongerAdmitsItIsDeleted() throws {
+        let (container, attempt) = try loggedRep()
+        let context = container.mainContext
+        let id = attempt.persistentModelID
+        context.delete(attempt)
+        try context.save()
+
+        XCTAssertFalse(context.model(for: id).isDeleted,
+                       "the flush guard cannot see this — the queue prune is not optional")
+    }
+
+    /// One logged rep in a live folder, saved. Hands the CONTAINER back, not
+    /// just the context: let it go out of scope and the store is torn down
+    /// under the models, which traps rather than failing an assertion.
+    private func loggedRep() throws -> (ModelContainer, Attempt) {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let team = Team(name: "Deck", orderIndex: 0)
+        let group = StuntGroup(name: "Toe touch", number: 1, orderIndex: 0)
+        group.team = team
+        let session = PracticeSession()
+        let attempt = Attempt(outcome: .hit, group: group, session: session)
+        context.insert(team)
+        context.insert(group)
+        context.insert(session)
+        context.insert(attempt)
+        try context.save()
+        return (container, attempt)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema([
             Team.self, StuntGroup.self, PracticeSession.self, Attempt.self,

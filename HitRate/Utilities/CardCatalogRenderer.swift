@@ -92,6 +92,47 @@ enum CardCatalogRenderer {
         ]
     }
 
+    /// The card ladder, one card per stage (see CardStage.swift): minted →
+    /// inked (grey number) → 10+ reps (band color) → proven (flavor voice,
+    /// proven edge) → decorated (badges) → foil (holo badge) → foil
+    /// (legendary badge). Renders the staged chrome path end to end.
+    private static var ladderCards: [(slug: String, spec: CardSpec)] {
+        func cup(_ n: Int) -> CardBadge {
+            CardBadge(id: "cup-\(n)", icon: "percent", label: "Rate cup", tier: .rare)
+        }
+        let vol100 = CardBadge(id: "vol100", icon: "square.stack.3d.up.fill", label: "100 reps", tier: .rare)
+        let vol500 = CardBadge(id: "vol500", icon: "square.stack.3d.up.fill", label: "500 reps", tier: .holo)
+        let run10 = CardBadge(id: "run10", icon: "flame.fill", label: "10 straight", tier: .rare)
+        let run25 = CardBadge(id: "run25", icon: "flame.fill", label: "25 straight", tier: .holo)
+        let mastery = CardBadge(id: "mastery-x", icon: "star.circle.fill", label: "Mastered", tier: .legendary)
+        func spec(_ id: Int, _ name: String, rate: Int, counts: [Int], total: Int,
+                  reps: Int, badges: [CardBadge]) -> CardSpec {
+            CardSpec(id: id, kicker: "SKILL \(id)", name: name, badge: "\(id)",
+                     color: Theme.groupColor(id - 1), rate: rate, counts: counts,
+                     total: total, delta: nil, flavorNoun: "skill", kind: .stunt,
+                     category: .stunts, outcomeDefs: tierDefs(.stunts),
+                     standing: CardStanding(reps: reps, badges: badges))
+        }
+        return [
+            ("ladder-0-minted", spec(1, "New Pyramid", rate: 0, counts: [0, 0, 0, 0],
+                                     total: 0, reps: 0, badges: [])),
+            ("ladder-1-inked-grey", spec(2, "Lib", rate: 67, counts: [4, 1, 1, 0],
+                                         total: 6, reps: 6, badges: [])),
+            ("ladder-2-inked-banded", spec(3, "Full Up", rate: 78, counts: [14, 2, 1, 1],
+                                           total: 18, reps: 18, badges: [])),
+            ("ladder-3-proven", spec(4, "Elite Toss", rate: 72, counts: [40, 8, 5, 2],
+                                     total: 55, reps: 55, badges: [])),
+            ("ladder-4-decorated", spec(5, "Heel Stretch", rate: 81, counts: [98, 12, 7, 4],
+                                        total: 121, reps: 121, badges: [vol100, run10, cup(1)])),
+            ("ladder-5-foil-holo", spec(6, "Back Wall", rate: 84, counts: [430, 45, 25, 12],
+                                        total: 512, reps: 512, badges: [vol500, run25, cup(1)])),
+            ("ladder-6-foil-legendary", spec(7, "Center Lib", rate: 93, counts: [140, 8, 2, 0],
+                                             total: 150, reps: 150,
+                                             badges: [vol100, run25, mastery,
+                                                      cup(1), cup(2), cup(3), cup(4)])),
+        ]
+    }
+
     /// Every milestone type with engine-accurate copy, in earned and locked form.
     private static var milestones: [(slug: String, m: Milestone)] {
         [
@@ -242,7 +283,7 @@ enum CardCatalogRenderer {
 
     private static func renderAll(to dir: URL) {
         let org = "CheerForce San Diego"
-        let stats = statCards
+        let stats = statCards + ladderCards
         let stones = milestones
         let count = stats.count + stones.count
 

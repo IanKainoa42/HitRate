@@ -203,6 +203,10 @@ final class SyncEngine: ObservableObject {
                                                isImporting: isImportingAttempts) {
             invalidateAttemptCaches()
         }
+        // A row this save DELETED must not stay queued for a push — resolving
+        // it later hands back an invalidated model that traps on the first
+        // relationship read. See PendingPushQueue.
+        pendingPushIDs = PendingPushQueue.prune(pendingPushIDs, deleted: deleted)
         guard !pendingPushIDs.isEmpty else { return }
         enqueuePush()
     }
@@ -331,6 +335,11 @@ final class SyncEngine: ObservableObject {
 
         for identifier in identifiers {
             let model = context.model(for: identifier)
+            // Catches a delete that hasn't been SAVED yet — that instance does
+            // still report itself. A saved delete does not (proven in
+            // SyncDataModelTests), which is why the real protection is
+            // PendingPushQueue.prune upstream, not this line.
+            guard !model.isDeleted, model.modelContext != nil else { continue }
             switch model {
             case let team as Team:
                 guard !team.isDemo else { continue }

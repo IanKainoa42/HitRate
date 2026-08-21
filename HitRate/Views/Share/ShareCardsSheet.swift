@@ -11,6 +11,9 @@ struct ShareCardsSheet: View {
     let teamName: String
     let orgName: String
     let mode: AppMode
+    // Card-ladder positions (lifetime reps + badges per card) — nil renders
+    // the pre-ladder flat deck.
+    var standings: CardStandings? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var activeIndex: Int? = 0
@@ -20,7 +23,8 @@ struct ShareCardsSheet: View {
     @State private var holdingCard: DeckCard?
 
     private var cards: [DeckCard] {
-        var deck = CardSpec.deck(from: stats, teamName: teamName, mode: mode)
+        var deck = CardSpec.deck(from: stats, teamName: teamName, mode: mode,
+                                 standings: standings)
             .map { DeckCard(id: $0.id, content: .stats($0)) }
         for m in milestones {
             deck.append(DeckCard(id: deck.count, content: .milestone(m)))
