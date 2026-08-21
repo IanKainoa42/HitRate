@@ -506,7 +506,9 @@ struct OnboardingView: View {
             .frame(width: 290 * scale, height: 430 * scale)
             .overlay(alignment: .topTrailing) {
                 Button {
-                    withAnimation(.easeOut(duration: 0.18)) { pending.remove(at: index) }
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        _ = pending.remove(at: index)
+                    }
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
