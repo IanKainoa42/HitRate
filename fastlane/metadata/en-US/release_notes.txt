@@ -1,6 +1,6 @@
-Your reps and shared folders are safer and more reliable.
+Your skill deck is ready for a bigger practice day.
 
-• Deleted or missing folders now fail cleanly when someone tries an old join code.
-• Removing someone from a shared roster revokes their access without deleting their historical reps.
-• Clinic sessions can now be saved directly to your permanent roster.
-• Save your account with Apple or Google so your folders, reps, and shared rosters follow you to a new phone.
+• Every skill now has its own card, with progression that grows from your logged reps and achievements.
+• Build Practice Pages to run up to nine skills together with an armed outcome.
+• Shared-folder join codes now publish atomically, so a freshly sent code cannot point at a missing folder.
+• Clearer sharing errors distinguish an invalid code from a permissions or connection problem.
