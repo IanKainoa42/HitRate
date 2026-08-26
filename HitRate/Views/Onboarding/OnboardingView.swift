@@ -168,20 +168,25 @@ struct OnboardingView: View {
                 }
                 .padding(.vertical, 6)
             } else {
-                AccountSignInButtons()
-
-                Button {
-                    accountStepDone = true
-                } label: {
-                    Text("Not now")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                AccountSignInButtons(onDarkBrandBackground: true)
             }
+
+            // ALWAYS present, restoring or not. This is the first screen of the
+            // app: whatever the network, the account, or Firebase is doing, it
+            // has to be possible to walk past it. The 2.1(a) rejection on
+            // 1.7 (34) was exactly this screen with no way forward.
+            Button {
+                restoring = false
+                accountStepDone = true
+            } label: {
+                Text(restoring ? "Skip" : "Not now")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
             Spacer()
             Spacer()
@@ -201,6 +206,9 @@ struct OnboardingView: View {
         Task { @MainActor in
             for _ in 0..<32 {                       // ~8s at 250ms
                 try? await Task.sleep(nanoseconds: 250_000_000)
+                // The user pressed Skip while we waited — they've moved on to
+                // naming a deck, so don't reach back in and reroute them.
+                guard restoring else { return }
                 let live = ((try? context.fetch(FetchDescriptor<Team>())) ?? [])
                     .filter { $0.deletedAt == nil }
                 guard let restored = live.first else { continue }

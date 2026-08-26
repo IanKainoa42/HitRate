@@ -20,6 +20,16 @@ class AuthViewModel: NSObject, ObservableObject {
     /// True when signed in with a REAL provider (Apple/Google), not anonymous.
     @Published var isUpgraded = false
 
+    /// A sign-in is in flight (credential accepted by the provider, Firebase
+    /// still working). Drives the button spinner.
+    @Published var isSigningIn = false
+    /// The last sign-in failure, in words the user can act on. NOTHING in this
+    /// class may fail silently: every surface that offers sign-in renders this,
+    /// because a provider sheet that succeeds and then leaves the screen
+    /// unchanged is indistinguishable from a hung app (App Review 2.1(a),
+    /// 1.7 build 34).
+    @Published var authError: String?
+
     /// Whether a fresh credential should LINK the current session or prove the
     /// user's identity again (Firebase demands a recent login before
     /// `user.delete()`). Threaded through explicitly — no stored mode flag to
@@ -51,7 +61,16 @@ class AuthViewModel: NSObject, ObservableObject {
     private func apply(_ user: User?) {
         currentUser = user
         uid = user?.uid
-        isUpgraded = (user.map { !$0.isAnonymous }) ?? false
+        let upgraded = (user.map { !$0.isAnonymous }) ?? false
+        isUpgraded = upgraded
+        // Landing clears any stale complaint from an earlier attempt — the
+        // account IS saved, whatever went wrong on the way.
+        if upgraded {
+            authError = nil
+            isSigningIn = false
+            applePrefersSignIn = false
+            pendingNonces.removeAll()
+        }
     }
 
     /// Anonymous-first launch: only signs in if there's no session at all, so we
@@ -86,105 +105,339 @@ class AuthViewModel: NSObject, ObservableObject {
 
     // MARK: - Credential routing
 
+    /// Which provider a credential came from. Only matters for collision
+    /// recovery, where the two behave differently (see `recoverFromCollision`).
+    private enum Provider { case apple, google }
+
     /// Link OR sign in with a credential: if the current session is anonymous we
     /// LINK (so the anonymous account's cloud data carries into the permanent
-    /// account); otherwise we sign in fresh. On the "already in use" collision
-    /// (the provider account exists), fall back to a plain sign-in.
-    private func linkOrSignIn(_ credential: AuthCredential) {
-        if let user = Auth.auth().currentUser, user.isAnonymous {
-            user.link(with: credential) { [weak self] result, error in
-                if let nsError = error as NSError?,
-                   nsError.code == AuthErrorCode.credentialAlreadyInUse.rawValue {
-                    let updated = (nsError.userInfo[AuthErrorUserInfoUpdatedCredentialKey] as? AuthCredential) ?? credential
-                    Auth.auth().signIn(with: updated) { _, err in
-                        if let err { print("Sign-in after link collision: \(err.localizedDescription)") }
+    /// account); otherwise we sign in fresh. `forcingSignIn` is the second pass
+    /// of a collision recovery — the provider account already exists, so skip
+    /// straight to signing into it.
+    private func linkOrSignIn(_ credential: AuthCredential, provider: Provider,
+                              forcingSignIn: Bool = false) {
+        if let user = Auth.auth().currentUser, user.isAnonymous, !forcingSignIn {
+            user.link(with: credential) { [weak self] _, error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    guard let nsError = error as NSError? else {
+                        self.finish(nil)
+                        return
                     }
-                } else if let error {
-                    print("Link error: \(error.localizedDescription)")
+                    if nsError.code == AuthErrorCode.credentialAlreadyInUse.rawValue {
+                        self.recoverFromCollision(nsError, original: credential, provider: provider)
+                    } else {
+                        self.finish(nsError)
+                    }
                 }
-                _ = result
-                _ = self
             }
         } else {
-            Auth.auth().signIn(with: credential) { _, error in
-                if let error { print("Sign-in error: \(error.localizedDescription)") }
+            Auth.auth().signIn(with: credential) { [weak self] _, error in
+                Task { @MainActor in self?.finish(error) }
             }
         }
     }
 
-    private func handle(_ credential: AuthCredential, use: CredentialUse) {
+    /// The Apple ID (or Google account) is already attached to a HitRate
+    /// account — which is the RESTORE case onboarding step 0 exists for, so it
+    /// has to land, not dead-end.
+    ///
+    /// Firebase 10.28 promises an "updated credential" on this error but only
+    /// actually attaches one for phone auth: the OAuth path builds it from a
+    /// `FIRVerifyAssertionResponse` that is never populated on an error
+    /// response, and `initWithVerifyAssertionResponse:` returns nil when the
+    /// token fields are empty. So the old `?? credential` fallback re-sent the
+    /// ORIGINAL credential — and an Apple identity token is single-use, already
+    /// spent by the link that just failed. Firebase rejected it, the error was
+    /// only `print`ed, and the app sat on the login screen forever. That is the
+    /// 2.1(a) bug App Review hit on 1.7 (34): it needs an Apple ID that has
+    /// signed into HitRate before, which is why it never reproduced locally.
+    ///
+    /// So: use the updated credential if one is genuinely there; otherwise ask
+    /// Apple for a FRESH token and sign in with that. Google id_tokens stay
+    /// valid after a failed link, so they can just be re-sent.
+    private func recoverFromCollision(_ error: NSError, original: AuthCredential,
+                                      provider: Provider) {
+        let updated = error.userInfo[AuthErrorUserInfoUpdatedCredentialKey] as? AuthCredential
+        let plan = CredentialCollisionPolicy.recovery(
+            provider: provider == .apple ? .apple : .google,
+            hasUpdatedCredential: updated != nil)
+
+        switch plan {
+        case .signInWithUpdated:
+            signIn(updated ?? original)
+        case .signInWithOriginal:
+            signIn(original)
+        case .refreshCredential:
+            // ONE refresh per user-initiated attempt. A retry runs with
+            // `forcingSignIn`, so it signs in rather than links and can't
+            // collide again — but if that invariant ever breaks, an ungated
+            // recovery would reopen the Apple sheet forever, which to a
+            // reviewer looks worse than the bug it replaced.
+            guard !appleRetryInFlight else {
+                isSigningIn = false
+                authError = "That Apple ID already has a HitRate account, but the sign-in didn't complete. Try again."
+                return
+            }
+            applePrefersSignIn = true
+            appleRetryInFlight = true
+            // Fresh token, then sign in. If Apple hands back the SAME token it
+            // just minted (it can, when re-asked immediately), the sign-in
+            // fails and `finish` turns that into one clear instruction — and
+            // `applePrefersSignIn` guarantees the next tap skips the link and
+            // succeeds. Either way the user is never stranded.
+            startAppleSignIn(for: appleUse, forcingSignIn: true)
+        }
+    }
+
+    private func signIn(_ credential: AuthCredential) {
+        Auth.auth().signIn(with: credential) { [weak self] _, error in
+            Task { @MainActor in self?.finish(error) }
+        }
+    }
+
+    /// Single exit point for every credential path — clears the spinner and
+    /// either lands the sign-in or puts a readable reason on screen.
+    private func finish(_ error: Error?) {
+        let wasRetry = appleRetryInFlight
+        isSigningIn = false
+        appleRetryInFlight = false
+        guard let error else {
+            authError = nil
+            return
+        }
+        // A failed auto-retry is never a raw Firebase string: the user tapped
+        // once, saw two Apple prompts, and needs one instruction — not a nonce
+        // hash. `applePrefersSignIn` makes that next tap sign in directly.
+        authError = wasRetry
+            ? "Almost there — tap Continue with Apple once more to finish signing in to that account."
+            : Self.message(for: error)
+    }
+
+    /// Firebase's `localizedDescription` is serviceable but occasionally raw;
+    /// translate the handful a user can actually act on.
+    private static func message(for error: Error) -> String {
+        let nsError = error as NSError
+        switch nsError.code {
+        case AuthErrorCode.networkError.rawValue:
+            return "Couldn't reach the network. Check your connection and try again."
+        case AuthErrorCode.providerAlreadyLinked.rawValue:
+            return "This account is already saved on this phone."
+        case AuthErrorCode.invalidCredential.rawValue, AuthErrorCode.userTokenExpired.rawValue:
+            return "That sign-in expired before it went through. Try again."
+        case AuthErrorCode.operationNotAllowed.rawValue:
+            return "That sign-in method isn't available right now. Try the other one."
+        default:
+            return nsError.localizedDescription
+        }
+    }
+
+    private func handle(_ credential: AuthCredential, use: CredentialUse,
+                        provider: Provider, forcingSignIn: Bool = false) {
         switch use {
         case .link:
-            linkOrSignIn(credential)
+            linkOrSignIn(credential, provider: provider, forcingSignIn: forcingSignIn)
         case .reauthenticate:
-            guard let user = Auth.auth().currentUser else { return }
+            guard let user = Auth.auth().currentUser else {
+                finish(nil)
+                return
+            }
             user.reauthenticate(with: credential) { [weak self] _, error in
                 Task { @MainActor in
+                    guard let self else { return }
+                    self.isSigningIn = false
                     if let error {
-                        self?.deletion = .failed(error.localizedDescription)
+                        self.deletion = .failed(error.localizedDescription)
+                        self.authError = Self.message(for: error)
                     } else {
-                        self?.deletion = .reauthenticated
+                        self.authError = nil
+                        self.deletion = .reauthenticated
                     }
                 }
             }
         }
     }
+
+    /// Clears a stale failure so a retry starts from a blank slate.
+    func clearAuthError() { authError = nil }
 
     // MARK: - Google
 
     func signInWithGoogle(for use: CredentialUse = .link) {
-        guard let clientID = FirebaseApp.app()?.options.clientID else { return }
+        authError = nil
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            authError = "Google sign-in isn't configured in this build."
+            return
+        }
 
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
 
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first?.rootViewController else {
+        guard let rootViewController = Self.presentingViewController() else {
+            authError = "Couldn't open Google sign-in. Try again."
             return
         }
 
-        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { signInResult, error in
-            if let error = error {
-                print("Google Sign In Error: \(error.localizedDescription)")
-                return
+        isSigningIn = true
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] signInResult, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    // The user backing out isn't a failure — just stand down.
+                    if (error as NSError).code == GIDSignInError.canceled.rawValue {
+                        self.isSigningIn = false
+                    } else {
+                        self.finish(error)
+                    }
+                    return
+                }
+                guard let idToken = signInResult?.user.idToken?.tokenString else {
+                    self.isSigningIn = false
+                    self.authError = "Google didn't return a usable sign-in. Try again."
+                    return
+                }
+                let accessToken = signInResult?.user.accessToken.tokenString
+                let credential = GoogleAuthProvider.credential(withIDToken: idToken,
+                                                               accessToken: accessToken ?? "")
+                self.handle(credential, use: use, provider: .google)
             }
-            guard let idToken = signInResult?.user.idToken?.tokenString else { return }
-            let accessToken = signInResult?.user.accessToken.tokenString
-
-            let credential = GoogleAuthProvider.credential(withIDToken: idToken,
-                                                           accessToken: accessToken ?? "")
-            Task { @MainActor in self.handle(credential, use: use) }
         }
+    }
+
+    /// Topmost view controller of the foreground scene — `windows.first` picks
+    /// an arbitrary window and can miss the key one entirely.
+    private static func presentingViewController() -> UIViewController? {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        guard let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first else {
+            return nil
+        }
+        var top = window.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        return top
     }
 
     // MARK: - Apple
 
-    private var currentNonce: String?
+    /// Raw nonces for Apple authorizations that MAY still be in flight, newest
+    /// first. A single `currentNonce` slot was a race: the collision retry (and
+    /// an impatient double tap) each mint a new nonce while an earlier
+    /// authorization can still land, and pairing a token with the wrong raw
+    /// nonce is exactly what produced "The nonce in ID Token … does not match
+    /// the SHA256 hash of the raw nonce …" on device. Apple stamps the nonce it
+    /// used into the token, so match on that instead of guessing.
+    private var pendingNonces: [String] = []
+    private static let maxPendingNonces = 4
+    /// Once Apple has told us this Apple ID already owns a HitRate account,
+    /// every later Apple tap must SIGN IN rather than link. Linking again would
+    /// only collide again and burn another single-use token.
+    private var applePrefersSignIn = false
+    /// What the credential from the CURRENT Apple request is for. Held because
+    /// the programmatic retry (`startAppleSignIn`) answers through the delegate,
+    /// which carries no context of its own.
+    private var appleUse: CredentialUse = .link
+    private var appleForcesSignIn = false
+    /// True only while the collision RETRY is the request in flight. Gates the
+    /// retry to one attempt, and makes cancelling that second sheet explain
+    /// itself — the user tapped one button and got two prompts, so silence
+    /// there would rebuild the dead end this whole change exists to remove.
+    private var appleRetryInFlight = false
+    /// Kept alive for the duration of a programmatic request —
+    /// `ASAuthorizationController` is not retained by the system.
+    private var appleController: ASAuthorizationController?
 
     /// Configure a `SignInWithAppleButton` request: stores the raw nonce for
     /// the completion handler and returns its SHA256 for the request.
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = randomNonceString()
-        currentNonce = nonce
+        pendingNonces.insert(nonce, at: 0)
+        if pendingNonces.count > Self.maxPendingNonces { pendingNonces.removeLast() }
         request.requestedScopes = [.fullName, .email]
         request.nonce = sha256(nonce)
     }
 
+    /// Runs the Apple flow WITHOUT `SignInWithAppleButton` — used for the
+    /// collision retry, which needs a second, unspent identity token and can't
+    /// ask the user to find and tap the button again.
+    func startAppleSignIn(for use: CredentialUse, forcingSignIn: Bool = false) {
+        appleUse = use
+        appleForcesSignIn = forcingSignIn
+        isSigningIn = true
+
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        prepareAppleRequest(request)
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        appleController = controller
+        controller.performRequests()
+    }
+
     func completeAppleSignIn(_ result: Result<ASAuthorization, Error>,
                              for use: CredentialUse = .link) {
+        appleUse = use
+        appleForcesSignIn = applePrefersSignIn
+        appleRetryInFlight = false
         switch result {
         case .failure(let error):
-            // Includes the user just dismissing the sheet — not an app error.
-            print("Sign in with Apple: \(error.localizedDescription)")
+            appleFailed(error)
         case .success(let authorization):
-            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                  let nonce = currentNonce,
-                  let tokenData = appleIDCredential.identityToken,
-                  let idToken = String(data: tokenData, encoding: .utf8) else { return }
-            let credential = OAuthProvider.credential(withProviderID: "apple.com",
-                                                      idToken: idToken,
-                                                      rawNonce: nonce)
-            handle(credential, use: use)
+            appleSucceeded(authorization)
+        }
+    }
+
+    private func appleSucceeded(_ authorization: ASAuthorization) {
+        appleController = nil
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = appleIDCredential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8) else {
+            isSigningIn = false
+            authError = "Apple didn't return a usable sign-in. Try again."
+            return
+        }
+        guard let nonce = rawNonce(matching: idToken) else {
+            isSigningIn = false
+            authError = "That Apple sign-in didn't match this request. Tap Continue with Apple to try again."
+            return
+        }
+        // Each identity token is good for exactly one Firebase call, so retire
+        // its nonce the moment it's spent.
+        pendingNonces.removeAll { $0 == nonce }
+        isSigningIn = true
+        let credential = OAuthProvider.credential(withProviderID: "apple.com",
+                                                  idToken: idToken,
+                                                  rawNonce: nonce)
+        handle(credential, use: appleUse, provider: .apple, forcingSignIn: appleForcesSignIn)
+    }
+
+    private func appleFailed(_ error: Error) {
+        appleController = nil
+        isSigningIn = false
+        guard let appleError = error as? ASAuthorizationError else {
+            authError = Self.message(for: error)
+            return
+        }
+        let wasRetry = appleRetryInFlight
+        appleRetryInFlight = false
+        switch appleError.code {
+        case .canceled:
+            // Backing out of the FIRST sheet is a choice, not a failure. Backing
+            // out of the retry is different: from the user's side they tapped
+            // Continue with Apple once and nothing happened.
+            if wasRetry {
+                authError = "That Apple ID already has a HitRate account — finish the Apple prompt to sign back into it."
+            }
+            return
+        case .unknown:
+            // What Apple returns when there's no Apple Account on the device.
+            // Deliberately NOT silent: the user tapped a button and the sheet
+            // vanished, so saying nothing is the same dead end as the 2.1(a)
+            // bug, just one layer up.
+            authError = "Sign in with Apple isn't available on this device. Check you're signed in to your Apple Account in Settings, or use Google."
+        default:
+            authError = "Apple couldn't complete the sign-in. Try again, or use Google."
         }
     }
 
@@ -248,6 +501,12 @@ class AuthViewModel: NSObject, ObservableObject {
         return result
     }
 
+    /// The raw nonce THIS token was actually minted with — see
+    /// `AppleIdentityToken`, where the matching lives so it can be tested.
+    private func rawNonce(matching idToken: String) -> String? {
+        AppleIdentityToken.rawNonce(matching: idToken, from: pendingNonces)
+    }
+
     private func sha256(_ input: String) -> String {
         let inputData = Data(input.utf8)
         let hashedData = SHA256.hash(data: inputData)
@@ -255,5 +514,31 @@ class AuthViewModel: NSObject, ObservableObject {
             String(format: "%02x", $0)
         }.joined()
         return hashString
+    }
+}
+
+// MARK: - Programmatic Apple flow
+
+/// Only used by `startAppleSignIn` (the collision retry). The onboarding and
+/// account surfaces still drive Apple through `SignInWithAppleButton`, which
+/// Apple requires for the visible entry point.
+extension AuthViewModel: ASAuthorizationControllerDelegate,
+                         ASAuthorizationControllerPresentationContextProviding {
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        appleSucceeded(authorization)
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: Error) {
+        appleFailed(error)
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first ?? UIWindow()
     }
 }

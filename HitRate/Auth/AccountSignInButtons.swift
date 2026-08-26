@@ -7,13 +7,21 @@ import AuthenticationServices
 /// and button chrome can't drift between them — Apple requires Sign in with
 /// Apple to be offered wherever a third-party provider is, so these two ship
 /// together or not at all.
+/// Both providers stay tappable while a sign-in is in flight — the ONLY states
+/// this pair may be in are "offering" and "offering, with a reason the last try
+/// didn't take". Disabling them on `isSigningIn` would rebuild the dead end
+/// App Review hit on 1.7 (34), where a request that never came back left the
+/// screen frozen with nothing to press.
 struct AccountSignInButtons: View {
     @EnvironmentObject private var auth: AuthViewModel
     var use: AuthViewModel.CredentialUse = .link
+    /// Onboarding paints on navy; the editor and the save prompt on graphite.
+    var onDarkBrandBackground = false
 
     var body: some View {
         VStack(spacing: 10) {
             SignInWithAppleButton(.continue) { request in
+                auth.clearAuthError()
                 auth.prepareAppleRequest(request)
             } onCompletion: { result in
                 auth.completeAppleSignIn(result, for: use)
@@ -35,6 +43,31 @@ struct AccountSignInButtons: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if auth.isSigningIn {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(onDarkBrandBackground ? .white : Theme.accent)
+                    Text("Signing in…")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(onDarkBrandBackground ? .white.opacity(0.7) : Theme.label2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let message = auth.authError {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                    Text(message)
+                        .font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Theme.majorFall)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: auth.isSigningIn)
+        .animation(.easeOut(duration: 0.2), value: auth.authError)
     }
 }

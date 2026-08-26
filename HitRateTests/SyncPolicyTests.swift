@@ -450,3 +450,77 @@ final class FolderSummaryIndexTests: XCTestCase {
         XCTAssertEqual(summaries["b"], .init(skillCount: 1, repCount: 4_995))
     }
 }
+
+/// Guards the App Review 2.1(a) rejection on 1.7 (34): Sign in with Apple
+/// completed, then the app sat on the login screen. The cause was the collision
+/// fallback re-sending an Apple identity token the failed link had already
+/// spent — Apple's are single-use, and Firebase 10.28 attaches no updated
+/// credential on the OAuth path.
+final class CredentialCollisionPolicyTests: XCTestCase {
+    func testAppleWithoutUpdatedCredentialAsksForAFreshOne() {
+        XCTAssertEqual(
+            CredentialCollisionPolicy.recovery(provider: .apple, hasUpdatedCredential: false),
+            .refreshCredential,
+            "Re-sending a spent Apple identity token is what dead-ended the login screen")
+    }
+
+    func testGoogleWithoutUpdatedCredentialReusesTheOriginal() {
+        // Google id_tokens stay valid after a failed link, so there's no reason
+        // to make the user go through the provider sheet twice.
+        XCTAssertEqual(
+            CredentialCollisionPolicy.recovery(provider: .google, hasUpdatedCredential: false),
+            .signInWithOriginal)
+    }
+
+    func testAnUpdatedCredentialIsAlwaysPreferred() {
+        for provider in [CredentialCollisionPolicy.Provider.apple, .google] {
+            XCTAssertEqual(
+                CredentialCollisionPolicy.recovery(provider: provider, hasUpdatedCredential: true),
+                .signInWithUpdated)
+        }
+    }
+}
+
+/// Guards the device failure found while verifying the 2.1(a) fix:
+/// "The nonce in ID Token … does not match the SHA256 hash of the raw nonce …".
+/// The collision retry starts a SECOND Apple authorization, so the newest
+/// pending nonce is not reliably the one the arriving token belongs to.
+final class AppleIdentityTokenTests: XCTestCase {
+    /// Minimal unsigned JWT — only the payload is ever parsed.
+    private func token(nonceClaim: String) -> String {
+        let payload = try! JSONSerialization.data(withJSONObject: ["nonce": nonceClaim])
+        let b64 = payload.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "header.\(b64).signature"
+    }
+
+    func testPicksTheNonceTheTokenWasMintedWithNotTheNewest() {
+        let first = "nonce-from-the-original-tap"
+        let second = "nonce-from-the-collision-retry"
+        // Newest first, exactly how AuthViewModel stores them.
+        let pending = [second, first]
+        let arriving = token(nonceClaim: AppleIdentityToken.sha256(first))
+
+        XCTAssertEqual(AppleIdentityToken.rawNonce(matching: arriving, from: pending), first,
+                       "Pairing the token with the newest nonce is the on-device nonce mismatch")
+    }
+
+    func testMatchesTheNewestWhenItIsTheRightOne() {
+        let first = "older"
+        let second = "newest"
+        let arriving = token(nonceClaim: AppleIdentityToken.sha256(second))
+        XCTAssertEqual(AppleIdentityToken.rawNonce(matching: arriving, from: [second, first]), second)
+    }
+
+    func testUnreadableTokenFallsBackToNewest() {
+        XCTAssertEqual(AppleIdentityToken.rawNonce(matching: "not-a-jwt", from: ["a", "b"]), "a")
+    }
+
+    func testNoMatchRatherThanAWrongPairing() {
+        let arriving = token(nonceClaim: AppleIdentityToken.sha256("a-nonce-we-never-sent"))
+        XCTAssertNil(AppleIdentityToken.rawNonce(matching: arriving, from: ["x", "y"]),
+                     "A wrong pairing is what Firebase rejects — better to report no match")
+    }
+}

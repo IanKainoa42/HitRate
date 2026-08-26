@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Describes which Firestore collections stay live for each visible folder.
 /// Rosters are lightweight and must remain available in the folder list, while
@@ -280,6 +281,38 @@ enum AccountPromptPolicy {
     }
 }
 
+/// What to do when linking a provider credential collides with an account that
+/// already owns it — the RESTORE case onboarding step 0 exists to serve.
+///
+/// Pure and separate from `AuthViewModel` so the bug App Review rejected on
+/// 1.7 (34) is held down by a test: Apple identity tokens are SINGLE-USE, and
+/// Firebase 10.28 does not attach an updated credential on the OAuth path (it
+/// builds one from a `FIRVerifyAssertionResponse` it never populates on an
+/// error, and that initialiser returns nil for empty tokens). Re-sending the
+/// original Apple credential therefore always fails, and the old code only
+/// `print`ed that — leaving the app on the login screen forever.
+enum CredentialCollisionPolicy {
+    enum Provider { case apple, google }
+
+    enum Recovery: Equatable {
+        /// Firebase handed back a usable credential — sign in with it.
+        case signInWithUpdated
+        /// Ask the provider for a FRESH credential, then sign in.
+        case refreshCredential
+        /// Re-send the credential we already hold. Google id_tokens survive a
+        /// failed link; Apple's do not.
+        case signInWithOriginal
+    }
+
+    static func recovery(provider: Provider, hasUpdatedCredential: Bool) -> Recovery {
+        if hasUpdatedCredential { return .signInWithUpdated }
+        switch provider {
+        case .apple:  return .refreshCredential
+        case .google: return .signInWithOriginal
+        }
+    }
+}
+
 /// Value-only folder summaries keep SwiftUI from faulting every Attempt
 /// relationship more than once while rendering the folder list.
 enum FolderSummaryIndex {
@@ -307,5 +340,47 @@ enum FolderSummaryIndex {
             result[attempt.teamID, default: Summary()].repCount += 1
         }
         return result
+    }
+}
+
+/// Pairing an Apple identity token with the raw nonce it was actually minted
+/// with.
+///
+/// Pure so the device failure that produced *"The nonce in ID Token … does not
+/// match the SHA256 hash of the raw nonce … in the request"* stays fixed. The
+/// app can have more than one Apple authorization in flight — the collision
+/// retry starts a second one, and an impatient double tap a third — so the
+/// newest nonce is NOT reliably the one that belongs to the token that just
+/// landed. Apple stamps the SHA256 it received into the token's `nonce` claim,
+/// so the token itself resolves the ambiguity.
+enum AppleIdentityToken {
+    /// Reads the `nonce` claim out of the JWT payload. Parsing only — the
+    /// signature is verified server-side by Firebase, never here.
+    static func nonceClaim(in idToken: String) -> String? {
+        let parts = idToken.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        var encoded = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while encoded.count % 4 != 0 { encoded += "=" }
+        guard let data = Data(base64Encoded: encoded),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json["nonce"] as? String
+    }
+
+    static func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    /// Picks the pending raw nonce this token answers. Falls back to the newest
+    /// only when the claim can't be read — right for the ordinary single-request
+    /// case, and no worse than the old behaviour otherwise.
+    static func rawNonce(matching idToken: String, from pending: [String]) -> String? {
+        guard let claim = nonceClaim(in: idToken) else { return pending.first }
+        return pending.first { sha256($0) == claim }
     }
 }
