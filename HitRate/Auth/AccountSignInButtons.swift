@@ -20,29 +20,11 @@ struct AccountSignInButtons: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            SignInWithAppleButton(.continue) { request in
-                auth.clearAuthError()
-                auth.prepareAppleRequest(request)
-            } onCompletion: { result in
-                auth.completeAppleSignIn(result, for: use)
+            if let confirmation = auth.signInConfirmation {
+                confirmationBanner(confirmation)
+            } else {
+                providerButtons
             }
-            .signInWithAppleButtonStyle(.white)
-            .frame(height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            Button {
-                auth.signInWithGoogle(for: use)
-            } label: {
-                Text("Continue with Google")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
 
             if auth.isSigningIn {
                 HStack(spacing: 8) {
@@ -69,5 +51,54 @@ struct AccountSignInButtons: View {
         }
         .animation(.easeOut(duration: 0.2), value: auth.isSigningIn)
         .animation(.easeOut(duration: 0.2), value: auth.authError)
+        .animation(.easeOut(duration: 0.2), value: auth.signInConfirmation)
+        // A confirmation left over from an earlier sign-in must never greet
+        // someone who just opened this screen to sign in.
+        .onAppear { auth.clearSignInConfirmation() }
+    }
+
+    private var providerButtons: some View {
+        VStack(spacing: 10) {
+            SignInWithAppleButton(.continue) { request in
+                auth.clearAuthError()
+                auth.prepareAppleRequest(request)
+            } onCompletion: { result in
+                auth.completeAppleSignIn(result, for: use)
+            }
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Button {
+                auth.signInWithGoogle(for: use)
+            } label: {
+                Text("Continue with Google")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Replaces the pair rather than sitting under it: the sign-in landed, so
+    /// still offering the buttons is exactly the ambiguity this exists to end.
+    private func confirmationBanner(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 15))
+            Text(text)
+                .font(.system(size: 14, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        // Green is the training floor's one signal accent; on the navy brand
+        // register (onboarding) it would be off-palette, so plain white there.
+        .foregroundStyle(onDarkBrandBackground ? Color.white : Theme.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
     }
 }

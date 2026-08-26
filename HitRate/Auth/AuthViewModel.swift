@@ -29,6 +29,27 @@ class AuthViewModel: NSObject, ObservableObject {
     /// unchanged is indistinguishable from a hung app (App Review 2.1(a),
     /// 1.7 build 34).
     @Published var authError: String?
+    /// A sign-in the user JUST completed, in words, shown briefly and then
+    /// cleared. Apple's 2.1(a) finding was "the app remained on the login page
+    /// after we signed in"; the flow now moves on, but every surface it moves
+    /// on FROM disappears at the same moment (the prompt dismisses, onboarding
+    /// advances, the editor swaps in the saved row), so without this a
+    /// successful sign-in still reads as nothing having happened.
+    @Published var signInConfirmation: String?
+    /// Cleared by `apply` (or `finish`) the moment the sign-in lands — the flag
+    /// is what separates "the user just tapped a provider button" from "a cold
+    /// launch restored a saved session", which runs `apply` with
+    /// `upgraded == true` too, twice, on every launch.
+    private var awaitingUserSignIn = false
+    private var confirmationTask: Task<Void, Never>?
+    /// The same problem at the other end of the screen: `isUpgraded` flips
+    /// false the instant the account dies, so the view swaps straight back to
+    /// "Save your account" — which reads exactly like the deletion having
+    /// silently failed. Kept separate from `signInConfirmation` because the
+    /// sign-in buttons clear THAT on appear, and they are the first thing that
+    /// renders after a deletion.
+    @Published var deletionConfirmation: String?
+    private var deletionNoticeTask: Task<Void, Never>?
 
     /// Whether a fresh credential should LINK the current session or prove the
     /// user's identity again (Firebase demands a recent login before
@@ -47,6 +68,18 @@ class AuthViewModel: NSObject, ObservableObject {
         /// ModelContext this class deliberately doesn't hold).
         case reauthenticated
         case failed(String)
+
+        /// Erased to the case alone — `AccountDeletionPolicy` reasons about
+        /// which states leave the user something to press, not about messages.
+        var step: AccountDeletionPolicy.Step {
+            switch self {
+            case .idle: return .idle
+            case .working: return .working
+            case .needsRecentLogin: return .needsRecentLogin
+            case .reauthenticated: return .reauthenticated
+            case .failed: return .failed
+            }
+        }
     }
     @Published var deletion: AccountDeletion = .idle
 
@@ -66,10 +99,13 @@ class AuthViewModel: NSObject, ObservableObject {
         // Landing clears any stale complaint from an earlier attempt — the
         // account IS saved, whatever went wrong on the way.
         if upgraded {
+            let confirming = awaitingUserSignIn
+            awaitingUserSignIn = false
             authError = nil
             isSigningIn = false
             applePrefersSignIn = false
             pendingNonces.removeAll()
+            if confirming { announceSignIn() }
         }
     }
 
@@ -176,6 +212,7 @@ class AuthViewModel: NSObject, ObservableObject {
             // reviewer looks worse than the bug it replaced.
             guard !appleRetryInFlight else {
                 isSigningIn = false
+                awaitingUserSignIn = false
                 authError = "That Apple ID already has a HitRate account, but the sign-in didn't complete. Try again."
                 return
             }
@@ -204,8 +241,17 @@ class AuthViewModel: NSObject, ObservableObject {
         appleRetryInFlight = false
         guard let error else {
             authError = nil
+            // Normally the auth state listener has already consumed this via
+            // `apply`. If it never fired — signing in as the user we already
+            // are is not a state CHANGE — confirm here, so no success path is
+            // silent regardless of which callback wins the race.
+            if awaitingUserSignIn {
+                awaitingUserSignIn = false
+                announceSignIn()
+            }
             return
         }
+        awaitingUserSignIn = false
         // A failed auto-retry is never a raw Firebase string: the user tapped
         // once, saw two Apple prompts, and needs one instruction — not a nonce
         // hash. `applePrefersSignIn` makes that next tap sign in directly.
@@ -236,10 +282,12 @@ class AuthViewModel: NSObject, ObservableObject {
                         provider: Provider, forcingSignIn: Bool = false) {
         switch use {
         case .link:
+            awaitingUserSignIn = true
             linkOrSignIn(credential, provider: provider, forcingSignIn: forcingSignIn)
         case .reauthenticate:
             guard let user = Auth.auth().currentUser else {
-                finish(nil)
+                isSigningIn = false
+                deletion = .failed("You're not signed in on this device.")
                 return
             }
             user.reauthenticate(with: credential) { [weak self] _, error in
@@ -258,13 +306,56 @@ class AuthViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Names the provider that just landed, and retires the message on its own
+    /// so it can't still be sitting there next time the screen is opened.
+    private func announceSignIn() {
+        let provider = providerName
+        signInConfirmation = provider.isEmpty
+            ? "Signed in. Your folders follow this account now."
+            : "Saved with \(provider). Your folders follow this account now."
+        confirmationTask?.cancel()
+        confirmationTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.signInConfirmation = nil
+        }
+    }
+
+    func clearSignInConfirmation() {
+        confirmationTask?.cancel()
+        confirmationTask = nil
+        signInConfirmation = nil
+    }
+
+    /// Says the account is gone AND that the reps aren't — the thing a user is
+    /// actually anxious about at that moment.
+    private func announceDeletion() {
+        deletionConfirmation = "Account deleted. Your reps are still on this phone — save an account any time to back them up again."
+        deletionNoticeTask?.cancel()
+        deletionNoticeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.deletionConfirmation = nil
+        }
+    }
+
+    private func clearDeletionConfirmation() {
+        deletionNoticeTask?.cancel()
+        deletionNoticeTask = nil
+        deletionConfirmation = nil
+    }
+
     /// Clears a stale failure so a retry starts from a blank slate.
-    func clearAuthError() { authError = nil }
+    func clearAuthError() {
+        authError = nil
+        clearDeletionConfirmation()
+    }
 
     // MARK: - Google
 
     func signInWithGoogle(for use: CredentialUse = .link) {
         authError = nil
+        clearDeletionConfirmation()
         guard let clientID = FirebaseApp.app()?.options.clientID else {
             authError = "Google sign-in isn't configured in this build."
             return
@@ -286,6 +377,7 @@ class AuthViewModel: NSObject, ObservableObject {
                     // The user backing out isn't a failure — just stand down.
                     if (error as NSError).code == GIDSignInError.canceled.rawValue {
                         self.isSigningIn = false
+                        self.awaitingUserSignIn = false
                     } else {
                         self.finish(error)
                     }
@@ -293,6 +385,7 @@ class AuthViewModel: NSObject, ObservableObject {
                 }
                 guard let idToken = signInResult?.user.idToken?.tokenString else {
                     self.isSigningIn = false
+                    self.awaitingUserSignIn = false
                     self.authError = "Google didn't return a usable sign-in. Try again."
                     return
                 }
@@ -394,11 +487,13 @@ class AuthViewModel: NSObject, ObservableObject {
               let tokenData = appleIDCredential.identityToken,
               let idToken = String(data: tokenData, encoding: .utf8) else {
             isSigningIn = false
+            awaitingUserSignIn = false
             authError = "Apple didn't return a usable sign-in. Try again."
             return
         }
         guard let nonce = rawNonce(matching: idToken) else {
             isSigningIn = false
+            awaitingUserSignIn = false
             authError = "That Apple sign-in didn't match this request. Tap Continue with Apple to try again."
             return
         }
@@ -415,6 +510,7 @@ class AuthViewModel: NSObject, ObservableObject {
     private func appleFailed(_ error: Error) {
         appleController = nil
         isSigningIn = false
+        awaitingUserSignIn = false
         guard let appleError = error as? ASAuthorizationError else {
             authError = Self.message(for: error)
             return
@@ -450,7 +546,14 @@ class AuthViewModel: NSObject, ObservableObject {
     /// anonymous session and local folders go local-only (re-adopted by the new
     /// uid via the normal bootstrap).
     func deleteAccount(context: ModelContext) async {
-        guard let user = Auth.auth().currentUser else { return }
+        // `.onChange(of: auth.deletion)` re-enters this after a reauth; without
+        // the guard a stray republish of `.reauthenticated` would start a
+        // second footprint walk on top of the live one.
+        guard AccountDeletionPolicy.admitsRequest(current: deletion.step) else { return }
+        guard let user = Auth.auth().currentUser else {
+            deletion = .failed("You're not signed in on this device.")
+            return
+        }
         deletion = .working
         let oldUID = user.uid
 
@@ -464,13 +567,33 @@ class AuthViewModel: NSObject, ObservableObject {
             deletion = .needsRecentLogin
             return
         } catch {
+            // The footprint is gone but the login survived: sync has to come
+            // back up so what is still on the phone gets re-pushed.
+            SyncEngine.shared.resumeSyncing()
             deletion = .failed(error.localizedDescription)
             return
         }
         GIDSignIn.sharedInstance.signOut()
         SyncEngine.shared.resetLocalCloudLinkage(oldUID: oldUID, context: context)
         deletion = .idle
+        announceDeletion()
         signInAnonymouslyIfNeeded()
+    }
+
+    /// Backing out of the "Confirm it's you" step. Cancelling either provider
+    /// sheet leaves `deletion` at `.needsRecentLogin`, and that branch replaces
+    /// the whole Danger zone — no delete button, no way back. Stranding the
+    /// user on a screen with nothing to press is the same shape as the 2.1(a)
+    /// dead end, one screen over, so the escape is explicit rather than
+    /// inferred from a cancelled sheet.
+    func cancelDeletion() {
+        deletion = .idle
+        authError = nil
+        isSigningIn = false
+        // Reaching the reauth step means the footprint walk already ran and
+        // tore sync down. The account is staying, so bring it back — the
+        // bootstrap re-pushes whatever is still on this phone.
+        SyncEngine.shared.resumeSyncing()
     }
 
     // MARK: - Helpers

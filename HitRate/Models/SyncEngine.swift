@@ -1069,26 +1069,12 @@ final class SyncEngine: ObservableObject {
         if g.outcomeOverridesRaw != remote.outcomeOverridesRaw { g.outcomeOverridesRaw = remote.outcomeOverridesRaw; changed = true }
         if g.deletedAt != remote.deletedAt { g.deletedAt = remote.deletedAt; changed = true }
         if g.team?.id != team.id { g.team = team; changed = true }
-        // Adopt any homework that arrived ahead of this skill (see applyAssignment).
-        changed = linkPendingAssignments(to: g, in: context) || changed
+        // Adopt any homework that arrived ahead of this skill (see AssignmentLinking).
+        changed = AssignmentLinking.linkPending(to: g, in: context) || changed
         if acknowledged {
             syncedFingerprints[groupKey(remote.teamId, idStr)] = groupFingerprint(g, teamID: remote.teamId)
         }
         if changed { try? context.save() }
-    }
-
-    /// Attach assignments that named this skill before it existed locally.
-    /// Returns true when anything was linked.
-    private func linkPendingAssignments(to group: StuntGroup, in context: ModelContext) -> Bool {
-        let raw = group.id.uuidString
-        let orphans = (try? context.fetch(FetchDescriptor<Assignment>(
-            predicate: #Predicate { $0.groupIDRaw == raw }))) ?? []
-        var linked = false
-        for assignment in orphans where assignment.group == nil {
-            assignment.link(group)
-            linked = true
-        }
-        return linked
     }
 
     private func applyTemplate(_ remote: FTemplate, acknowledged: Bool) {
@@ -1112,32 +1098,25 @@ final class SyncEngine: ObservableObject {
     private func applyAssignment(_ remote: FAssignment, acknowledged: Bool) {
         guard let context = modelContext, let idStr = remote.id,
               let uuid = UUID(uuidString: idStr), let team = team(remote.teamId) else { return }
-        // The skill may not have landed yet: groups and assignments are SIBLING
-        // listeners with no delivery order between them, and Firestore delivers
-        // a document as `.added` exactly once. Dropping the doc here would lose
-        // this homework for good on this install, so store it unlinked and let
-        // `applyGroup` heal it when the skill arrives.
-        let groupUUID = UUID(uuidString: remote.groupId)
-        let group = groupUUID.flatMap { id in
-            (try? context.fetch(FetchDescriptor<StuntGroup>(
-                predicate: #Predicate { $0.id == id })))?.first
-        }
-        let existing = (try? context.fetch(FetchDescriptor<Assignment>(
-            predicate: #Predicate { $0.id == uuid })))?.first
-        let assignment = existing ?? Assignment(group: group, targetReps: remote.targetReps,
-                                                id: uuid, startedAt: remote.startedAt)
-        if existing == nil { assignment.team = team; context.insert(assignment) }
-        var changed = existing == nil
-        if assignment.targetReps != remote.targetReps { assignment.targetReps = remote.targetReps; changed = true }
-        if assignment.note != remote.note { assignment.note = remote.note; changed = true }
-        if assignment.subjectIDsRaw != remote.subjectIdsRaw { assignment.subjectIDsRaw = remote.subjectIdsRaw; changed = true }
-        if assignment.startedAt != remote.startedAt { assignment.startedAt = remote.startedAt; changed = true }
-        if assignment.archivedAt != remote.archivedAt { assignment.archivedAt = remote.archivedAt; changed = true }
-        if assignment.deletedAt != remote.deletedAt { assignment.deletedAt = remote.deletedAt; changed = true }
-        if assignment.createdByUID != remote.createdBy { assignment.createdByUID = remote.createdBy; changed = true }
-        if assignment.groupIDRaw != remote.groupId { assignment.groupIDRaw = remote.groupId; changed = true }
-        if let group, assignment.group?.id != group.id { assignment.link(group); changed = true }
-        if assignment.team?.id != team.id { assignment.team = team; changed = true }
+        // The store mutation — including the ordering rule for a doc that names
+        // a skill we haven't pulled down yet — lives in AssignmentLinking so it
+        // can be tested without Firestore. See that file for why dropping an
+        // unresolved assignment would lose the homework permanently.
+        let (assignment, changed) = AssignmentLinking.apply(
+            AssignmentLinking.Incoming(
+                id: uuid,
+                groupID: remote.groupId,
+                targetReps: remote.targetReps,
+                note: remote.note,
+                subjectIDsRaw: remote.subjectIdsRaw,
+                startedAt: remote.startedAt,
+                archivedAt: remote.archivedAt,
+                deletedAt: remote.deletedAt,
+                createdBy: remote.createdBy
+            ),
+            team: team,
+            in: context
+        )
         if acknowledged {
             syncedFingerprints[assignmentKey(remote.teamId, idStr)] =
                 assignmentFingerprint(assignment, teamID: remote.teamId)
@@ -1389,52 +1368,117 @@ final class SyncEngine: ObservableObject {
     func deleteCloudFootprint(uid: String) async -> String? {
         stopSyncing()
         do {
-            let owned = try await db.collection("teams")
-                .whereField("ownerUID", isEqualTo: uid).getDocuments()
-            for teamDoc in owned.documents {
-                let base = teamDoc.reference
+            let owned = try await teamRefs(
+                matching: db.collection("teams").whereField("ownerUID", isEqualTo: uid))
+            for team in owned {
+                let base = db.document(team.path)
                 for sub in ["subjects", "groups", "templates", "assignments"] {
-                    await deleteAllDocuments(matching: base.collection(sub))
+                    try await deleteAllDocuments(matching: base.collection(sub))
                 }
                 // Rules only let us delete sessions/attempts we logged; query
                 // down to ours instead of collecting a denial per foreign rep.
                 for sub in ["sessions", "attempts"] {
-                    await deleteAllDocuments(
+                    try await deleteAllDocuments(
                         matching: base.collection(sub).whereField("loggerId", isEqualTo: uid))
                 }
-                if let code = teamDoc.data()["joinCode"] as? String, !code.isEmpty {
-                    try? await db.collection("joinCodes").document(code).delete()
+                if let code = team.joinCode, !code.isEmpty {
+                    try? await withTimeout(seconds: Self.deleteStepTimeout) {
+                        try await self.db.collection("joinCodes").document(code).delete()
+                    }
                 }
-                try await base.delete()
+                try await withTimeout(seconds: Self.deleteStepTimeout) {
+                    try await base.delete()
+                }
             }
 
             // Leave every folder we joined: drop our uid from its roster.
-            let joined = try await db.collection("teams")
-                .whereField("memberIds", arrayContains: uid).getDocuments()
-            for teamDoc in joined.documents {
-                try? await teamDoc.reference.updateData([
-                    "memberIds": FieldValue.arrayRemove([uid]),
-                    "updatedAt": FieldValue.serverTimestamp()
-                ])
+            let joined = try await teamRefs(
+                matching: db.collection("teams").whereField("memberIds", arrayContains: uid))
+            for team in joined {
+                let ref = db.document(team.path)
+                try? await withTimeout(seconds: Self.deleteStepTimeout) {
+                    try await ref.updateData([
+                        "memberIds": FieldValue.arrayRemove([uid]),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ])
+                }
             }
             return nil
         } catch {
-            return error.localizedDescription
+            // Nothing was removed from auth, so the account still exists and the
+            // app has to keep syncing — `stopSyncing()` above tore it down.
+            resumeSyncing()
+            return error is TimedOutError
+                ? "Couldn’t reach the server. Check your connection and try again."
+                : error.localizedDescription
         }
+    }
+
+    /// Ceiling on any SINGLE network step of the deletion walk. Firestore write
+    /// callbacks fire only on server ack, so offline (or against a wedged
+    /// stream) a delete never returns at all — leaving the UI on “Deleting…”
+    /// with no button to press, which is the same dead end App Review cited in
+    /// 1.7 (34). Applied per step and not to the whole walk on purpose: a
+    /// season of reps is a legitimately long delete, and one ceiling over all
+    /// of it would abort a run that was working fine.
+    private static let deleteStepTimeout: TimeInterval = 20
+
+    /// The Sendable slice of a team document the deletion walk needs.
+    /// `withTimeout` requires a Sendable result and Firestore’s snapshot types
+    /// are not, so resolve to paths INSIDE the timeout and rebuild references
+    /// outside it.
+    private struct CloudTeamRef: Sendable {
+        let path: String
+        let joinCode: String?
+    }
+
+    private func teamRefs(matching query: Query) async throws -> [CloudTeamRef] {
+        try await withTimeout(seconds: Self.deleteStepTimeout) {
+            let snap = try await query.getDocuments()
+            return snap.documents.map {
+                CloudTeamRef(path: $0.reference.path,
+                             joinCode: $0.data()["joinCode"] as? String)
+            }
+        }
+    }
+
+    /// `deleteCloudFootprint` tears sync down before it starts. Any path where
+    /// the account SURVIVES has to put it back, or the app is silently offline
+    /// until the next relaunch. Idempotent (`startSyncing` no-ops while
+    /// running), so every abort path can call it without coordinating.
+    func resumeSyncing() {
+        guard let modelContext else { return }
+        startSyncing(context: modelContext)
     }
 
     /// Best-effort bulk delete, a small concurrent batch at a time. Not a
     /// WriteBatch: batches are atomic, so one rule-denied doc would fail the
     /// whole page — per-doc deletes let the deniable ones just fall through.
-    private func deleteAllDocuments(matching query: Query) async {
-        guard let snap = try? await query.getDocuments() else { return }
-        let refs = snap.documents.map(\.reference)
+    ///
+    /// A rules denial on the whole query is tolerated (killing the team doc is
+    /// what actually revokes access). A TIMEOUT is not: it means the network is
+    /// gone, and pressing on would delete the auth account while cloud data is
+    /// still reachable.
+    private func deleteAllDocuments(matching query: Query) async throws {
+        let paths: [String]
+        do {
+            paths = try await withTimeout(seconds: Self.deleteStepTimeout) {
+                try await query.getDocuments().documents.map { $0.reference.path }
+            }
+        } catch let timeout as TimedOutError {
+            throw timeout
+        } catch {
+            return
+        }
+        let refs = paths.map { db.document($0) }
         var index = 0
         while index < refs.count {
-            let page = refs[index ..< min(index + 20, refs.count)]
-            await withTaskGroup(of: Void.self) { group in
-                for ref in page {
-                    group.addTask { try? await ref.delete() }
+            let page = Array(refs[index ..< min(index + 20, refs.count)])
+            try await withTimeout(seconds: Self.deleteStepTimeout) {
+                await withTaskGroup(of: Void.self) { group in
+                    for ref in page {
+                        group.addTask { try? await ref.delete() }
+                    }
                 }
             }
             index += 20

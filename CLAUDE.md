@@ -252,12 +252,17 @@ Key invariants:
   reads. Two sync invariants: (1) its listener is deliberately NOT in
   `requiredServerCollections`, which gates ATTEMPT pushes — adding a
   never-marked name there silently stops every rep in the app from syncing; and
-  (2) assignments and groups are SIBLING listeners with no delivery order, and
-  Firestore delivers a doc as `.added` exactly once per listener lifetime, so an
-  assignment arriving before its skill is stored UNLINKED (`groupIDRaw`, always
-  set via `Assignment.link(_:)`) and adopted later by `applyGroup`. Dropping it
-  instead would lose that homework permanently on a fresh join — and would still
-  pass a relaunch test, since the group is local by then.
+  (2) THE ORDERING RULE, in `Models/AssignmentLinking.swift`: assignments and
+  groups are SIBLING listeners with no delivery order, and Firestore delivers a
+  doc as `.added` exactly once per listener lifetime, so an assignment arriving
+  before its skill is stored UNLINKED (`groupIDRaw`, always set via
+  `Assignment.link(_:)`) and adopted by `linkPending` when the group lands, or
+  by the `linkOrphans` launch sweep in RootView if that delivery already
+  happened. Dropping an unresolved assignment instead would lose that homework
+  permanently on a fresh join — and would still pass a manual relaunch test,
+  since the group is local by the second launch. That is why the import path
+  lives in a Firebase-free seam with `AssignmentLinkingTests` driving BOTH
+  delivery orders.
 - `Theme/Theme.swift` — every design token, rate bands, `Rarity` chrome,
   fonts, season string. No colors/fonts hardcoded in views.
 - `Views/Home/*` — dashboard cards, all driven by one `StatsEngine.compute`

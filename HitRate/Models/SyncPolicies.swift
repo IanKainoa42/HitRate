@@ -384,3 +384,40 @@ enum AppleIdentityToken {
         return pending.first { sha256($0) == claim }
     }
 }
+
+/// Shape of the account-deletion screen, kept out of the view so its one
+/// invariant is testable: EVERY state must leave the user something to press.
+///
+/// 1.7 (34) was rejected under 2.1(a) for a screen that offered no way forward.
+/// The same shape hid one screen over — the reauth step REPLACES the danger
+/// zone, and backing out of the provider sheet left `needsRecentLogin` standing
+/// with no delete button and no cancel — and `working` could sit forever
+/// because the footprint walk had no timeout.
+enum AccountDeletionPolicy {
+    enum Step: CaseIterable, Equatable {
+        case idle, working, needsRecentLogin, reauthenticated, failed
+    }
+
+    /// A second request while a footprint walk is live would run two deletes
+    /// over the same documents. The view re-enters `deleteAccount` on
+    /// `.reauthenticated`, so this is a real path, not a theoretical one.
+    static func admitsRequest(current: Step) -> Bool { current != .working }
+
+    /// The danger zone's own button.
+    static func showsDeleteButton(_ step: Step) -> Bool {
+        step == .idle || step == .failed
+    }
+
+    /// An explicit way back out of a step that hides the delete button.
+    static func showsEscape(_ step: Step) -> Bool {
+        step == .needsRecentLogin || step == .reauthenticated
+    }
+
+    /// The one state that offers no control. Every network step it waits on is
+    /// individually time-boxed (`SyncEngine.deleteStepTimeout`), so the walk
+    /// always TERMINATES — but that is a guarantee about termination, not about
+    /// wall-clock: a season of reps is many steps, and a slow connection can
+    /// push each one toward its ceiling. Hence the copy sets the expectation
+    /// rather than pretending it is instant.
+    static func isTransient(_ step: Step) -> Bool { step == .working }
+}

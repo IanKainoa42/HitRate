@@ -47,10 +47,17 @@ struct SaveAccountPrompt: View {
         .padding(.horizontal, 22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(FloorBackdrop().ignoresSafeArea())
-        // Linking flips this the moment it lands; get out of the way rather than
-        // leaving the user staring at buttons they already used.
+        // Linking flips this the moment it lands. Hold just long enough for the
+        // confirmation to be read before getting out of the way — dismissing on
+        // the instant is indistinguishable from the sheet having been swiped
+        // away, which is how a successful sign-in came to look like nothing
+        // happening at all.
         .onChange(of: auth.isUpgraded) { _, saved in
-            if saved { dismiss() }
+            guard saved else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_800_000_000)
+                dismiss()
+            }
         }
     }
 }

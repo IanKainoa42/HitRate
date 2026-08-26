@@ -524,3 +524,59 @@ final class AppleIdentityTokenTests: XCTestCase {
                      "A wrong pairing is what Firebase rejects — better to report no match")
     }
 }
+
+// MARK: - Account deletion screen
+
+final class AccountDeletionPolicyTests: XCTestCase {
+    /// The invariant the 2.1(a) rejection was about, stated once: a screen the
+    /// user cannot act on is a dead end. Enumerated over `allCases` so adding a
+    /// state without deciding what it offers fails here rather than in review.
+    func testEveryStateLeavesSomethingToPress() {
+        for step in AccountDeletionPolicy.Step.allCases {
+            let actionable = AccountDeletionPolicy.showsDeleteButton(step)
+                || AccountDeletionPolicy.showsEscape(step)
+                || AccountDeletionPolicy.isTransient(step)
+            XCTAssertTrue(actionable, "\(step) offers the user nothing")
+        }
+    }
+
+    /// `working` is the sole exception, and only because it always terminates.
+    func testOnlyWorkingIsAllowedToOfferNoControl() {
+        for step in AccountDeletionPolicy.Step.allCases {
+            let hasControl = AccountDeletionPolicy.showsDeleteButton(step)
+                || AccountDeletionPolicy.showsEscape(step)
+            XCTAssertEqual(hasControl, step != .working, "\(step)")
+        }
+    }
+
+    func testReauthStepsOfferAnEscapeAndHideTheDeleteButton() {
+        for step in [AccountDeletionPolicy.Step.needsRecentLogin, .reauthenticated] {
+            XCTAssertTrue(AccountDeletionPolicy.showsEscape(step))
+            XCTAssertFalse(AccountDeletionPolicy.showsDeleteButton(step),
+                           "The reauth step replaces the danger zone")
+        }
+    }
+
+    func testAFailedDeletionCanBeRetried() {
+        XCTAssertTrue(AccountDeletionPolicy.showsDeleteButton(.failed))
+        XCTAssertTrue(AccountDeletionPolicy.admitsRequest(current: .failed))
+    }
+
+    func testASecondRequestIsRefusedWhileAWalkIsLive() {
+        XCTAssertFalse(AccountDeletionPolicy.admitsRequest(current: .working),
+                       "The view re-enters deleteAccount on .reauthenticated")
+        for step in AccountDeletionPolicy.Step.allCases where step != .working {
+            XCTAssertTrue(AccountDeletionPolicy.admitsRequest(current: step), "\(step)")
+        }
+    }
+
+    /// The erasure the view and the policy meet on.
+    @MainActor
+    func testDeletionStateMapsToItsStep() {
+        XCTAssertEqual(AuthViewModel.AccountDeletion.idle.step, .idle)
+        XCTAssertEqual(AuthViewModel.AccountDeletion.working.step, .working)
+        XCTAssertEqual(AuthViewModel.AccountDeletion.needsRecentLogin.step, .needsRecentLogin)
+        XCTAssertEqual(AuthViewModel.AccountDeletion.reauthenticated.step, .reauthenticated)
+        XCTAssertEqual(AuthViewModel.AccountDeletion.failed("anything").step, .failed)
+    }
+}

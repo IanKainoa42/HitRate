@@ -14,6 +14,11 @@ import AuthenticationServices
 struct AccountView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    /// Set only where this is presented as a sheet — pushed into the editor's
+    /// navigation stack it already has a back button.
+    var showsDone = false
 
     @State private var confirmDelete = false
 
@@ -21,7 +26,15 @@ struct AccountView: View {
 
     var body: some View {
         List {
+            // Outside the upgraded branch on purpose: a completed deletion is
+            // announced to a user the app already considers signed out.
+            if let notice = auth.deletionConfirmation {
+                noticeRow(notice, icon: "trash.circle.fill", tint: Theme.label2)
+            }
             if auth.isUpgraded {
+                if let confirmation = auth.signInConfirmation {
+                    noticeRow(confirmation, icon: "checkmark.circle.fill", tint: Theme.accent)
+                }
                 savedSection
                 deleteSection
             } else {
@@ -32,6 +45,15 @@ struct AccountView: View {
         .background(FloorBackdrop().ignoresSafeArea())
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsDone {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: auth.signInConfirmation)
+        .animation(.easeOut(duration: 0.2), value: auth.deletionConfirmation)
         .alert("Delete your account?", isPresented: $confirmDelete) {
             Button("Delete account", role: .destructive) {
                 Task { await auth.deleteAccount(context: context) }
@@ -47,6 +69,25 @@ struct AccountView: View {
                 Task { await auth.deleteAccount(context: context) }
             }
         }
+    }
+
+    /// Both ends of this screen swap quietly — the saved row looks the same
+    /// whether the user signed in ten seconds or ten months ago, and a deleted
+    /// account leaves the sign-in offer looking untouched. These say the thing
+    /// happened, then retire themselves (see `AuthViewModel`).
+    private func noticeRow(_ text: String, icon: String, tint: Color) -> some View {
+        Section {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                Text(text)
+                    .font(.system(size: 14, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(tint)
+            .padding(.vertical, 3)
+        }
+        .listRowBackground(glassRow)
     }
 
     // MARK: - Anonymous: save the account
@@ -90,11 +131,17 @@ struct AccountView: View {
     @ViewBuilder
     private var deleteSection: some View {
         switch auth.deletion {
-        case .needsRecentLogin, .reauthenticated:
+        case _ where AccountDeletionPolicy.showsEscape(auth.deletion.step):
             Section {
                 signInButtons(for: .reauthenticate)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                // This branch REPLACES the danger zone, so without an explicit
+                // way out a cancelled provider sheet strands the user here with
+                // no delete button and nothing to press.
+                Button("Cancel") { auth.cancelDeletion() }
+                    .foregroundStyle(Theme.label2)
+                    .listRowBackground(glassRow)
             } header: {
                 Text("Confirm it's you")
             } footer: {
@@ -102,12 +149,21 @@ struct AccountView: View {
             }
         default:
             Section {
-                if auth.deletion == .working {
+                if AccountDeletionPolicy.isTransient(auth.deletion.step) {
+                    // No cancel here on purpose — abandoning a walk midway
+                    // would leave the account alive with its cloud data half
+                    // gone. It is bounded instead: every step is time-boxed,
+                    // and the copy says so rather than implying it's instant.
                     HStack(spacing: 10) {
                         ProgressView().tint(Theme.accent)
-                        Text("Deleting…")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.label2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Deleting…")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.label)
+                            Text("A big folder can take a minute.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.label2)
+                        }
                     }
                 } else {
                     Button(role: .destructive) {

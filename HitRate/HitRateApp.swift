@@ -115,6 +115,10 @@ struct RootView: View {
             migrateExistingInstallIfNeeded()
             migrateGroupsIntoDefaultTeam()
             sweepOrphanedAttempts()
+            // Adopt homework whose skill landed before it did — the sibling
+            // listeners have no delivery order, and Firestore re-delivers a doc
+            // only to a fresh listener. See AssignmentLinking.
+            AssignmentLinking.linkOrphans(in: context)
             endStaleSessions()
             configureWatchLogging()
             // Anonymous-first: guarantee a signed-in session so cloud sync has a

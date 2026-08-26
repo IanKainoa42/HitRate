@@ -150,7 +150,7 @@ struct FolderListView: View {
                 .presentationBackground(Theme.appBGBottom)
         }
         .sheet(isPresented: $accountOpen) {
-            NavigationStack { AccountView() }
+            NavigationStack { AccountView(showsDone: true) }
         }
         .alert(
             "Move “\(pendingTrash?.name ?? "")” to Trash?",
@@ -533,7 +533,7 @@ private struct ShareFolderSheet: View {
             }
         }
         .sheet(isPresented: $accountOpen) {
-            NavigationStack { AccountView() }
+            NavigationStack { AccountView(showsDone: true) }
         }
         .confirmationDialog(
             "Remove folder access?",
