@@ -33,21 +33,27 @@ struct FolderListView: View {
     @State private var pendingTrash: Team?
     @State private var accountOpen = false
 
+    /// Two states, one row. Unsaved it's the nudge; saved it's the only path to
+    /// Account — and so to account deletion — from the launch root. Saved state
+    /// stays deliberately quiet: green is the go/hit signal, not a status light.
     private var saveAccountChip: some View {
         Button {
             accountOpen = true
         } label: {
             HStack(spacing: 9) {
-                Image(systemName: "exclamationmark.shield.fill")
+                Image(systemName: auth.isUpgraded
+                      ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.label2)
-                Text("Reps live on this phone only")
+                Text(auth.isUpgraded
+                     ? "Reps saved to your \(auth.providerName) account"
+                     : "Reps live on this phone only")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.label2)
                 Spacer(minLength: 4)
-                Text("SAVE")
+                Text(auth.isUpgraded ? "ACCOUNT" : "SAVE")
                     .font(.system(size: 12, weight: .heavy))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(auth.isUpgraded ? Theme.label3 : Theme.accent)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Theme.label3)

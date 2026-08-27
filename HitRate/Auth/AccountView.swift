@@ -52,8 +52,9 @@ struct AccountView: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.2), value: auth.signInConfirmation)
-        .animation(.easeOut(duration: 0.2), value: auth.deletionConfirmation)
+        // NOT animated. Animating a `List` across a section insert/remove
+        // double-renders the outgoing rows on top of the incoming ones — the
+        // sign-in pair drawn twice, overlapping its own footer.
         .alert("Delete your account?", isPresented: $confirmDelete) {
             Button("Delete account", role: .destructive) {
                 Task { await auth.deleteAccount(context: context) }

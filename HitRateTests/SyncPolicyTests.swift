@@ -427,7 +427,10 @@ final class AccountPromptPolicyTests: XCTestCase {
     func testFolderChipPersistsButOnlyWithAFolderToLose() {
         XCTAssertTrue(AccountPromptPolicy.showsFolderListChip(isUpgraded: false, folderCount: 1))
         XCTAssertFalse(AccountPromptPolicy.showsFolderListChip(isUpgraded: false, folderCount: 0))
-        XCTAssertFalse(AccountPromptPolicy.showsFolderListChip(isUpgraded: true, folderCount: 3))
+        // Saved keeps the row: it is the only route to Account — and to
+        // account deletion — from the launch root.
+        XCTAssertTrue(AccountPromptPolicy.showsFolderListChip(isUpgraded: true, folderCount: 3))
+        XCTAssertFalse(AccountPromptPolicy.showsFolderListChip(isUpgraded: true, folderCount: 0))
     }
 }
 

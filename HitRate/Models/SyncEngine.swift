@@ -1408,10 +1408,18 @@ final class SyncEngine: ObservableObject {
             // Nothing was removed from auth, so the account still exists and the
             // app has to keep syncing — `stopSyncing()` above tore it down.
             resumeSyncing()
-            return error is TimedOutError
-                ? "Couldn’t reach the server. Check your connection and try again."
-                : error.localizedDescription
+            return Self.deletionMessage(for: error)
         }
+    }
+
+    private static func deletionMessage(for error: Error) -> String {
+        let nsError = error as NSError
+        if error is TimedOutError
+            || CloudDeletionReadPolicy.isUnreachable(errorDomain: nsError.domain,
+                                                     errorCode: nsError.code) {
+            return "Couldn’t reach the server. Check your connection and try again."
+        }
+        return nsError.localizedDescription
     }
 
     /// Ceiling on any SINGLE network step of the deletion walk. Firestore write
@@ -1434,7 +1442,8 @@ final class SyncEngine: ObservableObject {
 
     private func teamRefs(matching query: Query) async throws -> [CloudTeamRef] {
         try await withTimeout(seconds: Self.deleteStepTimeout) {
-            let snap = try await query.getDocuments()
+            // .server, never the cache — see CloudDeletionReadPolicy.
+            let snap = try await query.getDocuments(source: .server)
             return snap.documents.map {
                 CloudTeamRef(path: $0.reference.path,
                              joinCode: $0.data()["joinCode"] as? String)
@@ -1463,11 +1472,12 @@ final class SyncEngine: ObservableObject {
         let paths: [String]
         do {
             paths = try await withTimeout(seconds: Self.deleteStepTimeout) {
-                try await query.getDocuments().documents.map { $0.reference.path }
+                try await query.getDocuments(source: .server)
+                    .documents.map { $0.reference.path }
             }
-        } catch let timeout as TimedOutError {
-            throw timeout
-        } catch {
+        } catch let error as NSError
+            where CloudDeletionReadPolicy.skipsCollection(errorDomain: error.domain,
+                                                          errorCode: error.code) {
             return
         }
         let refs = paths.map { db.document($0) }

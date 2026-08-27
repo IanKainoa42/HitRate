@@ -86,8 +86,14 @@ class AuthViewModel: NSObject, ObservableObject {
     override init() {
         super.init()
         apply(Auth.auth().currentUser)
+        // The hop is EXPLICIT. `apply` publishes the state SwiftUI renders, and
+        // Firebase does not contract which queue this listener fires on — a
+        // callback that lands off-main mutates @Published from a background
+        // thread, where the update may never reach the view. That is exactly
+        // the shape of "signed in, Firebase kept it, but the screen still
+        // offers the buttons until a relaunch".
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            self?.apply(user)
+            Task { @MainActor in self?.apply(user) }
         }
     }
 
@@ -109,12 +115,39 @@ class AuthViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// The bootstrap anonymous sign-in, TRACKED so a user-initiated credential
+    /// can wait for it instead of racing it.
+    ///
+    /// Guarding on `currentUser == nil` at call time is not enough: Firebase
+    /// replaces `currentUser` wholesale when the request lands, so an anonymous
+    /// sign-in still in flight will overwrite an Apple sign-in that completed
+    /// in between — the account reads as saved, the confirmation shows, and
+    /// then the sign-in buttons quietly come back. The window is wide open
+    /// right after account deletion, which starts a bootstrap and then hands
+    /// the user a screen whose first offer is "Continue with Apple".
+    private var anonymousBootstrap: Task<Void, Never>?
+
     /// Anonymous-first launch: only signs in if there's no session at all, so we
     /// never clobber an upgraded (Apple/Google) account or a live anonymous one.
     func signInAnonymouslyIfNeeded() {
-        guard Auth.auth().currentUser == nil else { return }
-        Auth.auth().signInAnonymously { _, error in
-            if let error { print("Anonymous sign-in error: \(error.localizedDescription)") }
+        guard Auth.auth().currentUser == nil, anonymousBootstrap == nil else { return }
+        anonymousBootstrap = Task { @MainActor [weak self] in
+            do {
+                _ = try await Auth.auth().signInAnonymously()
+            } catch {
+                print("Anonymous sign-in error: \(error.localizedDescription)")
+            }
+            self?.anonymousBootstrap = nil
+        }
+    }
+
+    /// Land every user-initiated credential AFTER the bootstrap, never across
+    /// it. Bounded: if the anonymous request is stuck (offline), going ahead
+    /// beats blocking the sign-in the user actually asked for.
+    private func awaitAnonymousBootstrap() async {
+        for _ in 0 ..< 50 {                     // ≤ 5s
+            guard anonymousBootstrap != nil else { return }
+            try? await Task.sleep(nanoseconds: 100_000_000)
         }
     }
 
@@ -241,10 +274,16 @@ class AuthViewModel: NSObject, ObservableObject {
         appleRetryInFlight = false
         guard let error else {
             authError = nil
-            // Normally the auth state listener has already consumed this via
-            // `apply`. If it never fired — signing in as the user we already
-            // are is not a state CHANGE — confirm here, so no success path is
-            // silent regardless of which callback wins the race.
+            // LINKING a provider does not change the auth STATE: it is the same
+            // uid, so `addStateDidChangeListener` has no event to send and
+            // never fires. `isUpgraded` is derived only from `apply`, so
+            // without this it stayed false until the next cold launch — the
+            // account saved correctly, the confirmation showed, and then the
+            // sign-in buttons came straight back. Re-derive from the live user
+            // rather than waiting for an event that is not coming.
+            apply(Auth.auth().currentUser)
+            // Belt and braces: if the user somehow isn't upgraded, `apply`
+            // won't have consumed the flag, and a success must never be silent.
             if awaitingUserSignIn {
                 awaitingUserSignIn = false
                 announceSignIn()
@@ -280,9 +319,19 @@ class AuthViewModel: NSObject, ObservableObject {
 
     private func handle(_ credential: AuthCredential, use: CredentialUse,
                         provider: Provider, forcingSignIn: Bool = false) {
+        // Armed synchronously so a landing `apply` can't miss it, then the
+        // Firebase call waits out any bootstrap that would clobber it.
+        if use == .link { awaitingUserSignIn = true }
+        Task { @MainActor in
+            await self.awaitAnonymousBootstrap()
+            self.route(credential, use: use, provider: provider, forcingSignIn: forcingSignIn)
+        }
+    }
+
+    private func route(_ credential: AuthCredential, use: CredentialUse,
+                       provider: Provider, forcingSignIn: Bool = false) {
         switch use {
         case .link:
-            awaitingUserSignIn = true
             linkOrSignIn(credential, provider: provider, forcingSignIn: forcingSignIn)
         case .reauthenticate:
             guard let user = Auth.auth().currentUser else {
@@ -299,6 +348,7 @@ class AuthViewModel: NSObject, ObservableObject {
                         self.authError = Self.message(for: error)
                     } else {
                         self.authError = nil
+                        self.apply(Auth.auth().currentUser)
                         self.deletion = .reauthenticated
                     }
                 }

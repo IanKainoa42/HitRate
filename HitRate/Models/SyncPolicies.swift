@@ -273,11 +273,14 @@ enum AccountPromptPolicy {
         !isUpgraded && !alreadyAsked && repCount > 0
     }
 
-    /// The always-on folder-list chip. Unlike the prompt this never expires —
-    /// it's the standing door back in — but it stays hidden until there's a
-    /// folder to lose so a first launch isn't nagged.
+    /// The always-on folder-list account row. Before saving it's the standing
+    /// door in; AFTER saving it has to stay, as the way back. Gating it on
+    /// `!isUpgraded` left a saved account with no path to Account from the
+    /// launch root at all — and account deletion has to be findable
+    /// (App Review 5.1.1(v)). Still hidden until there's a folder to lose, so a
+    /// first launch isn't nagged.
     static func showsFolderListChip(isUpgraded: Bool, folderCount: Int) -> Bool {
-        !isUpgraded && folderCount > 0
+        folderCount > 0
     }
 }
 
@@ -420,4 +423,30 @@ enum AccountDeletionPolicy {
     /// push each one toward its ceiling. Hence the copy sets the expectation
     /// rather than pretending it is instant.
     static func isTransient(_ step: Step) -> Bool { step == .working }
+}
+
+/// Enumeration for a deletion walk must come from the SERVER.
+///
+/// Firestore's default read falls back to the local cache and returns whatever
+/// is in it — on a reinstalled build, offline, that is NOTHING. The walk then
+/// reports "cleared everything" having touched no document, and the caller goes
+/// on to delete the auth account while every folder is still live in the cloud.
+/// That breaks the one guarantee `deleteCloudFootprint` makes.
+enum CloudDeletionReadPolicy {
+    private static let firestoreErrorDomain = "FIRFirestoreErrorDomain"
+    private static let permissionDenied = 7
+    private static let unavailable = 14
+
+    /// A collection we're not ALLOWED to read is skippable — killing the team
+    /// doc is what actually revokes access. Anything else means we don't know
+    /// what is there, and pressing on would delete the login regardless.
+    static func skipsCollection(errorDomain: String, errorCode: Int) -> Bool {
+        errorDomain == firestoreErrorDomain && errorCode == permissionDenied
+    }
+
+    /// Offline reads and step timeouts get one plain sentence; anything else
+    /// keeps the backend's own wording, which beats a guess.
+    static func isUnreachable(errorDomain: String, errorCode: Int) -> Bool {
+        errorDomain == firestoreErrorDomain && errorCode == unavailable
+    }
 }
