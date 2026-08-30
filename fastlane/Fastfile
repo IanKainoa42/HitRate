@@ -211,6 +211,24 @@ platform :ios do
     )
   end
 
+  desc "Upload only App Store screenshots to an editable version. No metadata, binary, or submit."
+  lane :ship_screenshots do
+    version = ENV["SHIP_APP_VERSION"]
+    UI.user_error!("Set SHIP_APP_VERSION to the editable App Store version") if version.to_s.empty?
+    upload_to_app_store(
+      api_key: app_store_api_key,
+      app_identifier: APP_IDENTIFIER,
+      app_version: version,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: false,
+      overwrite_screenshots: true,
+      force: true,
+      run_precheck_before_submit: false,
+      submit_for_review: false
+    )
+  end
+
   desc "Push App Privacy declaration from app_privacy_details.json (User ID + User Content, linked, App Functionality — Firebase sync; no tracking/analytics)."
   lane :ship_privacy do
     require "spaceship"
