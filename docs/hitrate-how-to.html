@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HitRate — How It Works</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+  :root {
+    /* Training Floor */
+    --floor-top: #1A202A;
+    --floor-mid: #141820;
+    --floor-bot: #090D15;
+    --well-bg: #0C1119;
+    --well-shadow: rgba(0,0,0,0.6);
+    --well-light: rgba(42,52,69,0.26);
+    --label: #F3F4F1;
+    --label2: #8D8B86;
+    --label3: #5C5B57;
+    --accent: #29F06D;
+    --accent-text: #0E1511;
+    --icon-tile: #101621;
+    --icon-edge: #2A3445;
+    --separator: #26303D;
+
+    /* Outcomes */
+    --hit: #34D26A;
+    --bobble: #E8C94B;
+    --building-fall: #FF9A3D;
+    --major-fall: #FF6B57;
+
+    /* Court at Night */
+    --court-bg: #0A0F1E;
+    --court-grad1: #1B2335;
+    --court-grad2: #0C1120;
+    --court-grad3: #06080F;
+    --coral: #FF4757;
+    --electric: #00D4FF;
+    --gold: #FFD43B;
+
+    /* Group colors */
+    --g1: #6B9BD8;
+    --g2: #5FBF77;
+    --g3: #E0A458;
+    --g4: #A98BD4;
+    --g5: #D97B85;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── Phone Frame ── */
+  .phone {
+    width: 375px;
+    height: 812px;
+    border-radius: 48px;
+    border: 4px solid #2A2A2E;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 80px rgba(41,240,109,0.08), 0 40px 100px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 126px; height: 34px;
+    background: #000;
+    border-radius: 0 0 18px 18px;
+    z-index: 1000;
+  }
+
+  /* ── Screens ── */
+  .screen {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .screen.active { opacity: 1; z-index: 10; }
+
+  /* ── Cursor ── */
+  .cursor {
+    position: absolute;
+    width: 28px; height: 28px;
+    z-index: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .cursor.visible { opacity: 1; }
+  .cursor-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.4) 50%, transparent 70%);
+    box-shadow: 0 0 12px rgba(255,255,255,0.5);
+  }
+  .cursor-ring {
+    position: absolute;
+    top: -8px; left: -8px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    opacity: 0;
+  }
+  .cursor.tapping .cursor-ring {
+    animation: tapRing 0.4s ease-out;
+  }
+  @keyframes tapRing {
+    0% { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* ── Progress Bar ── */
+  .progress-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    z-index: 900;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.5s linear;
+  }
+
+  /* ── Step Label ── */
+  .step-label {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 800;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--label2);
+    opacity: 0;
+    transition: opacity 0.5s;
+    white-space: nowrap;
+  }
+  .step-label.visible { opacity: 1; }
+
+  /* ══════════════════════════════════════════
+     SCREEN 1: ONBOARDING — DECK COVER
+     ══════════════════════════════════════════ */
+  .s-onboard {
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, var(--court-grad1), var(--court-grad2), var(--court-grad3));
+  }
+  .s-onboard::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 60px);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
+  }
+  .coral-glow {
+    position: absolute;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(255,71,87,0.16), transparent 70%);
+    top: -60px; left: -80px;
+    filter: blur(80px);
+  }
+  .electric-glow {
+    position: absolute;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(0,212,255,0.13), transparent 70%);
+    bottom: 40px; right: -80px;
+    filter: blur(80px);
+  }
+  .ob-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 70px 28px 40px;
+    height: 100%;
+  }
+  .ob-heading {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--label);
+    margin-bottom: 32px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.6s 0.5s ease forwards;
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Deck box preview */
+  .deck-box {
+    width: 200px;
+    height: 280px;
+    border-radius: 16px;
+    background: linear-gradient(165deg, #141A2B, #0D1322);
+    border: 2px solid rgba(0,212,255,0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    opacity: 0;
+    transform: scale(0.85);
+    animation: deckPop 0.5s 0.8s ease forwards;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(0,212,255,0.08);
+  }
+  @keyframes deckPop {
+    to { opacity: 1; transform: scale(1); }
+  }
+  .deck-box-wordmark {
+    font-family: -apple-system, sans-serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+  .deck-box-wordmark .hit { color: var(--label); }
+  .deck-box-wordmark .rate { color: var(--court-bg); -webkit-text-stroke: 1px var(--label); }
+  .deck-box-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--electric);
+    margin-top: 12px;
+    opacity: 0;
+    animation: fadeUp 0.4s 2.5s ease forwards;
+  }
+
+  /* Text field */
+  .ob-field {
+    width: 100%;
+    height: 48px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    margin-bottom: 16px;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.2s ease forwards;
+  }
+  .ob-field-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    color: var(--label);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .ob-field-cursor {
+    width: 2px;
+    height: 20px;
+    background: var(--electric);
+    margin-left: 1px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* Mode pills */
+  .mode-pills {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.5s ease forwards;
+  }
+  .mode-pill {
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s;
+  }
+  .mode-pill.selected {
+    background: #fff;
+    color: var(--court-bg);
+  }
+  .mode-pill.unselected {
+    background: rgba(255,255,255,0.06);
+    color: var(--label2);
+  }
+
+  .ob-cta {
+    width: 100%;
+    height: 52px;
+    background: var(--accent);
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: auto;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.8s ease forwards;
+  }
+  .ob-cta-dot {
+    width: 8px; height: 8px;
+    background: var(--accent-text);
+    border-radius: 50%;
+  }
+  .ob-cta-text {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent-text);
+  }
+
+  /* ══════════════════════════════════════════
+     SCREEN 2: MINT YOUR CARDS
+     ══════════════════════════════════════════ */
+  .s-mint {
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, var(--court-grad1), var(--court-grad2), var(--court-grad3));
+  }
+  .mint-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 70px 28px 40px;
+    height: 100%;
+  }
+  .mint-heading {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--label);
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .focus-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .focus-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.3s;
+  }
+  .focus-btn.sel { background: #fff; color: var(--court-bg); }
+  .focus-btn.unsel { background: rgba(255,255,255,0.06); color: var(--label2); }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    color: var(--label);
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.3s;
+  }
+  .chip.minted {
+    background: rgba(41,240,109,0.12);
+    border-color: rgba(41,240,109,0.3);
+    color: var(--accent);
+  }
+
+  .mini-cards-rail {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0;
+    min-height: 100px;
+  }
+  .mini-card {
+    width: 65px;
+    height: 95px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .mini-card.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .mini-card-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    background: linear-gradient(160deg, #141A2B, #0D1322);
+    border: 1.5px solid var(--icon-edge);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+  }
+  .mini-card-line {
+    width: 70%;
+    height: 2px;
+    border-top: 1.5px dashed rgba(255,255,255,0.2);
+    margin: 3px 0;
+  }
+  .mini-card-name {
+    font-size: 7px;
+    font-weight: 600;
+    color: var(--label2);
+    margin-top: 4px;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ══════════════════════════════════════════
+     SCREEN 3: HOME DASHBOARD
+     ══════════════════════════════════════════ */
+  .s-home {
+    background: linear-gradient(180deg, var(--floor-top) 0%, var(--floor-mid) 40%, var(--floor-bot) 100%);
+  }
+  .s-home::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.018) 3px, rgba(255,255,255,0.018) 4px);
+  }
+  .home-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 58px 0 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Header well */
+  .home-header {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .wordmark {
+    font-weight: 900;
+    font-style: italic;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+  }
+  .wordmark .hit { color: var(--label); }
+  .wordmark .rate { color: var(--accent); }
+  .header-identity {
+    font-size: 11px;
+    color: var(--label2);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+  .header-icons {
+    display: flex;
+    gap: 6px;
+  }
+  .header-icon {
+    width: 34px; height: 34px;
+    background: var(--icon-tile);
+    border: 1px solid var(--icon-edge);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  /* Timeframe tabs well */
+  .tf-well {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 12px;
+    padding: 8px 10px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    gap: 4px;
+    margin-bottom: 9px;
+  }
+  .tf-tab {
+    flex: 1;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    transition: all 0.3s;
+  }
+  .tf-tab.sel { background: rgba(255,255,255,0.95); color: #111; }
+  .tf-tab.unsel { color: var(--label2); }
+
+  /* Cards scroll area */
+  .cards-scroll {
+    flex: 1;
+    overflow: hidden;
+    padding: 0 12px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  /* Summary card */
+  .feed-card {
+    background: var(--well-bg);
+    border-radius: 14px;
+    padding: 18px 16px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .card-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--label2);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .rate-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 64px;
+    line-height: 1;
+    color: var(--hit);
+  }
+  .rate-pct {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--hit);
+    margin-left: 2px;
+  }
+  .rate-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .delta-badge {
+    background: rgba(52,210,106,0.15);
+    color: var(--hit);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+  .outcome-bar {
+    height: 12px;
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden;
+    margin: 14px 0 12px;
+  }
+  .outcome-bar div { height: 100%; }
+  .ob-hit { background: var(--hit); }
+  .ob-bob { background: var(--bobble); }
+  .ob-bf { background: var(--building-fall); }
+  .ob-mf { background: var(--major-fall); }
+
+  .outcome-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--label2);
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--label);
+    margin-left: auto;
+  }
+
+  /* Trend card (simplified) */
+  .trend-card { padding: 18px 16px 14px; }
+  .trend-line-area {
+    height: 60px;
+    position: relative;
+    margin-top: 8px;
+  }
+  .trend-svg { width: 100%; height: 100%; }
+
+  /* Groups card */
+  .groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .group-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .group-swatch {
+    width: 10px; height: 28px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .group-name {
+    font-size: 13px;
+    color: var(--label);
+    flex: 1;
+    font-weight: 500;
+  }
+  .group-pct {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .group-reps {
+    font-size: 11px;
+    color: var(--label3);
+    width: 50px;
+    text-align: right;
+  }
+
+  /* Practice CTA */
+  .practice-cta {
+    position: absolute;
+    bottom: 24px;
+    left: 16px;
+    right: 16px;
+    height: 52px;
+    background: var(--accent);
+    border-radius: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    z-index: 20;
+    box-shadow: 0 0 20px rgba(41,240,109,0.2), 0 4px 16px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.28);
+  }
+  .cta-dot {
+    width: 8px; height: 8px;
+    background: var(--accent-text);
+    border-radius: 50%;
+    animation: ctaPulse 2s ease infinite;
+  }
+  @keyframes ctaPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .cta-label {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent-text);
+  }
+
+  /* ══════════════════════════════════════════
+     SCREEN 4: CAPTURE VIEW
+     ══════════════════════════════════════════ */
+  .s-capture {
+    background: linear-gradient(180deg, var(--floor-top), var(--floor-mid), var(--floor-bot));
+  }
+  .s-capture::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.018) 3px, rgba(255,255,255,0.018) 4px);
+  }
+  .capture-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 58px 0 0;
+    height: 100%;
+  }
+
+  /* Capture header */
+  .cap-header {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .cap-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--label2);
+    text-transform: uppercase;
+  }
+  .cap-reps {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 30px;
+    color: var(--label);
+    line-height: 1;
+  }
+  .cap-reps-sub {
+    font-size: 12px;
+    color: var(--label2);
+    font-weight: 500;
+  }
+  .cap-end-btn {
+    background: var(--major-fall);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Pin bar */
+  .pin-bar {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+  }
+  .pin-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: var(--label3);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .pin-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .pin-chip.sel { background: var(--label); color: #111; }
+  .pin-chip.unsel { background: var(--icon-tile); color: var(--label2); border: 1px solid var(--icon-edge); }
+  .pin-chip-swatch {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+
+  /* Outcome grid */
+  .outcome-grid {
+    flex: 1;
+    margin: 0 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+    padding-bottom: 8px;
+    align-content: start;
+  }
+  .outcome-header {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 4px 0;
+  }
+  .outcome-cell {
+    background: var(--well-bg);
+    border-radius: 10px;
+    box-shadow: inset 0 2px 3px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 4px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.15s;
+    min-height: 56px;
+  }
+  .outcome-cell::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 0 0 10px 10px;
+  }
+  .outcome-cell.hit-cell::after { background: var(--hit); }
+  .outcome-cell.bob-cell::after { background: var(--bobble); }
+  .outcome-cell.bf-cell::after { background: var(--building-fall); }
+  .outcome-cell.mf-cell::after { background: var(--major-fall); }
+  .cell-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--label);
+  }
+  .cell-label {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--label3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cell-flash {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 2px solid;
+    opacity: 0;
+  }
+  .cell-flash.flash-anim {
+    animation: cellFlash 0.35s ease-out;
+  }
+  @keyframes cellFlash {
+    0% { opacity: 0.9; transform: scale(0.95); }
+    50% { opacity: 0.5; transform: scale(1.02); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+  .cell-flash.hit-flash { border-color: var(--hit); }
+  .cell-flash.bob-flash { border-color: var(--bobble); }
+
+  .grid-row-label {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px 2px;
+  }
+  .row-swatch {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+  .row-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label);
+  }
+
+  /* Auto-save toast */
+  .autosave-toast {
+    background: var(--well-bg);
+    margin: 0 12px 8px;
+    border-radius: 12px;
+    padding: 10px 14px;
+    box-shadow: inset 0 2px 3px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label2);
+    letter-spacing: 0.8px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s;
+  }
+  .autosave-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .toast-check {
+    color: var(--accent);
+    font-size: 14px;
+  }
+
+  /* ══════════════════════════════════════════
+     SCREEN 5: SHARE CARDS
+     ══════════════════════════════════════════ */
+  .s-share {
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, var(--court-grad1), var(--court-grad2), var(--court-grad3));
+  }
+  .share-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 70px 28px 40px;
+    height: 100%;
+  }
+  .share-heading {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--label2);
+    margin-bottom: 20px;
+  }
+
+  /* Share card */
+  .share-card {
+    width: 240px;
+    height: 356px;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.5);
+  }
+  .share-card-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, #141A2B, #0D1322);
+  }
+  .share-card-edge {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    border: 2px solid #3A5070;
+    pointer-events: none;
+  }
+  .share-card-content {
+    position: relative;
+    z-index: 2;
+    padding: 20px 18px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .sc-kicker {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--label2);
+    text-transform: uppercase;
+  }
+  .sc-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--label);
+    margin: 6px 0 2px;
+  }
+  .sc-number {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 56px;
+    line-height: 1;
+    margin: 12px 0 4px;
+  }
+  .sc-pct {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+  }
+  .sc-bar {
+    height: 8px;
+    border-radius: 4px;
+    display: flex;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .sc-flavor {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--label3);
+    margin-top: auto;
+    line-height: 1.4;
+  }
+  .sc-set-num {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--label3);
+    letter-spacing: 1px;
+    text-align: right;
+    margin-top: 8px;
+  }
+
+  /* Foil sweep overlay */
+  .foil-sweep {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 35%,
+      rgba(0,212,255,0.08) 42%,
+      rgba(151,117,250,0.1) 48%,
+      rgba(255,77,109,0.08) 54%,
+      transparent 62%,
+      transparent 100%
+    );
+    animation: foilSweep 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes foilSweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+
+  /* Share actions */
+  .share-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .share-action-btn {
+    width: 48px;
+    height: 48px;
+    background: var(--well-bg);
+    border: 1px solid var(--icon-edge);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  /* Deck dots */
+  .deck-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 20px;
+  }
+  .deck-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--label3);
+  }
+  .deck-dot.active { background: var(--label); }
+
+  /* ══════════════════════════════════════════
+     SCREEN 6: TROPHY ROOM
+     ══════════════════════════════════════════ */
+  .s-trophy {
+    background: linear-gradient(180deg, var(--floor-top), var(--floor-mid), var(--floor-bot));
+  }
+  .s-trophy::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.018) 3px, rgba(255,255,255,0.018) 4px);
+  }
+  .trophy-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 58px 0 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .trophy-header {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+  }
+  .trophy-icon {
+    font-size: 20px;
+  }
+  .trophy-title {
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    color: var(--label);
+    text-transform: uppercase;
+  }
+  .trophy-season {
+    font-size: 11px;
+    color: var(--label2);
+    margin-left: auto;
+    font-weight: 500;
+  }
+
+  /* Weekly game card */
+  .weekly-card {
+    background: var(--well-bg);
+    margin: 0 12px;
+    border-radius: 14px;
+    padding: 18px 16px;
+    box-shadow: inset 0 2px 4px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    margin-bottom: 9px;
+  }
+  .wk-game-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .wk-game-icon {
+    font-size: 16px;
+  }
+  .wk-game-name {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--label2);
+    text-transform: uppercase;
+  }
+  .wk-standing {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--separator);
+  }
+  .wk-standing:last-child { border-bottom: none; }
+  .wk-rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--label);
+    width: 24px;
+    text-align: center;
+  }
+  .wk-swatch {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+  .wk-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--label);
+  }
+  .wk-score {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .wk-qualifier {
+    font-size: 9px;
+    color: var(--label3);
+    font-weight: 500;
+  }
+
+  /* Ghost standing */
+  .wk-ghost-swatch {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    border: 1.5px dashed var(--label3);
+    background: transparent;
+  }
+  .wk-ghost-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--label3);
+    font-style: italic;
+  }
+
+  /* Cups grid */
+  .cups-section {
+    margin: 0 12px;
+  }
+  .cups-heading {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--label2);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .cups-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .cup-tile {
+    background: var(--well-bg);
+    border-radius: 10px;
+    box-shadow: inset 0 2px 3px var(--well-shadow), inset 0 -1px 0 var(--well-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px 8px;
+    font-size: 18px;
+  }
+  .cup-week {
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--label3);
+    letter-spacing: 0.8px;
+    margin-top: 4px;
+  }
+
+  /* ══════════════════════════════════════════
+     ANIMATIONS & TYPING
+     ══════════════════════════════════════════ */
+  .typing-text {
+    display: inline;
+  }
+  .typing-text span {
+    opacity: 0;
+    animation: letterAppear 0.05s ease forwards;
+  }
+  @keyframes letterAppear {
+    to { opacity: 1; }
+  }
+
+  /* Highlight pulse for guided attention */
+  .highlight-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(41,240,109,0.5);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+  }
+  .highlight-ring.pulse {
+    animation: highlightPulse 1.5s ease infinite;
+  }
+  @keyframes highlightPulse {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    50% { transform: scale(1.1); opacity: 0.3; }
+    100% { transform: scale(0.8); opacity: 0.7; }
+  }
+
+  /* Fade backstop for CTA */
+  .fade-backstop {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 100px;
+    background: linear-gradient(transparent, var(--floor-bot));
+    z-index: 15;
+    pointer-events: none;
+  }
+
+  /* Counter animation */
+  .count-up {
+    transition: all 0.2s ease;
+  }
+
+  /* ── Side annotations ── */
+  .annotations {
+    position: absolute;
+    right: -220px;
+    top: 0;
+    width: 200px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    pointer-events: none;
+  }
+  .annotation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.5s ease;
+  }
+  .annotation.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .anno-line {
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .anno-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    color: var(--label2);
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  /* Wrapper for phone + annotations */
+  .stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <!-- CURSOR -->
+    <div class="cursor" id="cursor">
+      <div class="cursor-dot"></div>
+      <div class="cursor-ring"></div>
+    </div>
+
+    <!-- STEP LABEL -->
+    <div class="step-label" id="stepLabel"></div>
+
+    <!-- PROGRESS BAR -->
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+    <!-- ════ SCREEN 1: ONBOARDING ════ -->
+    <div class="screen s-onboard" id="screen1">
+      <div class="coral-glow"></div>
+      <div class="electric-glow"></div>
+      <div class="ob-content">
+        <div class="ob-heading">Start your deck</div>
+        <div class="deck-box">
+          <div class="deck-box-wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
+          <div class="deck-box-name" id="deckName"></div>
+        </div>
+        <div class="ob-field" id="obField">
+          <div class="ob-field-text" id="obFieldText"></div>
+          <div class="ob-field-cursor"></div>
+        </div>
+        <div class="mode-pills">
+          <div class="mode-pill selected">My team's deck</div>
+          <div class="mode-pill unselected">Just mine</div>
+        </div>
+        <div class="ob-cta" id="obCta">
+          <div class="ob-cta-dot"></div>
+          <div class="ob-cta-text">Mint the first card</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCREEN 2: MINT ════ -->
+    <div class="screen s-mint" id="screen2">
+      <div class="coral-glow"></div>
+      <div class="electric-glow"></div>
+      <div class="mint-content">
+        <div class="mint-heading">Mint your cards</div>
+        <div class="focus-row">
+          <div class="focus-btn sel">Stunts</div>
+          <div class="focus-btn unsel">Tumbling</div>
+          <div class="focus-btn unsel">Jumps</div>
+          <div class="focus-btn unsel">Tosses</div>
+        </div>
+        <div class="chip-row" id="chipRow">
+          <div class="chip" id="chip0">+ Lib</div>
+          <div class="chip" id="chip1">+ Extension</div>
+          <div class="chip" id="chip2">+ Cupie</div>
+          <div class="chip" id="chip3">+ Basket</div>
+        </div>
+        <div class="mini-cards-rail" id="cardRail">
+          <div class="mini-card" id="mc0"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Lib</div></div></div>
+          <div class="mini-card" id="mc1"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Extension</div></div></div>
+          <div class="mini-card" id="mc2"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Cupie</div></div></div>
+          <div class="mini-card" id="mc3"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Basket</div></div></div>
+        </div>
+        <div class="ob-cta" id="mintCta" style="opacity:0; animation:none; margin-top:auto;">
+          <div class="ob-cta-dot"></div>
+          <div class="ob-cta-text">Start counting</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCREEN 3: HOME DASHBOARD ════ -->
+    <div class="screen s-home" id="screen3">
+      <div class="home-content">
+        <div class="home-header">
+          <div>
+            <div class="wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
+            <div class="header-identity">Stingray Allstars</div>
+          </div>
+          <div class="header-icons">
+            <div class="header-icon">⌚</div>
+            <div class="header-icon" id="trophyBtn">🏆</div>
+            <div class="header-icon">👥</div>
+            <div class="header-icon" id="shareBtn">🃏</div>
+          </div>
+        </div>
+        <div class="tf-well">
+          <div class="tf-tab unsel">TODAY</div>
+          <div class="tf-tab sel" id="tfWeek">THIS WEEK</div>
+          <div class="tf-tab unsel">ALL TIME</div>
+        </div>
+        <div class="cards-scroll" id="cardsScroll">
+          <!-- Summary Card -->
+          <div class="feed-card" id="summaryCard">
+            <div class="card-kicker">MY HIT RATE</div>
+            <div class="rate-row">
+              <div><span class="rate-num" id="rateNum">74</span><span class="rate-pct">%</span></div>
+              <div class="delta-badge">+3</div>
+            </div>
+            <div class="outcome-bar">
+              <div class="ob-hit" style="width:74%"></div>
+              <div class="ob-bob" style="width:11%"></div>
+              <div class="ob-bf" style="width:9%"></div>
+              <div class="ob-mf" style="width:6%"></div>
+            </div>
+            <div class="outcome-legend">
+              <div class="legend-row"><div class="legend-dot" style="background:var(--hit)"></div>Hit<div class="legend-count">127</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--bobble)"></div>Bobble<div class="legend-count">19</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--building-fall)"></div>Bld Fall<div class="legend-count">15</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--major-fall)"></div>Mjr Fall<div class="legend-count">10</div></div>
+            </div>
+          </div>
+          <!-- Trend Card -->
+          <div class="feed-card trend-card">
+            <div class="card-kicker">TREND</div>
+            <div class="trend-line-area">
+              <svg class="trend-svg" viewBox="0 0 300 60" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#34D26A" stop-opacity="0.3"/>
+                    <stop offset="100%" stop-color="#34D26A" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0 45 Q30 40 60 38 T120 30 T180 25 T240 20 T300 15" fill="none" stroke="#34D26A" stroke-width="2" stroke-linecap="round">
+                  <animate attributeName="stroke-dasharray" from="0 600" to="600 0" dur="1.5s" fill="freeze"/>
+                </path>
+                <path d="M0 45 Q30 40 60 38 T120 30 T180 25 T240 20 T300 15 L300 60 L0 60 Z" fill="url(#trendGrad)" opacity="0">
+                  <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1s" fill="freeze"/>
+                </path>
+              </svg>
+            </div>
+          </div>
+          <!-- Groups Card -->
+          <div class="feed-card">
+            <div class="card-kicker">SKILLS</div>
+            <div class="groups-list">
+              <div class="group-row"><div class="group-swatch" style="background:var(--g1)"></div><div class="group-name">Lib</div><div class="group-pct" style="color:var(--hit)">82%</div><div class="group-reps">45 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g2)"></div><div class="group-name">Extension</div><div class="group-pct" style="color:var(--hit)">78%</div><div class="group-reps">38 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g3)"></div><div class="group-name">Cupie</div><div class="group-pct" style="color:var(--building-fall)">65%</div><div class="group-reps">52 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g4)"></div><div class="group-name">Basket</div><div class="group-pct" style="color:var(--major-fall)">48%</div><div class="group-reps">36 reps</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fade-backstop"></div>
+        <div class="practice-cta" id="practiceCta">
+          <div class="cta-dot"></div>
+          <div class="cta-label">Start Practice</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCREEN 4: CAPTURE ════ -->
+    <div class="screen s-capture" id="screen4">
+      <div class="capture-content">
+        <div class="cap-header">
+          <div>
+            <div class="wordmark" style="font-size:16px"><span class="hit">HIT</span><span class="rate">RATE</span></div>
+            <div class="cap-kicker">PRACTICE</div>
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <div class="cap-reps" id="capReps">0</div>
+              <div class="cap-reps-sub" id="capRepsSub">REPS</div>
+            </div>
+          </div>
+          <div class="cap-end-btn">END</div>
+        </div>
+        <div class="pin-bar">
+          <div class="pin-label">PIN</div>
+          <div class="pin-chip sel"><div class="pin-chip-swatch" style="background:var(--g1)"></div>Lib</div>
+          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g2)"></div>Ext</div>
+          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g3)"></div>Cup</div>
+        </div>
+        <div class="outcome-grid" id="outcomeGrid">
+          <div class="outcome-header" style="color:var(--hit)">HIT</div>
+          <div class="outcome-header" style="color:var(--bobble)">BOBBLE</div>
+          <div class="outcome-header" style="color:var(--building-fall)">BLD FALL</div>
+          <div class="outcome-header" style="color:var(--major-fall)">MJR FALL</div>
+
+          <div class="outcome-cell hit-cell" id="cell-0-0">
+            <div class="cell-count" id="count-0-0">0</div>
+            <div class="cell-flash hit-flash" id="flash-0-0"></div>
+          </div>
+          <div class="outcome-cell bob-cell" id="cell-0-1">
+            <div class="cell-count" id="count-0-1">0</div>
+            <div class="cell-flash bob-flash" id="flash-0-1"></div>
+          </div>
+          <div class="outcome-cell bf-cell" id="cell-0-2">
+            <div class="cell-count" id="count-0-2">0</div>
+            <div class="cell-flash" style="border-color:var(--building-fall)" id="flash-0-2"></div>
+          </div>
+          <div class="outcome-cell mf-cell" id="cell-0-3">
+            <div class="cell-count" id="count-0-3">0</div>
+            <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-0-3"></div>
+          </div>
+
+          <div class="grid-row-label"><div class="row-swatch" style="background:var(--g2)"></div><div class="row-name">Extension</div></div>
+          <div class="outcome-cell hit-cell" id="cell-1-0">
+            <div class="cell-count" id="count-1-0">0</div>
+            <div class="cell-flash hit-flash" id="flash-1-0"></div>
+          </div>
+          <div class="outcome-cell bob-cell" id="cell-1-1">
+            <div class="cell-count" id="count-1-1">0</div>
+            <div class="cell-flash bob-flash" id="flash-1-1"></div>
+          </div>
+          <div class="outcome-cell bf-cell" id="cell-1-2">
+            <div class="cell-count" id="count-1-2">0</div>
+            <div class="cell-flash" style="border-color:var(--building-fall)" id="flash-1-2"></div>
+          </div>
+          <div class="outcome-cell mf-cell" id="cell-1-3">
+            <div class="cell-count" id="count-1-3">0</div>
+            <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-1-3"></div>
+          </div>
+        </div>
+        <div class="autosave-toast" id="autosaveToast">
+          <div class="toast-check">✓</div>
+          1-TAP AUTO-SAVE ACTIVE
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCREEN 5: SHARE CARDS ════ -->
+    <div class="screen s-share" id="screen5">
+      <div class="coral-glow"></div>
+      <div class="electric-glow"></div>
+      <div class="share-content">
+        <div class="share-heading">YOUR STUNT CARDS</div>
+        <div class="share-card" id="shareCard">
+          <div class="share-card-bg"></div>
+          <div class="share-card-edge"></div>
+          <div class="foil-sweep"></div>
+          <div class="share-card-content">
+            <div class="sc-kicker">STINGRAY ALLSTARS</div>
+            <div class="sc-name">Lib</div>
+            <div style="display:flex;align-items:baseline;">
+              <div class="sc-number" style="color:var(--hit)">82</div>
+              <div class="sc-pct" style="color:var(--hit)">%</div>
+            </div>
+            <div class="sc-bar">
+              <div style="width:82%;height:100%;background:var(--hit);border-radius:4px 0 0 4px;"></div>
+              <div style="width:8%;height:100%;background:var(--bobble);"></div>
+              <div style="width:6%;height:100%;background:var(--building-fall);"></div>
+              <div style="width:4%;height:100%;background:var(--major-fall);border-radius:0 4px 4px 0;"></div>
+            </div>
+            <div class="sc-flavor">"Sticking it like rent is due."</div>
+            <div class="sc-set-num">001 / 005</div>
+          </div>
+        </div>
+        <div class="share-actions">
+          <div class="share-action-btn">📋</div>
+          <div class="share-action-btn">💾</div>
+          <div class="share-action-btn">📤</div>
+        </div>
+        <div class="deck-dots">
+          <div class="deck-dot active"></div>
+          <div class="deck-dot"></div>
+          <div class="deck-dot"></div>
+          <div class="deck-dot"></div>
+          <div class="deck-dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCREEN 6: TROPHY ROOM ════ -->
+    <div class="screen s-trophy" id="screen6">
+      <div class="trophy-content">
+        <div class="trophy-header">
+          <div class="trophy-icon">🏆</div>
+          <div class="trophy-title">Trophy Room</div>
+          <div class="trophy-season">2025–26 Season</div>
+        </div>
+        <div class="weekly-card">
+          <div class="wk-game-label">
+            <div class="wk-game-icon">🎯</div>
+            <div class="wk-game-name">THIS WEEK: RATE CUP</div>
+          </div>
+          <div class="wk-standing">
+            <div class="wk-rank">1</div>
+            <div class="wk-swatch" style="background:var(--g1)"></div>
+            <div class="wk-name">Lib</div>
+            <div class="wk-score" style="color:var(--hit)">82%</div>
+          </div>
+          <div class="wk-standing">
+            <div class="wk-rank">2</div>
+            <div class="wk-swatch" style="background:var(--g2)"></div>
+            <div class="wk-name">Extension</div>
+            <div class="wk-score" style="color:var(--hit)">78%</div>
+          </div>
+          <div class="wk-standing">
+            <div class="wk-rank">3</div>
+            <div class="wk-ghost-swatch"></div>
+            <div class="wk-ghost-name">THE SPIRIT</div>
+            <div class="wk-score" style="color:var(--label3)">76%</div>
+          </div>
+          <div class="wk-standing">
+            <div class="wk-rank">4</div>
+            <div class="wk-swatch" style="background:var(--g3)"></div>
+            <div class="wk-name">Cupie</div>
+            <div class="wk-score" style="color:var(--building-fall)">65%</div>
+          </div>
+          <div class="wk-standing" style="border-bottom:none;">
+            <div class="wk-rank" style="color:var(--label3)">5</div>
+            <div class="wk-swatch" style="background:var(--g4)"></div>
+            <div class="wk-name" style="color:var(--label2)">Basket</div>
+            <div class="wk-score" style="color:var(--major-fall)">48%</div>
+          </div>
+        </div>
+        <div class="cups-section">
+          <div class="cups-heading">CUPS WON</div>
+          <div class="cups-grid">
+            <div class="cup-tile">🏆<div class="cup-week">WK 1</div></div>
+            <div class="cup-tile">💪<div class="cup-week">WK 2</div></div>
+            <div class="cup-tile">🔥<div class="cup-week">WK 3</div></div>
+            <div class="cup-tile">🏆<div class="cup-week">WK 4</div></div>
+            <div class="cup-tile">💪<div class="cup-week">WK 5</div></div>
+            <div class="cup-tile">🔥<div class="cup-week">WK 6</div></div>
+            <div class="cup-tile" style="opacity:0.3;">?<div class="cup-week">WK 7</div></div>
+            <div class="cup-tile" style="opacity:0.3;">?<div class="cup-week">WK 8</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side annotations (visible on wide screens) -->
+  <div class="annotations" id="annotations">
+    <div class="annotation" id="anno1"><div class="anno-line"></div><div class="anno-text">Name your deck<br>& pick your mode</div></div>
+    <div class="annotation" id="anno2"><div class="anno-line"></div><div class="anno-text">Mint cards for<br>each skill you train</div></div>
+    <div class="annotation" id="anno3"><div class="anno-line"></div><div class="anno-text">Live dashboard<br>tracks your hit rate</div></div>
+    <div class="annotation" id="anno4"><div class="anno-line"></div><div class="anno-text">1-tap logging<br>instant auto-save</div></div>
+    <div class="annotation" id="anno5"><div class="anno-line"></div><div class="anno-text">Collectible stunt<br>cards to share</div></div>
+    <div class="annotation" id="anno6"><div class="anno-line"></div><div class="anno-text">Weekly cups &<br>season league</div></div>
+  </div>
+</div>
+
+<script>
+const cursor = document.getElementById('cursor');
+const stepLabel = document.getElementById('stepLabel');
+const progressFill = document.getElementById('progressFill');
+
+// ── Cursor helpers ──
+function moveCursor(x, y, dur = 600) {
+  return new Promise(r => {
+    cursor.classList.add('visible');
+    cursor.style.transition = `left ${dur}ms cubic-bezier(0.4, 0, 0.2, 1), top ${dur}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    cursor.style.left = x + 'px';
+    cursor.style.top = y + 'px';
+    setTimeout(r, dur);
+  });
+}
+function tapCursor() {
+  return new Promise(r => {
+    cursor.classList.add('tapping');
+    setTimeout(() => { cursor.classList.remove('tapping'); r(); }, 400);
+  });
+}
+function hideCursor() { cursor.classList.remove('visible'); }
+
+// ── Screen transitions ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setStep(text, pct) {
+  stepLabel.textContent = text;
+  stepLabel.classList.add('visible');
+  progressFill.style.width = pct + '%';
+}
+
+// ── Annotations ──
+function showAnno(id) {
+  document.querySelectorAll('.annotation').forEach(a => a.classList.remove('visible'));
+  document.getElementById(id).classList.add('visible');
+}
+
+// ── Typing effect ──
+function typeText(el, text, speed = 80) {
+  return new Promise(r => {
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        el.textContent += text[i];
+        i++;
+      } else {
+        clearInterval(timer);
+        r();
+      }
+    }, speed);
+  });
+}
+
+// ── Cell tap animation ──
+let repCount = 0;
+function tapCell(row, col) {
+  return new Promise(r => {
+    const countEl = document.getElementById(`count-${row}-${col}`);
+    const flashEl = document.getElementById(`flash-${row}-${col}`);
+    const current = parseInt(countEl.textContent);
+    countEl.textContent = current + 1;
+    repCount++;
+    document.getElementById('capReps').textContent = repCount;
+    if (repCount === 1) document.getElementById('capRepsSub').textContent = 'REP · — HIT';
+    else document.getElementById('capRepsSub').textContent = `REPS · ${Math.round((parseInt(document.getElementById('count-0-0').textContent) + parseInt(document.getElementById('count-1-0').textContent)) / repCount * 100)}% HIT`;
+    flashEl.classList.remove('flash-anim');
+    void flashEl.offsetWidth;
+    flashEl.classList.add('flash-anim');
+    setTimeout(r, 350);
+  });
+}
+
+// ── Wait helper ──
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════
+//  MAIN ANIMATION TIMELINE
+// ══════════════════════════════════════════
+async function runTimeline() {
+
+  // ── STEP 1: Onboarding ──
+  showScreen('screen1');
+  setStep('STEP 1 · NAME YOUR DECK', 0);
+  showAnno('anno1');
+  await wait(1200);
+
+  // Type team name
+  const fieldText = document.getElementById('obFieldText');
+  const deckName = document.getElementById('deckName');
+  await moveCursor(187, 475, 500);
+  await tapCursor();
+  await wait(300);
+  await typeText(fieldText, 'Stingray Allstars', 65);
+  deckName.textContent = 'Stingray Allstars';
+  deckName.style.opacity = '1';
+  deckName.style.animation = 'none';
+  await wait(800);
+
+  // Tap CTA
+  setStep('STEP 1 · NAME YOUR DECK', 8);
+  await moveCursor(187, 720, 500);
+  await tapCursor();
+  await wait(600);
+
+  // ── STEP 2: Mint Cards ──
+  setStep('STEP 2 · MINT YOUR CARDS', 17);
+  showScreen('screen2');
+  showAnno('anno2');
+  await wait(800);
+
+  // Tap chips one by one
+  const chipNames = ['chip0', 'chip1', 'chip2', 'chip3'];
+  const cardNames = ['mc0', 'mc1', 'mc2', 'mc3'];
+  const chipPositions = [
+    [115, 260], [205, 260], [115, 300], [210, 300]
+  ];
+
+  for (let i = 0; i < 4; i++) {
+    const chip = document.getElementById(chipNames[i]);
+    chip.style.opacity = '1';
+    chip.style.transform = 'scale(1)';
+    chip.style.animationDelay = (i * 0.15) + 's';
+  }
+  await wait(600);
+
+  for (let i = 0; i < 4; i++) {
+    await moveCursor(chipPositions[i][0], chipPositions[i][1], 350);
+    await tapCursor();
+    const chip = document.getElementById(chipNames[i]);
+    chip.classList.add('minted');
+    const card = document.getElementById(cardNames[i]);
+    card.classList.add('visible');
+    await wait(400);
+  }
+
+  await wait(600);
+  const mintCta = document.getElementById('mintCta');
+  mintCta.style.opacity = '1';
+  mintCta.style.transition = 'opacity 0.4s';
+  await wait(400);
+  await moveCursor(187, 680, 400);
+  await tapCursor();
+  await wait(600);
+
+  // ── STEP 3: Home Dashboard ──
+  setStep('STEP 3 · YOUR DASHBOARD', 33);
+  showScreen('screen3');
+  showAnno('anno3');
+  hideCursor();
+  await wait(600);
+
+  // Animate rate number counting up
+  const rateNum = document.getElementById('rateNum');
+  let r = 0;
+  const rateInterval = setInterval(() => {
+    r += 2;
+    if (r > 74) { r = 74; clearInterval(rateInterval); }
+    rateNum.textContent = r;
+  }, 25);
+  await wait(1200);
+
+  // Scroll the cards slightly
+  const cardsScroll = document.getElementById('cardsScroll');
+  cardsScroll.style.transition = 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+  cardsScroll.style.transform = 'translateY(-60px)';
+  await wait(1800);
+  cardsScroll.style.transform = 'translateY(0)';
+  await wait(1000);
+
+  // Tap practice CTA
+  setStep('STEP 3 · YOUR DASHBOARD', 42);
+  await moveCursor(187, 755, 500);
+  cursor.classList.add('visible');
+  await wait(300);
+  await tapCursor();
+  await wait(600);
+
+  // ── STEP 4: Capture / Logging ──
+  setStep('STEP 4 · LOG REPS', 50);
+  showScreen('screen4');
+  showAnno('anno4');
+  await wait(800);
+
+  // Show autosave toast
+  document.getElementById('autosaveToast').classList.add('visible');
+  await wait(600);
+
+  // Simulate tapping outcome cells — a mini practice
+  const taps = [
+    [0,0], [0,0], [0,0], // 3 hits on Lib
+    [0,1],               // 1 bobble
+    [0,0], [0,0],        // 2 more hits
+    [1,0], [1,0], [1,0], // 3 hits on Extension
+    [1,1],               // 1 bobble
+  ];
+
+  // Cell positions (approximate)
+  const cellPos = {
+    '0-0': [60, 380], '0-1': [145, 380], '0-2': [230, 380], '0-3': [315, 380],
+    '1-0': [60, 490], '1-1': [145, 490], '1-2': [230, 490], '1-3': [315, 490],
+  };
+
+  for (const [row, col] of taps) {
+    const key = `${row}-${col}`;
+    await moveCursor(cellPos[key][0], cellPos[key][1], 250);
+    await tapCursor();
+    await tapCell(row, col);
+    await wait(180);
+  }
+  await wait(800);
+  hideCursor();
+  await wait(500);
+
+  // ── STEP 5: Share Cards ──
+  setStep('STEP 5 · STUNT CARDS', 67);
+  showScreen('screen5');
+  showAnno('anno5');
+  await wait(600);
+
+  // Card entrance with a subtle tilt
+  const shareCard = document.getElementById('shareCard');
+  shareCard.style.transition = 'transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+  shareCard.style.transform = 'perspective(800px) rotateY(-5deg) rotateX(3deg)';
+  await wait(1500);
+  shareCard.style.transform = 'perspective(800px) rotateY(5deg) rotateX(-2deg)';
+  await wait(1200);
+  shareCard.style.transform = 'perspective(800px) rotateY(0) rotateX(0)';
+  await wait(1500);
+
+  // ── STEP 6: Trophy Room ──
+  setStep('STEP 6 · TROPHY ROOM', 83);
+  showScreen('screen6');
+  showAnno('anno6');
+  await wait(3500);
+
+  // ── LOOP ──
+  setStep('', 100);
+  stepLabel.classList.remove('visible');
+  document.querySelectorAll('.annotation').forEach(a => a.classList.remove('visible'));
+  await wait(2000);
+
+  // Reset and replay
+  repCount = 0;
+  document.querySelectorAll('.cell-count').forEach(el => el.textContent = '0');
+  document.getElementById('capReps').textContent = '0';
+  document.getElementById('obFieldText').textContent = '';
+  document.getElementById('deckName').textContent = '';
+  document.getElementById('deckName').style.opacity = '0';
+  chipNames.forEach(n => document.getElementById(n).classList.remove('minted'));
+  cardNames.forEach(n => document.getElementById(n).classList.remove('visible'));
+  document.getElementById('mintCta').style.opacity = '0';
+  document.getElementById('autosaveToast').classList.remove('visible');
+  document.getElementById('rateNum').textContent = '0';
+  progressFill.style.width = '0%';
+
+  runTimeline();
+}
+
+// Start with a brief pause
+wait(500).then(runTimeline);
+</script>
+</body>
+</html>

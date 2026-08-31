@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HitRate — Coach's Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap');
+
+  :root {
+    --bg: #0A0F1E;
+    --bg-floor: #141820;
+    --well: #0C1119;
+    --surface2: #18202B;
+    --sep: #26303D;
+    --label: #F3F4F1;
+    --label2: #8D8B86;
+    --label3: #5C5B57;
+    --accent: #29F06D;
+    --hit: #34D26A;
+    --bobble: #E8C94B;
+    --building: #FF9A3D;
+    --major: #FF6B57;
+    --coral: #FF4757;
+    --electric: #00D4FF;
+    --gold: #FFD43B;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--label);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 80px 24px 60px;
+    background: linear-gradient(180deg, #0E1528 0%, var(--bg) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 120px,
+      rgba(255,255,255,0.012) 120px,
+      rgba(255,255,255,0.012) 121px
+    );
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(41,240,109,0.1);
+    border: 1px solid rgba(41,240,109,0.25);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: clamp(48px, 8vw, 80px);
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .subtitle {
+    font-size: 20px;
+    color: var(--label2);
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+  .hero .tagline {
+    font-size: 14px;
+    color: var(--label3);
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── Section ── */
+  section { padding: 48px 0; }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  section > .container > h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    margin-bottom: 24px;
+    letter-spacing: -0.5px;
+  }
+
+  /* ── Well Cards ── */
+  .well {
+    background: var(--well);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03);
+    position: relative;
+  }
+  .well h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .well p, .well li {
+    color: var(--label2);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .well ul {
+    list-style: none;
+    padding: 0;
+  }
+  .well ul li {
+    padding: 6px 0 6px 24px;
+    position: relative;
+  }
+  .well ul li::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 14px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+
+  /* ── Icon Circles ── */
+  .icon-circle {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .icon-circle svg { width: 20px; height: 20px; }
+  .icon-green  { background: rgba(41,240,109,0.12); color: var(--accent); }
+  .icon-coral  { background: rgba(255,71,87,0.12); color: var(--coral); }
+  .icon-blue   { background: rgba(0,212,255,0.12); color: var(--electric); }
+  .icon-gold   { background: rgba(255,212,59,0.12); color: var(--gold); }
+  .icon-label2 { background: rgba(141,139,134,0.12); color: var(--label2); }
+
+  /* ── Steps (numbered) ── */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 28px;
+    align-items: flex-start;
+  }
+  .step-num {
+    counter-increment: step;
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(41,240,109,0.1);
+    border: 1px solid rgba(41,240,109,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--accent);
+  }
+  .step-num::after { content: counter(step); }
+  .step-body h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-body p {
+    color: var(--label2);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  /* ── Outcome chips ── */
+  .outcome-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .outcome-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .outcome-chip .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── Two-up grid ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 600px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--sep);
+    margin: 48px 0;
+  }
+
+  /* ── Tip callout ── */
+  .tip {
+    background: rgba(41,240,109,0.05);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 12px 12px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .tip-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .tip p {
+    color: var(--label2);
+    font-size: 14px;
+  }
+
+  /* ── Rate bands diagram ── */
+  .rate-bands {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .rate-band {
+    flex: 1;
+    text-align: center;
+    padding: 16px 8px;
+    border-radius: 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  .rate-band .pct { font-size: 28px; font-weight: 800; }
+  .rate-band .range { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--label3);
+    font-size: 13px;
+    border-top: 1px solid var(--sep);
+  }
+  footer strong { color: var(--label2); }
+
+  /* ── Diagram: card ladder ── */
+  .ladder {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin: 20px 0;
+    padding: 0 8px;
+  }
+  .ladder-rung {
+    flex: 1;
+    text-align: center;
+    border-radius: 10px;
+    padding: 14px 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    position: relative;
+  }
+  .ladder-rung .rung-label { font-size: 11px; opacity: 0.7; margin-top: 4px; display: block; }
+  .rung-1 { background: var(--surface2); min-height: 60px; color: var(--label3); border: 1px dashed var(--label3); }
+  .rung-2 { background: var(--surface2); min-height: 80px; }
+  .rung-3 { background: linear-gradient(180deg, #1a2a20, var(--surface2)); min-height: 100px; border: 1px solid rgba(41,240,109,0.2); }
+  .rung-4 { background: linear-gradient(180deg, #2a2010, var(--surface2)); min-height: 120px; border: 1px solid rgba(255,212,59,0.25); }
+  .rung-5 { background: linear-gradient(180deg, #1a1535, #1a2030); min-height: 140px; border: 1px solid rgba(0,212,255,0.3); }
+
+  /* ── Trophy game chips ── */
+  .game-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 14px 0;
+  }
+  .game-chip {
+    flex: 1;
+    min-width: 150px;
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .game-chip .trophy-icon { font-size: 28px; margin-bottom: 6px; }
+  .game-chip h4 { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
+  .game-chip p { font-size: 12px; color: var(--label3); margin-top: 4px; }
+
+  /* ── Pages diagram ── */
+  .pocket-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 240px;
+    margin: 16px auto;
+  }
+  .pocket {
+    aspect-ratio: 1;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--sep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label2);
+    text-align: center;
+    padding: 4px;
+    line-height: 1.2;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<div class="hero">
+  <div class="hero-badge">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1v14M1 8h14"/></svg>
+    Coach's Guide
+  </div>
+  <h1>HIT<span>RATE</span></h1>
+  <p class="subtitle">Track every rep. See where you stand.</p>
+  <p class="tagline">A step-by-step guide to logging practice, reading your dashboard, and unlocking Stunt Cards for your team.</p>
+</div>
+
+<!-- ═══════════════════ GETTING STARTED ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Getting Started</div>
+    <h2>Set Up Your Team in 3 Steps</h2>
+    <p style="color: var(--label2); margin-bottom: 32px;">
+      When you first open HitRate, you'll walk through a quick setup to create your team's card deck. Nothing is pre-made — you build a roster that matches <em>your</em> program.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Name Your Deck</h4>
+          <p>Type your team or program name — this becomes your folder. Tap <strong>"My team's deck"</strong> to use coach language (groups, program name on cards) or <strong>"Just mine"</strong> for athlete mode (skills, your own name). You can also enter your program name here.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Mint Your Cards</h4>
+          <p>Pick a category — Stunts, Tumbling, Jumps, or Tosses — and tap the suggestion chips to add skills (Prep, Extension, Full Up, etc.), or type your own custom name. Each skill you add becomes a card in your deck.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h4>Log Your First Rep</h4>
+          <p>A quick practice preview lets you try logging a few reps before landing on your dashboard. One tap per rep — you'll be up and running in under a minute.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>Already used HitRate before? Tap <strong>Sign in with Apple/Google</strong> on the first screen to restore your previous folders and data.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ LOGGING PRACTICE ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">At Practice</div>
+    <h2>Logging Reps</h2>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        The Counter (Freeform Mode)
+      </h3>
+      <p>Tap the green <strong>"Start practice"</strong> pill on your Home screen. The counter opens full-screen with your skills as rows and outcomes as columns. Logging is <strong>one tap</strong> — tap the outcome cell for the skill you're watching, and the rep is saved instantly.</p>
+      <p style="margin-top: 12px;">A 3.5-second <strong>undo toast</strong> appears after each tap in case you mis-log. Your recent reps show as chips at the bottom of the screen.</p>
+
+      <div class="outcome-row">
+        <div class="outcome-chip" style="background: rgba(52,210,106,0.12);">
+          <div class="dot" style="background: #34D26A;"></div> Hit
+        </div>
+        <div class="outcome-chip" style="background: rgba(232,201,75,0.12);">
+          <div class="dot" style="background: #E8C94B;"></div> Bobble
+        </div>
+        <div class="outcome-chip" style="background: rgba(255,154,61,0.12);">
+          <div class="dot" style="background: #FF9A3D;"></div> Building Fall
+        </div>
+        <div class="outcome-chip" style="background: rgba(255,107,87,0.12);">
+          <div class="dot" style="background: #FF6B57;"></div> Major Fall
+        </div>
+      </div>
+
+      <p>These are the default outcome names. You can <strong>rename them</strong> in the Editor to match your terminology (e.g., "Clean" / "Shaky" / "Drop" / "Full Reset"). The four severity levels and their colors stay fixed.</p>
+    </div>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        Practice Pages (Saved Lineups)
+      </h3>
+      <p>Build saved 9-pocket pages — preset lineups of up to 9 skills arranged in a grid. Great for running the same routine each practice.</p>
+
+      <div class="pocket-grid">
+        <div class="pocket">Prep</div>
+        <div class="pocket">Extension</div>
+        <div class="pocket">Full Up</div>
+        <div class="pocket">Lib</div>
+        <div class="pocket">Arabesque</div>
+        <div class="pocket">Heel Str.</div>
+        <div class="pocket">Torch</div>
+        <div class="pocket">Reload</div>
+        <div class="pocket">Pyramid</div>
+      </div>
+
+      <p>To create your first page: <strong>long-press</strong> (or context-menu) the practice pill → "Run or build a page." Once pages exist, the practice pill gives you a choice: <strong>Freeform Counter</strong>, <strong>Run a Page</strong>, or <strong>Build/Edit Pages</strong>.</p>
+      <p style="margin-top:8px;">When running a page, arm an outcome (Hit, Bobble, etc.) in the bar at the top, then tap any pocket to log that outcome for that skill.</p>
+    </div>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-gold">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+        </div>
+        The Pivot Toggle (Skill ↔ Athlete)
+      </h3>
+      <p>At the top of the counter there's a <strong>pin toggle</strong>. It changes what's pinned at the top vs. what varies row-by-row:</p>
+      <ul>
+        <li><strong>Pin a skill</strong> → rows become athletes (subjects). Log each person's attempt on the same skill.</li>
+        <li><strong>Pin an athlete</strong> → rows become skills. Log one person's reps across multiple skills.</li>
+      </ul>
+      <p style="margin-top: 8px;">You can add athletes or skills on the fly during practice — name them now or later.</p>
+    </div>
+
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>Have an Apple Watch? HitRate's watch companion acts as a remote clicker — scroll skills with the Digital Crown, tap to log. The watch wakes automatically when you start practice.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ THE DASHBOARD ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Your Dashboard</div>
+    <h2>Reading the Numbers</h2>
+    <p style="color: var(--label2); margin-bottom: 24px;">
+      After practice, the Home screen is your analytics hub. Everything updates live as reps are logged. Use the timeframe tabs at the top — <strong>Today</strong>, <strong>This Week</strong>, or <strong>All-Time</strong> — to change the window.
+    </p>
+
+    <div class="grid-2">
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 20V4M5 11l7-7 7 7"/></svg>
+          </div>
+          Summary
+        </h3>
+        <p>Your headline clean-hit rate with a distribution bar. The big number is hits ÷ total reps — a bobble is <em>not</em> a hit.</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="4 18 8 12 12 14 16 8 20 10"/></svg>
+          </div>
+          Trend
+        </h3>
+        <p>A line chart of your rate over time. The delta badge shows change vs. your baseline (yesterday, last week, or start of season).</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-gold">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="14" height="4" rx="1"/><rect x="3" y="16" width="10" height="4" rx="1"/></svg>
+          </div>
+          Skills Leaderboard
+        </h3>
+        <p>All skills ranked by hit rate with a heatmap bar. Quickly see which skills are strong and which need work.</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-coral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z"/></svg>
+          </div>
+          Skill Report
+        </h3>
+        <p>Your best, worst, cleanest, and most consistent skills ranked automatically (6+ reps minimum).</p>
+      </div>
+    </div>
+
+    <div class="well" style="margin-top: 16px;">
+      <h3>
+        <div class="icon-circle icon-label2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4"/></svg>
+        </div>
+        Session Tape
+      </h3>
+      <p>A visual barcode of your latest session — each bar is one rep, color-coded by outcome. A highlighted region marks your <strong>rough patch</strong> (worst stretch of 7 consecutive attempts). Great for spotting when energy dipped.</p>
+    </div>
+
+    <h3 style="margin-top: 32px; margin-bottom: 16px;">Hit-Rate Color Bands</h3>
+    <p style="color: var(--label2); margin-bottom: 16px; font-size: 15px;">
+      Throughout the app, your hit-rate number is color-coded at a glance:
+    </p>
+    <div class="rate-bands">
+      <div class="rate-band" style="background: rgba(52,210,106,0.12); color: #34D26A;">
+        <div class="pct">75%+</div>
+        <div class="range">Green — strong</div>
+      </div>
+      <div class="rate-band" style="background: rgba(255,154,61,0.12); color: #FF9A3D;">
+        <div class="pct">55–74%</div>
+        <div class="range">Amber — building</div>
+      </div>
+      <div class="rate-band" style="background: rgba(255,107,87,0.12); color: #FF6B57;">
+        <div class="pct">&lt;55%</div>
+        <div class="range">Red — needs work</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ TROPHY ROOM ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Competition</div>
+    <h2>The Trophy Room</h2>
+    <p style="color: var(--label2); margin-bottom: 20px;">
+      Tap the trophy icon on the Home header to open the competition hub. HitRate runs a <strong>weekly tournament</strong> across your skills — no setup needed, it's automatic.
+    </p>
+
+    <h3 style="margin-bottom: 12px;">Three Rotating Cups</h3>
+    <p style="color: var(--label2); margin-bottom: 16px;">
+      Each week, one of three games is in play. The game rotates every Monday:
+    </p>
+
+    <div class="game-chips">
+      <div class="game-chip">
+        <div class="trophy-icon">🎯</div>
+        <h4>RATE CUP</h4>
+        <p>Best clean-hit rate<br>(min. 10 reps to qualify)</p>
+      </div>
+      <div class="game-chip">
+        <div class="trophy-icon">💪</div>
+        <h4>GRIND CUP</h4>
+        <p>Most total reps logged<br>(min. 1 rep to qualify)</p>
+      </div>
+      <div class="game-chip">
+        <div class="trophy-icon">🔥</div>
+        <h4>STREAK CUP</h4>
+        <p>Longest landing streak<br>(min. 5 reps to qualify)</p>
+      </div>
+    </div>
+
+    <div class="well" style="margin-top: 20px;">
+      <h3>
+        <div class="icon-circle icon-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        The Spirit
+      </h3>
+      <p>A synthetic pace-setter that competes every week at the average winning score of past weeks — your team's bar to beat. Shown as a dashed ghost entry on the leaderboard. If no one beats The Spirit, it takes the cup. Use it to motivate athletes to push past "good enough."</p>
+    </div>
+
+    <p style="color: var(--label2); margin-top: 16px; font-size: 15px;">
+      The Trophy Room also shows the <strong>Season League</strong> (placement points accumulate all season: 5 for first, 3 for second, 2 for third, 1 for qualifying) and a <strong>Cups Won</strong> grid of past weekly champions. Season resets each June.
+    </p>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ STUNT CARDS ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Share & Celebrate</div>
+    <h2>Stunt Cards</h2>
+    <p style="color: var(--label2); margin-bottom: 20px;">
+      Every skill on your roster has a collectible card that evolves with work. Open the cards from the Home action row. Cards are designed for sharing on Instagram Stories and social media.
+    </p>
+
+    <h3 style="margin-bottom: 12px;">The Card Ladder</h3>
+    <p style="color: var(--label2); margin-bottom: 16px; font-size: 15px;">Cards level up based on total reps and achievements — never by rate alone:</p>
+
+    <div class="ladder">
+      <div class="ladder-rung rung-1">
+        MINTED
+        <span class="rung-label">0 reps</span>
+      </div>
+      <div class="ladder-rung rung-2">
+        INKED
+        <span class="rung-label">1+ reps</span>
+      </div>
+      <div class="ladder-rung rung-3">
+        PROVEN
+        <span class="rung-label">50+ reps</span>
+      </div>
+      <div class="ladder-rung rung-4">
+        DECORATED
+        <span class="rung-label">Badges earned</span>
+      </div>
+      <div class="ladder-rung rung-5">
+        ✨ FOIL
+        <span class="rung-label">Legendary badge</span>
+      </div>
+    </div>
+
+    <p style="color: var(--label2); font-size: 15px; margin-top: 16px;">
+      <strong>Badges</strong> appear as pips on the card — volume milestones (100 / 500 / 1000 reps), best hit-run streaks (10 / 25), mastery milestones, and weekly cup wins. A legendary badge upgrades the entire card to a holographic foil.
+    </p>
+
+    <div class="well" style="margin-top: 20px;">
+      <h3>
+        <div class="icon-circle icon-gold">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        </div>
+        Milestone Cards
+      </h3>
+      <p>In addition to stat cards, the app unlocks milestone cards for achievements — volume records, long streaks, perfect sessions, skill mastery, and even "dubious honor" cards for fall streaks. These unlock automatically from your rep history — no setup needed. Earned milestones can also be saved as round <strong>cheer pucks</strong> (collectible badge images).</p>
+    </div>
+
+    <div class="tip">
+      <div class="tip-label">Sharing</div>
+      <p>From the card deck: <strong>share</strong> directly to Instagram/Messages, <strong>save to Photos</strong>, or <strong>copy image</strong> to paste into any app. Locked milestone cards (not yet earned) can't be shared — they show the progress needed to unlock.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ HOMEWORK ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Between Practices</div>
+    <h2>Homework (Weekly Rep Targets)</h2>
+    <p style="color: var(--label2); margin-bottom: 20px;">
+      Assign weekly rep targets to your athletes so work between practices is visible.
+    </p>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        How It Works
+      </h3>
+      <ul>
+        <li>From the Home screen, open the <strong>Homework</strong> card or the editor to create an assignment.</li>
+        <li>Pick a <strong>skill</strong>, set a <strong>rep target</strong> (presets: 25, 50, 75, 100, 150 — or custom), and optionally assign it to specific athletes (default: the whole roster).</li>
+        <li>Athletes see the target on their Home screen and log reps throughout the week.</li>
+        <li>Progress is <strong>live</strong> — it recalculates from actual logged reps, never stored separately. A late-syncing rep from a teammate updates the bar instantly.</li>
+      </ul>
+    </div>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        Receipts
+      </h3>
+      <p>Tap the homework card to see detailed receipts: per-day rep counts, when the last rep was logged, clean-hit rate alongside volume, and whether reps were self-logged or coach-logged.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ EXECUTION SCORING ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Advanced</div>
+    <h2>Execution Scoring</h2>
+    <p style="color: var(--label2); margin-bottom: 20px;">
+      For skills assigned a <strong>United cheer category</strong> (Stunts, Pyramid, Standing Tumbling, Running Tumbling, Tosses, Jumps), HitRate offers an optional execution layer.
+    </p>
+
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-gold">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        How It Works
+      </h3>
+      <p>After logging a rep on an eligible skill, <strong>tap the recent-rep chip</strong> to open the execution sheet. You'll see the execution drivers for that category (e.g., 4 drivers for stunts/pyramid). All start as <strong>HELD</strong> — tap any that <strong>slipped</strong>. Hit Save.</p>
+      <p style="margin-top: 10px;">This is strictly binary (held/lost) — no point math. Reps you don't score contribute zero to the execution breakdown (the system never assumes a clean read you didn't give). A green shield chip = all held; amber = something slipped.</p>
+      <p style="margin-top: 10px;">The <strong>Execution Card</strong> on the dashboard shows which drivers slip most often — so you know exactly what to drill.</p>
+    </div>
+
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>Execution scoring is separate from the hit rate, tournament, and cards. It won't inflate your numbers — it's a focused diagnostic tool you opt into per-rep.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ MANAGING YOUR ROSTER ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Setup & Settings</div>
+    <h2>Managing Your Roster</h2>
+
+    <div class="grid-2">
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          Add Skills
+        </h3>
+        <p>Tap the editor button (top-right of Home). Add new skills, rename existing ones, reorder by drag, or delete. Assign a United category to enable execution scoring.</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          Add Athletes
+        </h3>
+        <p>Athletes (subjects) can be added in the editor or on the fly during practice — tap "+" in the counter and name them now or later.</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-gold">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="3" width="20" height="18" rx="3"/><path d="M2 9h20"/></svg>
+          </div>
+          Multiple Folders
+        </h3>
+        <p>Create separate folders for different teams, squads, or seasons from the Folder List (back arrow on Home). Each folder has its own roster and independent stats.</p>
+      </div>
+      <div class="well">
+        <h3 style="font-size: 16px;">
+          <div class="icon-circle icon-coral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+          Rename Outcomes
+        </h3>
+        <p>In the editor, customize what each outcome slot is called. "Hit" can become "Clean," "Bobble" can become "Shaky" — whatever language your program uses.</p>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>Tap your <strong>team name</strong> in the Home header to jump straight to the editor — no need to find the button.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ TEAM SYNC ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Team Sync</div>
+    <h2>Sharing a Folder</h2>
+    <div class="well">
+      <h3>
+        <div class="icon-circle icon-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </div>
+        Join Codes
+      </h3>
+      <p>From the Folder List, share a <strong>join code</strong> with assistant coaches or athletes. When they enter it on their device, they'll join your folder and see the same roster. Reps logged by anyone sync into the shared dashboard — the owner (you) is the source of truth.</p>
+      <p style="margin-top: 10px;">Sign in with Apple or Google to back up your data and enable sync. Without an account, everything stays local on your phone.</p>
+    </div>
+  </div>
+</section>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══════════════════ BEST PRACTICES ═══════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Get the Most Out of It</div>
+    <h2>Best Practices for Coaches</h2>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">🎯 &nbsp;Log Consistently</h3>
+      <p>The trend chart and weekly tournament are most useful with regular data. Even 10–20 reps per practice is enough to show meaningful patterns.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">📋 &nbsp;Build Practice Pages</h3>
+      <p>If you run the same skills each practice, build a page and use "Run a Page" for faster logging. The 9-pocket grid is purpose-built for routine-based tracking.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">📊 &nbsp;Check the Skill Report</h3>
+      <p>The Skill Report card surfaces your best and worst skills automatically. Use it to decide what to drill — the data tells you where the gaps are.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">🏆 &nbsp;Use the Tournament</h3>
+      <p>The weekly cup rotation keeps athletes engaged between big competitions. Post the weekly winner on your team's social — the Stunt Cards are designed for exactly this.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">🎴 &nbsp;Share Cards After Milestones</h3>
+      <p>When an athlete hits 100 reps, earns a perfect-session milestone, or takes a weekly cup — screenshot and share their card. The card ladder gives athletes something tangible to work toward.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">📝 &nbsp;Assign Homework</h3>
+      <p>Set a 50-rep weekly target on a skill that needs work. Athletes can see the progress bar and receipts — it holds everyone accountable without you having to chase.</p>
+    </div>
+
+    <div class="well">
+      <h3 style="font-size: 16px;">⌚ &nbsp;Pair Your Watch</h3>
+      <p>If you have an Apple Watch, the companion app lets you log reps from your wrist while you spot or coach on the floor — no phone in hand.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer>
+  <p><strong>HitRate</strong> — Track every rep. See where you stand.</p>
+  <p style="margin-top: 8px;">Questions? Reach out to your program admin or email support.</p>
+</footer>
+
+</body>
+</html>
