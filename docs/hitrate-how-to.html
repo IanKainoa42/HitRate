@@ -211,24 +211,204 @@
   }
 
   /* Deck box preview */
+  /* ── Foil Pack wrapper ── */
+  .pack-wrapper {
+    position: relative;
+    width: 170px;
+    height: 250px;
+    margin-bottom: 28px;
+    perspective: 900px;
+  }
+
+  /* ── 3D Card Deck Box ── */
+  .card-box {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    transform-style: preserve-3d;
+    transition: transform 1s ease 0.5s, opacity 0.6s ease 0.7s;
+  }
+
+  /* Front face */
+  .box-front {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(170deg, #1A2744, #0F1A30 50%, #0A1020);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow:
+      5px 5px 0 #080E1A,
+      6px 6px 0 rgba(255,255,255,0.04),
+      10px 10px 25px rgba(0,0,0,0.5);
+  }
+
+  /* Holo sheen sweep */
+  .box-front::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(125deg, transparent 0%, rgba(0,212,255,0.06) 25%, rgba(151,117,250,0.08) 40%, rgba(255,71,87,0.05) 55%, rgba(255,212,59,0.07) 70%, transparent 100%);
+    animation: boxSheen 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes boxSheen {
+    0% { transform: translateX(-150%); }
+    100% { transform: translateX(150%); }
+  }
+
+  /* Tuck flap lid */
+  .box-lid {
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 52px;
+    transform-origin: bottom center;
+    transform: rotateX(0deg);
+    transition: transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+    z-index: 6;
+    border-radius: 10px 10px 0 0;
+    background: linear-gradient(180deg, #1E2E4A, #162238);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
+  }
+  /* Tuck tab triangle */
+  .box-lid::after {
+    content: '';
+    position: absolute;
+    bottom: -12px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-top: 12px solid #162238;
+    opacity: 0.7;
+  }
+
+  /* Gold seal strip across the opening */
+  .box-seal {
+    position: absolute;
+    top: 44px; left: 18%; right: 18%;
+    height: 14px;
+    background: linear-gradient(90deg, #B8860B, #DAA520, #FFD700, #DAA520, #B8860B);
+    border-radius: 3px;
+    z-index: 7;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 5px; font-weight: 800; letter-spacing: 1.5px;
+    color: rgba(0,0,0,0.35); text-transform: uppercase;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+    transition: opacity 0.3s, transform 0.4s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  /* Branding on front face */
+  .box-wordmark {
+    font-weight: 900; font-style: italic; font-size: 28px;
+    letter-spacing: -0.5px; z-index: 1; margin-top: 10px;
+  }
+  .box-wordmark .hit { color: var(--label); }
+  .box-wordmark .rate { color: var(--court-bg); -webkit-text-stroke: 1.2px var(--label); }
+  .box-tag {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px; font-weight: 600; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--label3);
+    margin-top: 6px; z-index: 1;
+  }
+  .box-rule {
+    width: 55%; height: 1px; margin-top: 14px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    z-index: 1;
+  }
+  .box-edition {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 7px; font-weight: 500; letter-spacing: 1.8px;
+    text-transform: uppercase; color: var(--label3);
+    margin-top: 8px; z-index: 1; opacity: 0.6;
+  }
+
+  /* Card edges peeking out when lid opens */
+  .box-cards-peek {
+    position: absolute;
+    top: 6px; left: 14px; right: 14px;
+    height: 28px; z-index: 4;
+    opacity: 0;
+    transition: opacity 0.4s ease 0.15s;
+    display: flex; gap: 3px; justify-content: center;
+    overflow: hidden;
+    border-radius: 4px 4px 0 0;
+  }
+  .peek-card {
+    width: 26px; height: 100%;
+    border-radius: 3px 3px 0 0;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .peek-card:nth-child(1) { background: linear-gradient(180deg, #1A3A2A, #0F2A1A); }
+  .peek-card:nth-child(2) { background: linear-gradient(180deg, #2A1A3A, #1A0F2A); }
+  .peek-card:nth-child(3) { background: linear-gradient(180deg, #3A2A1A, #2A1A0F); }
+  .peek-card:nth-child(4) { background: linear-gradient(180deg, #1A2A3A, #0F1A2A); }
+
+  /* ── OPENED STATE ── */
+  .card-box.opened .box-lid {
+    transform: rotateX(-135deg);
+  }
+  .card-box.opened .box-seal {
+    opacity: 0;
+    transform: scaleX(1.5) scaleY(0.2);
+  }
+  .card-box.opened .box-cards-peek {
+    opacity: 1;
+  }
+  .card-box.opened {
+    transform: translateY(18px) scale(0.88);
+    opacity: 0;
+  }
+
+  /* Burst particles on seal crack */
+  .pack-burst {
+    position: absolute;
+    top: 44px; left: 0; right: 0; height: 20px;
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .pack-burst.active { opacity: 1; }
+  .burst-particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    top: 50%; left: 50%;
+  }
+  .pack-burst.active .burst-particle {
+    animation: burstOut 0.7s cubic-bezier(0.2, 0, 0, 1) forwards;
+  }
+  @keyframes burstOut {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--bx, 40px), var(--by, -30px)) scale(0); opacity: 0; }
+  }
+
+  /* Deck box revealed after card box opens */
   .deck-box {
-    width: 200px;
-    height: 280px;
-    border-radius: 16px;
+    position: absolute;
+    inset: 8px;
+    border-radius: 10px;
     background: linear-gradient(165deg, #141A2B, #0D1322);
     border: 2px solid rgba(0,212,255,0.5);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-bottom: 28px;
+    z-index: 1;
     opacity: 0;
     transform: scale(0.85);
-    animation: deckPop 0.5s 0.8s ease forwards;
+    transition: opacity 0.5s ease 0.3s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s;
     box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(0,212,255,0.08);
   }
-  @keyframes deckPop {
-    to { opacity: 1; transform: scale(1); }
+  .deck-box.revealed {
+    opacity: 1;
+    transform: scale(1);
   }
   .deck-box-wordmark {
     font-family: -apple-system, sans-serif;
@@ -398,22 +578,22 @@
 
   .mini-cards-rail {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     justify-content: center;
     margin: 20px 0;
-    min-height: 100px;
+    min-height: 110px;
   }
   .mini-card {
-    width: 65px;
-    height: 95px;
-    border-radius: 8px;
+    width: 58px;
+    height: 90px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transform: translateY(20px) scale(0.8);
-    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translateY(30px) scale(0.6);
+    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .mini-card.visible {
     opacity: 1;
@@ -422,25 +602,34 @@
   .mini-card-inner {
     width: 100%;
     height: 100%;
-    border-radius: 8px;
-    background: linear-gradient(160deg, #141A2B, #0D1322);
-    border: 1.5px solid var(--icon-edge);
+    border-radius: 10px;
+    background: linear-gradient(160deg, #1A2540, #101830);
+    border: 1.5px solid rgba(0,212,255,0.35);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 6px;
+    box-shadow: 0 0 12px rgba(0,212,255,0.12), 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .mini-card.visible .mini-card-inner {
+    animation: cardGlow 1.5s ease-in-out;
+  }
+  @keyframes cardGlow {
+    0% { box-shadow: 0 0 12px rgba(0,212,255,0.12), 0 4px 16px rgba(0,0,0,0.4); }
+    40% { box-shadow: 0 0 24px rgba(0,212,255,0.3), 0 0 40px rgba(0,212,255,0.1), 0 4px 16px rgba(0,0,0,0.4); }
+    100% { box-shadow: 0 0 12px rgba(0,212,255,0.12), 0 4px 16px rgba(0,0,0,0.4); }
   }
   .mini-card-line {
     width: 70%;
     height: 2px;
-    border-top: 1.5px dashed rgba(255,255,255,0.2);
+    border-top: 1.5px dashed rgba(0,212,255,0.25);
     margin: 3px 0;
   }
   .mini-card-name {
-    font-size: 7px;
-    font-weight: 600;
-    color: var(--label2);
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--electric);
     margin-top: 4px;
     text-align: center;
     letter-spacing: 0.5px;
@@ -840,7 +1029,7 @@
     position: relative;
     overflow: hidden;
     transition: all 0.15s;
-    min-height: 56px;
+    min-height: 44px;
   }
   .outcome-cell::after {
     content: '';
@@ -1363,9 +1552,39 @@
       <div class="electric-glow"></div>
       <div class="ob-content">
         <div class="ob-heading">Start your deck</div>
-        <div class="deck-box">
-          <div class="deck-box-wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
-          <div class="deck-box-name" id="deckName"></div>
+        <div class="pack-wrapper">
+          <!-- 3D Card Deck Box (cracks seal + lid opens) -->
+          <div class="card-box" id="foilPack">
+            <div class="box-front">
+              <div class="box-wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
+              <div class="box-tag">Stunt Cards</div>
+              <div class="box-rule"></div>
+              <div class="box-edition">2025–26 Season</div>
+            </div>
+            <div class="box-cards-peek">
+              <div class="peek-card"></div>
+              <div class="peek-card"></div>
+              <div class="peek-card"></div>
+              <div class="peek-card"></div>
+            </div>
+            <div class="box-lid"></div>
+            <div class="box-seal">SEALED</div>
+            <div class="pack-burst" id="packBurst">
+              <div class="burst-particle" style="background:var(--gold);animation-delay:0s;--bx:-50px;--by:-20px;"></div>
+              <div class="burst-particle" style="background:var(--gold);animation-delay:0.02s;--bx:45px;--by:-25px;"></div>
+              <div class="burst-particle" style="background:var(--electric);animation-delay:0.04s;--bx:-30px;--by:15px;"></div>
+              <div class="burst-particle" style="background:var(--gold);animation-delay:0.01s;--bx:55px;--by:10px;"></div>
+              <div class="burst-particle" style="background:var(--coral);animation-delay:0.05s;--bx:-15px;--by:-30px;"></div>
+              <div class="burst-particle" style="background:var(--gold);animation-delay:0.03s;--bx:25px;--by:20px;"></div>
+              <div class="burst-particle" style="background:var(--electric);animation-delay:0.06s;--bx:-45px;--by:5px;"></div>
+              <div class="burst-particle" style="background:var(--gold);animation-delay:0.015s;--bx:15px;--by:-15px;"></div>
+            </div>
+          </div>
+          <!-- Deck box revealed underneath -->
+          <div class="deck-box" id="deckBox">
+            <div class="deck-box-wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
+            <div class="deck-box-name" id="deckName"></div>
+          </div>
         </div>
         <div class="ob-field" id="obField">
           <div class="ob-field-text" id="obFieldText"></div>
@@ -1388,23 +1607,24 @@
       <div class="electric-glow"></div>
       <div class="mint-content">
         <div class="mint-heading">Mint your cards</div>
-        <div class="focus-row">
-          <div class="focus-btn sel">Stunts</div>
-          <div class="focus-btn unsel">Tumbling</div>
-          <div class="focus-btn unsel">Jumps</div>
-          <div class="focus-btn unsel">Tosses</div>
+        <div class="focus-row" id="focusRow">
+          <div class="focus-btn sel" id="focusStunts">Stunts</div>
+          <div class="focus-btn unsel" id="focusTumbling">Tumbling</div>
+          <div class="focus-btn unsel" id="focusBaskets">Baskets</div>
         </div>
         <div class="chip-row" id="chipRow">
-          <div class="chip" id="chip0">+ Lib</div>
-          <div class="chip" id="chip1">+ Extension</div>
-          <div class="chip" id="chip2">+ Cupie</div>
-          <div class="chip" id="chip3">+ Basket</div>
+          <div class="chip" id="chip0" data-cat="stunts">+ Lib</div>
+          <div class="chip" id="chip1" data-cat="stunts">+ Extension</div>
+          <div class="chip" id="chip2" data-cat="tumbling">+ Standing Tuck</div>
+          <div class="chip" id="chip3" data-cat="tumbling">+ Running Full</div>
+          <div class="chip" id="chip4" data-cat="baskets">+ Basket Toss</div>
         </div>
         <div class="mini-cards-rail" id="cardRail">
           <div class="mini-card" id="mc0"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Lib</div></div></div>
           <div class="mini-card" id="mc1"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Extension</div></div></div>
-          <div class="mini-card" id="mc2"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Cupie</div></div></div>
-          <div class="mini-card" id="mc3"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Basket</div></div></div>
+          <div class="mini-card" id="mc2"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">St. Tuck</div></div></div>
+          <div class="mini-card" id="mc3"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Run Full</div></div></div>
+          <div class="mini-card" id="mc4"><div class="mini-card-inner"><div class="mini-card-line"></div><div class="mini-card-line"></div><div class="mini-card-name">Bsk Toss</div></div></div>
         </div>
         <div class="ob-cta" id="mintCta" style="opacity:0; animation:none; margin-top:auto;">
           <div class="ob-cta-dot"></div>
@@ -1419,7 +1639,7 @@
         <div class="home-header">
           <div>
             <div class="wordmark"><span class="hit">HIT</span><span class="rate">RATE</span></div>
-            <div class="header-identity">Stingray Allstars</div>
+            <div class="header-identity">All Stars</div>
           </div>
           <div class="header-icons">
             <div class="header-icon">⌚</div>
@@ -1438,20 +1658,20 @@
           <div class="feed-card" id="summaryCard">
             <div class="card-kicker">MY HIT RATE</div>
             <div class="rate-row">
-              <div><span class="rate-num" id="rateNum">74</span><span class="rate-pct">%</span></div>
-              <div class="delta-badge">+3</div>
+              <div><span class="rate-num" id="rateNum">69</span><span class="rate-pct">%</span></div>
+              <div class="delta-badge">+4</div>
             </div>
             <div class="outcome-bar">
-              <div class="ob-hit" style="width:74%"></div>
+              <div class="ob-hit" style="width:69%"></div>
               <div class="ob-bob" style="width:11%"></div>
-              <div class="ob-bf" style="width:9%"></div>
-              <div class="ob-mf" style="width:6%"></div>
+              <div class="ob-bf" style="width:12%"></div>
+              <div class="ob-mf" style="width:8%"></div>
             </div>
             <div class="outcome-legend">
-              <div class="legend-row"><div class="legend-dot" style="background:var(--hit)"></div>Hit<div class="legend-count">127</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--hit)"></div>Hit<div class="legend-count">118</div></div>
               <div class="legend-row"><div class="legend-dot" style="background:var(--bobble)"></div>Bobble<div class="legend-count">19</div></div>
-              <div class="legend-row"><div class="legend-dot" style="background:var(--building-fall)"></div>Bld Fall<div class="legend-count">15</div></div>
-              <div class="legend-row"><div class="legend-dot" style="background:var(--major-fall)"></div>Mjr Fall<div class="legend-count">10</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--building-fall)"></div>Bld Fall<div class="legend-count">21</div></div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--major-fall)"></div>Mjr Fall<div class="legend-count">13</div></div>
             </div>
           </div>
           <!-- Trend Card -->
@@ -1478,10 +1698,11 @@
           <div class="feed-card">
             <div class="card-kicker">SKILLS</div>
             <div class="groups-list">
-              <div class="group-row"><div class="group-swatch" style="background:var(--g1)"></div><div class="group-name">Lib</div><div class="group-pct" style="color:var(--hit)">82%</div><div class="group-reps">45 reps</div></div>
-              <div class="group-row"><div class="group-swatch" style="background:var(--g2)"></div><div class="group-name">Extension</div><div class="group-pct" style="color:var(--hit)">78%</div><div class="group-reps">38 reps</div></div>
-              <div class="group-row"><div class="group-swatch" style="background:var(--g3)"></div><div class="group-name">Cupie</div><div class="group-pct" style="color:var(--building-fall)">65%</div><div class="group-reps">52 reps</div></div>
-              <div class="group-row"><div class="group-swatch" style="background:var(--g4)"></div><div class="group-name">Basket</div><div class="group-pct" style="color:var(--major-fall)">48%</div><div class="group-reps">36 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g1)"></div><div class="group-name">Lib</div><div class="group-pct" style="color:var(--hit)">82%</div><div class="group-reps">38 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g2)"></div><div class="group-name">Extension</div><div class="group-pct" style="color:var(--hit)">78%</div><div class="group-reps">32 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g3)"></div><div class="group-name">Standing Tuck</div><div class="group-pct" style="color:var(--hit)">71%</div><div class="group-reps">35 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g4)"></div><div class="group-name">Running Full</div><div class="group-pct" style="color:var(--building-fall)">60%</div><div class="group-reps">30 reps</div></div>
+              <div class="group-row"><div class="group-swatch" style="background:var(--g5)"></div><div class="group-name">Basket Toss</div><div class="group-pct" style="color:var(--major-fall)">53%</div><div class="group-reps">36 reps</div></div>
             </div>
           </div>
         </div>
@@ -1511,7 +1732,9 @@
           <div class="pin-label">PIN</div>
           <div class="pin-chip sel"><div class="pin-chip-swatch" style="background:var(--g1)"></div>Lib</div>
           <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g2)"></div>Ext</div>
-          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g3)"></div>Cup</div>
+          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g3)"></div>St.T</div>
+          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g4)"></div>R.Fl</div>
+          <div class="pin-chip unsel"><div class="pin-chip-swatch" style="background:var(--g5)"></div>BkT</div>
         </div>
         <div class="outcome-grid" id="outcomeGrid">
           <div class="outcome-header" style="color:var(--hit)">HIT</div>
@@ -1519,6 +1742,7 @@
           <div class="outcome-header" style="color:var(--building-fall)">BLD FALL</div>
           <div class="outcome-header" style="color:var(--major-fall)">MJR FALL</div>
 
+          <!-- Row 0: Lib (pinned) -->
           <div class="outcome-cell hit-cell" id="cell-0-0">
             <div class="cell-count" id="count-0-0">0</div>
             <div class="cell-flash hit-flash" id="flash-0-0"></div>
@@ -1536,6 +1760,7 @@
             <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-0-3"></div>
           </div>
 
+          <!-- Row 1: Extension -->
           <div class="grid-row-label"><div class="row-swatch" style="background:var(--g2)"></div><div class="row-name">Extension</div></div>
           <div class="outcome-cell hit-cell" id="cell-1-0">
             <div class="cell-count" id="count-1-0">0</div>
@@ -1552,6 +1777,63 @@
           <div class="outcome-cell mf-cell" id="cell-1-3">
             <div class="cell-count" id="count-1-3">0</div>
             <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-1-3"></div>
+          </div>
+
+          <!-- Row 2: Standing Tuck -->
+          <div class="grid-row-label"><div class="row-swatch" style="background:var(--g3)"></div><div class="row-name">Standing Tuck</div></div>
+          <div class="outcome-cell hit-cell" id="cell-2-0">
+            <div class="cell-count" id="count-2-0">0</div>
+            <div class="cell-flash hit-flash" id="flash-2-0"></div>
+          </div>
+          <div class="outcome-cell bob-cell" id="cell-2-1">
+            <div class="cell-count" id="count-2-1">0</div>
+            <div class="cell-flash bob-flash" id="flash-2-1"></div>
+          </div>
+          <div class="outcome-cell bf-cell" id="cell-2-2">
+            <div class="cell-count" id="count-2-2">0</div>
+            <div class="cell-flash" style="border-color:var(--building-fall)" id="flash-2-2"></div>
+          </div>
+          <div class="outcome-cell mf-cell" id="cell-2-3">
+            <div class="cell-count" id="count-2-3">0</div>
+            <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-2-3"></div>
+          </div>
+
+          <!-- Row 3: Running Full -->
+          <div class="grid-row-label"><div class="row-swatch" style="background:var(--g4)"></div><div class="row-name">Running Full</div></div>
+          <div class="outcome-cell hit-cell" id="cell-3-0">
+            <div class="cell-count" id="count-3-0">0</div>
+            <div class="cell-flash hit-flash" id="flash-3-0"></div>
+          </div>
+          <div class="outcome-cell bob-cell" id="cell-3-1">
+            <div class="cell-count" id="count-3-1">0</div>
+            <div class="cell-flash bob-flash" id="flash-3-1"></div>
+          </div>
+          <div class="outcome-cell bf-cell" id="cell-3-2">
+            <div class="cell-count" id="count-3-2">0</div>
+            <div class="cell-flash" style="border-color:var(--building-fall)" id="flash-3-2"></div>
+          </div>
+          <div class="outcome-cell mf-cell" id="cell-3-3">
+            <div class="cell-count" id="count-3-3">0</div>
+            <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-3-3"></div>
+          </div>
+
+          <!-- Row 4: Basket Toss -->
+          <div class="grid-row-label"><div class="row-swatch" style="background:var(--g5)"></div><div class="row-name">Basket Toss</div></div>
+          <div class="outcome-cell hit-cell" id="cell-4-0">
+            <div class="cell-count" id="count-4-0">0</div>
+            <div class="cell-flash hit-flash" id="flash-4-0"></div>
+          </div>
+          <div class="outcome-cell bob-cell" id="cell-4-1">
+            <div class="cell-count" id="count-4-1">0</div>
+            <div class="cell-flash bob-flash" id="flash-4-1"></div>
+          </div>
+          <div class="outcome-cell bf-cell" id="cell-4-2">
+            <div class="cell-count" id="count-4-2">0</div>
+            <div class="cell-flash" style="border-color:var(--building-fall)" id="flash-4-2"></div>
+          </div>
+          <div class="outcome-cell mf-cell" id="cell-4-3">
+            <div class="cell-count" id="count-4-3">0</div>
+            <div class="cell-flash" style="border-color:var(--major-fall)" id="flash-4-3"></div>
           </div>
         </div>
         <div class="autosave-toast" id="autosaveToast">
@@ -1585,7 +1867,7 @@
               <div style="width:4%;height:100%;background:var(--major-fall);border-radius:0 4px 4px 0;"></div>
             </div>
             <div class="sc-flavor">"Sticking it like rent is due."</div>
-            <div class="sc-set-num">001 / 005</div>
+            <div class="sc-set-num">001 / 006</div>
           </div>
         </div>
         <div class="share-actions">
@@ -1595,6 +1877,7 @@
         </div>
         <div class="deck-dots">
           <div class="deck-dot active"></div>
+          <div class="deck-dot"></div>
           <div class="deck-dot"></div>
           <div class="deck-dot"></div>
           <div class="deck-dot"></div>
@@ -1637,14 +1920,20 @@
           <div class="wk-standing">
             <div class="wk-rank">4</div>
             <div class="wk-swatch" style="background:var(--g3)"></div>
-            <div class="wk-name">Cupie</div>
-            <div class="wk-score" style="color:var(--building-fall)">65%</div>
+            <div class="wk-name">Standing Tuck</div>
+            <div class="wk-score" style="color:var(--hit)">71%</div>
+          </div>
+          <div class="wk-standing">
+            <div class="wk-rank">5</div>
+            <div class="wk-swatch" style="background:var(--g4)"></div>
+            <div class="wk-name">Running Full</div>
+            <div class="wk-score" style="color:var(--building-fall)">60%</div>
           </div>
           <div class="wk-standing" style="border-bottom:none;">
-            <div class="wk-rank" style="color:var(--label3)">5</div>
-            <div class="wk-swatch" style="background:var(--g4)"></div>
-            <div class="wk-name" style="color:var(--label2)">Basket</div>
-            <div class="wk-score" style="color:var(--major-fall)">48%</div>
+            <div class="wk-rank" style="color:var(--label3)">6</div>
+            <div class="wk-swatch" style="background:var(--g5)"></div>
+            <div class="wk-name" style="color:var(--label2)">Basket Toss</div>
+            <div class="wk-score" style="color:var(--major-fall)">53%</div>
           </div>
         </div>
         <div class="cups-section">
@@ -1668,8 +1957,8 @@
   <div class="annotations" id="annotations">
     <div class="annotation" id="anno1"><div class="anno-line"></div><div class="anno-text">Name your deck<br>& pick your mode</div></div>
     <div class="annotation" id="anno2"><div class="anno-line"></div><div class="anno-text">Mint cards for<br>each skill you train</div></div>
-    <div class="annotation" id="anno3"><div class="anno-line"></div><div class="anno-text">Live dashboard<br>tracks your hit rate</div></div>
-    <div class="annotation" id="anno4"><div class="anno-line"></div><div class="anno-text">1-tap logging<br>instant auto-save</div></div>
+    <div class="annotation" id="anno3"><div class="anno-line"></div><div class="anno-text">1-tap logging<br>instant auto-save</div></div>
+    <div class="annotation" id="anno4"><div class="anno-line"></div><div class="anno-text">Live dashboard<br>tracks your hit rate</div></div>
     <div class="annotation" id="anno5"><div class="anno-line"></div><div class="anno-text">Collectible stunt<br>cards to share</div></div>
     <div class="annotation" id="anno6"><div class="anno-line"></div><div class="anno-text">Weekly cups &<br>season league</div></div>
   </div>
@@ -1679,8 +1968,15 @@
 const cursor = document.getElementById('cursor');
 const stepLabel = document.getElementById('stepLabel');
 const progressFill = document.getElementById('progressFill');
+const phone = document.getElementById('phone');
 
-// ── Cursor helpers ──
+// ── Cursor helpers — use element centers for alignment ──
+function elCenter(el) {
+  const pr = phone.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  return { x: er.left + er.width/2 - pr.left, y: er.top + er.height/2 - pr.top };
+}
+
 function moveCursor(x, y, dur = 600) {
   return new Promise(r => {
     cursor.classList.add('visible');
@@ -1689,6 +1985,10 @@ function moveCursor(x, y, dur = 600) {
     cursor.style.top = y + 'px';
     setTimeout(r, dur);
   });
+}
+function moveToEl(el, dur = 500) {
+  const c = elCenter(el);
+  return moveCursor(c.x, c.y, dur);
 }
 function tapCursor() {
   return new Promise(r => {
@@ -1734,20 +2034,24 @@ function typeText(el, text, speed = 80) {
 
 // ── Cell tap animation ──
 let repCount = 0;
+function totalHits() {
+  let h = 0;
+  for (let r = 0; r < 4; r++) h += parseInt(document.getElementById(`count-${r}-0`).textContent);
+  return h;
+}
 function tapCell(row, col) {
   return new Promise(r => {
     const countEl = document.getElementById(`count-${row}-${col}`);
     const flashEl = document.getElementById(`flash-${row}-${col}`);
-    const current = parseInt(countEl.textContent);
-    countEl.textContent = current + 1;
+    countEl.textContent = parseInt(countEl.textContent) + 1;
     repCount++;
     document.getElementById('capReps').textContent = repCount;
-    if (repCount === 1) document.getElementById('capRepsSub').textContent = 'REP · — HIT';
-    else document.getElementById('capRepsSub').textContent = `REPS · ${Math.round((parseInt(document.getElementById('count-0-0').textContent) + parseInt(document.getElementById('count-1-0').textContent)) / repCount * 100)}% HIT`;
+    const pct = Math.round(totalHits() / repCount * 100);
+    document.getElementById('capRepsSub').textContent = `REPS · ${pct}% HIT`;
     flashEl.classList.remove('flash-anim');
     void flashEl.offsetWidth;
     flashEl.classList.add('flash-anim');
-    setTimeout(r, 350);
+    setTimeout(r, 300);
   });
 }
 
@@ -1756,30 +2060,52 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ══════════════════════════════════════════
 //  MAIN ANIMATION TIMELINE
+//  Skills: Lib, Extension, Cupie, Basket
+//  Consistent data across all screens:
+//    Lib          (stunt)   — 82%  (38 reps: 31 hit, 3 bob, 3 bf, 1 mf)
+//    Extension    (stunt)   — 78%  (32 reps: 25 hit, 3 bob, 2 bf, 2 mf)
+//    Standing Tuck(tumbling)— 71%  (35 reps: 25 hit, 4 bob, 4 bf, 2 mf)
+//    Running Full (tumbling)— 60%  (30 reps: 18 hit, 5 bob, 4 bf, 3 mf)
+//    Basket Toss  (basket)  — 53%  (36 reps: 19 hit, 4 bob, 8 bf, 5 mf)
+//    TOTAL                  — 69%  (171 reps: 118 hit, 19 bob, 21 bf, 13 mf)
 // ══════════════════════════════════════════
 async function runTimeline() {
 
-  // ── STEP 1: Onboarding ──
+  // ── STEP 1: Onboarding — Name Your Deck ──
   showScreen('screen1');
   setStep('STEP 1 · NAME YOUR DECK', 0);
   showAnno('anno1');
-  await wait(1200);
+  await wait(800);
 
-  // Type team name
+  // ── Pack-tear animation ──
+  const foilPack = document.getElementById('foilPack');
+  const packBurst = document.getElementById('packBurst');
+  const deckBox = document.getElementById('deckBox');
+
+  await moveToEl(foilPack, 500);
+  await tapCursor();
+  await wait(200);
+  foilPack.classList.add('opened');
+  packBurst.classList.add('active');
+  await wait(1000);
+  deckBox.classList.add('revealed');
+  await wait(1000);
+
   const fieldText = document.getElementById('obFieldText');
   const deckName = document.getElementById('deckName');
-  await moveCursor(187, 475, 500);
+  const obField = document.getElementById('obField');
+  await moveToEl(obField, 500);
   await tapCursor();
   await wait(300);
-  await typeText(fieldText, 'Stingray Allstars', 65);
-  deckName.textContent = 'Stingray Allstars';
+  await typeText(fieldText, 'All Stars', 65);
+  deckName.textContent = 'All Stars';
   deckName.style.opacity = '1';
   deckName.style.animation = 'none';
   await wait(800);
 
-  // Tap CTA
   setStep('STEP 1 · NAME YOUR DECK', 8);
-  await moveCursor(187, 720, 500);
+  const obCta = document.getElementById('obCta');
+  await moveToEl(obCta, 500);
   await tapCursor();
   await wait(600);
 
@@ -1789,124 +2115,169 @@ async function runTimeline() {
   showAnno('anno2');
   await wait(800);
 
-  // Tap chips one by one
-  const chipNames = ['chip0', 'chip1', 'chip2', 'chip3'];
-  const cardNames = ['mc0', 'mc1', 'mc2', 'mc3'];
-  const chipPositions = [
-    [115, 260], [205, 260], [115, 300], [210, 300]
-  ];
+  const chipIds = ['chip0', 'chip1', 'chip2', 'chip3', 'chip4'];
+  const cardIds = ['mc0', 'mc1', 'mc2', 'mc3', 'mc4'];
+  const allChips = chipIds.map(id => document.getElementById(id));
+  const focusBtns = {
+    stunts: document.getElementById('focusStunts'),
+    tumbling: document.getElementById('focusTumbling'),
+    baskets: document.getElementById('focusBaskets'),
+  };
 
-  for (let i = 0; i < 4; i++) {
-    const chip = document.getElementById(chipNames[i]);
-    chip.style.opacity = '1';
-    chip.style.transform = 'scale(1)';
-    chip.style.animationDelay = (i * 0.15) + 's';
+  function showCat(cat) {
+    // Toggle focus-btn classes
+    Object.entries(focusBtns).forEach(([k, btn]) => {
+      btn.classList.toggle('sel', k === cat);
+      btn.classList.toggle('unsel', k !== cat);
+    });
+    // Show/hide chips by data-cat
+    allChips.forEach(ch => {
+      if (ch.dataset.cat === cat && !ch.classList.contains('minted')) {
+        ch.style.opacity = '1';
+        ch.style.transform = 'scale(1)';
+      } else if (!ch.classList.contains('minted')) {
+        ch.style.opacity = '0';
+        ch.style.transform = 'scale(0.8)';
+      }
+    });
   }
-  await wait(600);
 
-  for (let i = 0; i < 4; i++) {
-    await moveCursor(chipPositions[i][0], chipPositions[i][1], 350);
-    await tapCursor();
-    const chip = document.getElementById(chipNames[i]);
-    chip.classList.add('minted');
-    const card = document.getElementById(cardNames[i]);
-    card.classList.add('visible');
-    await wait(400);
-  }
+  // ── STUNTS TAB (already selected) ──
+  showCat('stunts');
+  await wait(400);
 
-  await wait(600);
+  // Tap Lib chip → mint card
+  await moveToEl(allChips[0], 300);
+  await tapCursor();
+  allChips[0].classList.add('minted');
+  document.getElementById(cardIds[0]).classList.add('visible');
+  await wait(300);
+
+  // Tap Extension chip → mint card
+  await moveToEl(allChips[1], 300);
+  await tapCursor();
+  allChips[1].classList.add('minted');
+  document.getElementById(cardIds[1]).classList.add('visible');
+  await wait(350);
+
+  // ── SWITCH TO TUMBLING TAB ──
+  await moveToEl(focusBtns.tumbling, 350);
+  await tapCursor();
+  showCat('tumbling');
+  await wait(400);
+
+  // Tap Standing Tuck → mint
+  await moveToEl(allChips[2], 300);
+  await tapCursor();
+  allChips[2].classList.add('minted');
+  document.getElementById(cardIds[2]).classList.add('visible');
+  await wait(300);
+
+  // Tap Running Full → mint
+  await moveToEl(allChips[3], 300);
+  await tapCursor();
+  allChips[3].classList.add('minted');
+  document.getElementById(cardIds[3]).classList.add('visible');
+  await wait(350);
+
+  // ── SWITCH TO BASKETS TAB ──
+  await moveToEl(focusBtns.baskets, 350);
+  await tapCursor();
+  showCat('baskets');
+  await wait(400);
+
+  // Tap Basket Toss → mint
+  await moveToEl(allChips[4], 300);
+  await tapCursor();
+  allChips[4].classList.add('minted');
+  document.getElementById(cardIds[4]).classList.add('visible');
+  await wait(400);
   const mintCta = document.getElementById('mintCta');
   mintCta.style.opacity = '1';
   mintCta.style.transition = 'opacity 0.4s';
   await wait(400);
-  await moveCursor(187, 680, 400);
+  await moveToEl(mintCta, 400);
   await tapCursor();
   await wait(600);
 
-  // ── STEP 3: Home Dashboard ──
-  setStep('STEP 3 · YOUR DASHBOARD', 33);
-  showScreen('screen3');
+  // ── STEP 3: Log Reps (was step 4) ──
+  setStep('STEP 3 · LOG REPS', 33);
+  showScreen('screen4');
   showAnno('anno3');
-  hideCursor();
   await wait(600);
 
-  // Animate rate number counting up
+  document.getElementById('autosaveToast').classList.add('visible');
+  await wait(500);
+
+  // Simulate a mini practice across all 5 skills
+  // Tap sequence: skill-row, outcome-col
+  const taps = [
+    // Lib (stunt): 4 hit, 1 bobble
+    [0,0],[0,0],[0,1],[0,0],[0,0],
+    // Extension (stunt): 3 hit, 1 building fall
+    [1,0],[1,0],[1,0],[1,2],
+    // Standing Tuck (tumbling): 3 hit, 1 bobble
+    [2,0],[2,0],[2,1],[2,0],
+    // Running Full (tumbling): 2 hit, 1 major fall
+    [3,0],[3,0],[3,3],
+    // Basket Toss: 2 hit, 1 building fall
+    [4,0],[4,0],[4,2],
+  ];
+
+  for (const [row, col] of taps) {
+    const cell = document.getElementById(`cell-${row}-${col}`);
+    await moveToEl(cell, 200);
+    await tapCursor();
+    await tapCell(row, col);
+    await wait(120);
+  }
+  await wait(600);
+
+  // Tap END
+  const endBtn = document.querySelector('.cap-end-btn');
+  await moveToEl(endBtn, 400);
+  await tapCursor();
+  await wait(600);
+  hideCursor();
+
+  // ── STEP 4: Dashboard (was step 3) ──
+  setStep('STEP 4 · YOUR DASHBOARD', 50);
+  showScreen('screen3');
+  showAnno('anno4');
+  await wait(500);
+
+  // Count up the rate
   const rateNum = document.getElementById('rateNum');
   let r = 0;
   const rateInterval = setInterval(() => {
     r += 2;
-    if (r > 74) { r = 74; clearInterval(rateInterval); }
+    if (r > 69) { r = 69; clearInterval(rateInterval); }
     rateNum.textContent = r;
   }, 25);
   await wait(1200);
 
-  // Scroll the cards slightly
+  // Gentle scroll to show more cards
   const cardsScroll = document.getElementById('cardsScroll');
   cardsScroll.style.transition = 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
-  cardsScroll.style.transform = 'translateY(-60px)';
+  cardsScroll.style.transform = 'translateY(-70px)';
   await wait(1800);
   cardsScroll.style.transform = 'translateY(0)';
-  await wait(1000);
+  await wait(1200);
 
-  // Tap practice CTA
-  setStep('STEP 3 · YOUR DASHBOARD', 42);
-  await moveCursor(187, 755, 500);
-  cursor.classList.add('visible');
-  await wait(300);
-  await tapCursor();
-  await wait(600);
-
-  // ── STEP 4: Capture / Logging ──
-  setStep('STEP 4 · LOG REPS', 50);
-  showScreen('screen4');
-  showAnno('anno4');
-  await wait(800);
-
-  // Show autosave toast
-  document.getElementById('autosaveToast').classList.add('visible');
-  await wait(600);
-
-  // Simulate tapping outcome cells — a mini practice
-  const taps = [
-    [0,0], [0,0], [0,0], // 3 hits on Lib
-    [0,1],               // 1 bobble
-    [0,0], [0,0],        // 2 more hits
-    [1,0], [1,0], [1,0], // 3 hits on Extension
-    [1,1],               // 1 bobble
-  ];
-
-  // Cell positions (approximate)
-  const cellPos = {
-    '0-0': [60, 380], '0-1': [145, 380], '0-2': [230, 380], '0-3': [315, 380],
-    '1-0': [60, 490], '1-1': [145, 490], '1-2': [230, 490], '1-3': [315, 490],
-  };
-
-  for (const [row, col] of taps) {
-    const key = `${row}-${col}`;
-    await moveCursor(cellPos[key][0], cellPos[key][1], 250);
-    await tapCursor();
-    await tapCell(row, col);
-    await wait(180);
-  }
-  await wait(800);
-  hideCursor();
-  await wait(500);
-
-  // ── STEP 5: Share Cards ──
+  // ── STEP 5: Stunt Cards ──
   setStep('STEP 5 · STUNT CARDS', 67);
   showScreen('screen5');
   showAnno('anno5');
   await wait(600);
 
-  // Card entrance with a subtle tilt
   const shareCard = document.getElementById('shareCard');
   shareCard.style.transition = 'transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
   shareCard.style.transform = 'perspective(800px) rotateY(-5deg) rotateX(3deg)';
-  await wait(1500);
+  await wait(1400);
   shareCard.style.transform = 'perspective(800px) rotateY(5deg) rotateX(-2deg)';
   await wait(1200);
   shareCard.style.transform = 'perspective(800px) rotateY(0) rotateX(0)';
-  await wait(1500);
+  await wait(1400);
 
   // ── STEP 6: Trophy Room ──
   setStep('STEP 6 · TROPHY ROOM', 83);
@@ -1914,24 +2285,42 @@ async function runTimeline() {
   showAnno('anno6');
   await wait(3500);
 
-  // ── LOOP ──
+  // ── LOOP RESET ──
   setStep('', 100);
   stepLabel.classList.remove('visible');
   document.querySelectorAll('.annotation').forEach(a => a.classList.remove('visible'));
   await wait(2000);
 
-  // Reset and replay
+  // Reset everything for replay
   repCount = 0;
   document.querySelectorAll('.cell-count').forEach(el => el.textContent = '0');
   document.getElementById('capReps').textContent = '0';
+  document.getElementById('capRepsSub').textContent = 'REPS';
   document.getElementById('obFieldText').textContent = '';
   document.getElementById('deckName').textContent = '';
   document.getElementById('deckName').style.opacity = '0';
-  chipNames.forEach(n => document.getElementById(n).classList.remove('minted'));
-  cardNames.forEach(n => document.getElementById(n).classList.remove('visible'));
+  chipIds.forEach(n => {
+    const ch = document.getElementById(n);
+    ch.classList.remove('minted');
+    ch.style.opacity = '0';
+    ch.style.transform = 'scale(0.8)';
+  });
+  cardIds.forEach(n => document.getElementById(n).classList.remove('visible'));
+  // Reset focus tabs back to Stunts
+  document.getElementById('focusStunts').classList.add('sel');
+  document.getElementById('focusStunts').classList.remove('unsel');
+  document.getElementById('focusTumbling').classList.add('unsel');
+  document.getElementById('focusTumbling').classList.remove('sel');
+  document.getElementById('focusBaskets').classList.add('unsel');
+  document.getElementById('focusBaskets').classList.remove('sel');
   document.getElementById('mintCta').style.opacity = '0';
   document.getElementById('autosaveToast').classList.remove('visible');
   document.getElementById('rateNum').textContent = '0';
+  document.getElementById('shareCard').style.transform = '';
+  document.getElementById('cardsScroll').style.transform = '';
+  document.getElementById('foilPack').classList.remove('opened');
+  document.getElementById('packBurst').classList.remove('active');
+  document.getElementById('deckBox').classList.remove('revealed');
   progressFill.style.width = '0%';
 
   runTimeline();
