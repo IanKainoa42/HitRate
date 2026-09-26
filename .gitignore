@@ -6,11 +6,6 @@ xcuserdata/
 *.xcscmblueprint
 *.xccheckout
 
-# Firebase config — contains project identifiers; not secret per Firebase docs
-# but excluded from public repos so contributors use their own Firebase project.
-# Copy GoogleService-Info.plist.template and fill in your own Firebase values.
-HitRate/GoogleService-Info.plist
-
 # macOS
 .DS_Store
 
