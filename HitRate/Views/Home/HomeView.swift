@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import SwiftData
 
 struct HomeView: View {
@@ -18,6 +19,9 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthViewModel
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
+    /// Practices ended with ≥10 reps logged — drives the rating ask (see endOfPractice).
+    @AppStorage("completedPracticeCount") private var completedPracticeCount = 0
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("athleteName") private var athleteName = ""
     @AppStorage("orgName") private var orgName = ""
     @AppStorage("currentTeamID") private var currentTeamID = ""
@@ -605,9 +609,20 @@ struct HomeView: View {
     private func endOfPractice() {
         pendingPage = nil
         sweepEmptyLiveSessions()
-        guard AccountPromptPolicy.offersSaveAfterPractice(isUpgraded: auth.isUpgraded,
-                                                          alreadyAsked: askedSaveAccount,
-                                                          repCount: loggedRepCount) else { return }
+        // A practice ending with real reps on the books (lifetime ≥10) is the app
+        // having done its job.
+        // Ask for a rating on the 2nd and 6th such practice — never on the
+        // same dismissal as the save-account prompt (one ask per exit).
+        let willOfferSave = AccountPromptPolicy.offersSaveAfterPractice(isUpgraded: auth.isUpgraded,
+                                                                        alreadyAsked: askedSaveAccount,
+                                                                        repCount: loggedRepCount)
+        if loggedRepCount >= 10 {
+            completedPracticeCount += 1
+            if !willOfferSave, completedPracticeCount == 2 || completedPracticeCount == 6 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { requestReview() }
+            }
+        }
+        guard willOfferSave else { return }
         askedSaveAccount = true
         // Let the cover finish dismissing; presenting a sheet from inside another
         // presentation's onDismiss drops it silently often enough to matter.

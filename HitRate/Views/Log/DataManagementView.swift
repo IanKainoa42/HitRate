@@ -31,6 +31,9 @@ struct DataManagementView: View {
 
     private enum Confirm { case clearFolderHistory, clearHistory, eraseAll }
     @State private var confirm: Confirm?
+    @State private var paywallOpen = false
+    @State private var moreAppsOpen = false
+    @ObservedObject private var coach = CoachEntitlement.shared
     /// Trash-row "Delete permanently" awaiting confirmation (name shown + the
     /// hard-delete to run if the user confirms).
     @State private var pendingPurge: (name: String, action: () -> Void)?
@@ -60,7 +63,12 @@ struct DataManagementView: View {
 
             Section {
                 let csv = CSVExportItem(sessions: sessions)
-                if csv.hasData {
+                if csv.hasData, !coach.isCoach {
+                    Button { paywallOpen = true } label: {
+                        Label("Export CSV backup", systemImage: "arrow.down.to.line")
+                            .badge(Text("COACH").font(.system(size: 10, weight: .heavy)))
+                    }
+                } else if csv.hasData {
                     ShareLink(item: csv, preview: SharePreview("HitRate practice data")) {
                         Label("Export CSV backup", systemImage: "arrow.down.to.line")
                     }
@@ -72,6 +80,26 @@ struct DataManagementView: View {
                 Text("Backup")
             } footer: {
                 Text("Save a spreadsheet of every rep before you delete anything below — these deletes can't be undone.")
+            }
+            .listRowBackground(glassRow)
+
+            Section {
+                Button {
+                    paywallOpen = true
+                } label: {
+                    Label(coach.isCoach ? "HitRate Coach · active" : "HitRate Coach",
+                          systemImage: coach.isCoach ? "checkmark.seal.fill" : "person.2.fill")
+                }
+                Button {
+                    moreAppsOpen = true
+                } label: {
+                    Label("More coaching tools", systemImage: "square.grid.2x2")
+                }
+            } header: {
+                Text("From the same coach")
+            } footer: {
+                Text(coach.isCoach ? "Sharing, unlimited folders, homework and CSV are unlocked on this Apple ID."
+                                   : "Athletes track free. Coach unlocks sharing by code, unlimited folders, homework and CSV backup.")
             }
             .listRowBackground(glassRow)
 
@@ -160,6 +188,12 @@ struct DataManagementView: View {
         .background(FloorBackdrop().ignoresSafeArea())
         .navigationTitle("Manage Data")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $paywallOpen) {
+            CoachPaywallView(reason: coach.isCoach ? .general : .csv)
+        }
+        .sheet(isPresented: $moreAppsOpen) {
+            MoreCoachingAppsView()
+        }
         .alert(
             "Clear history in \(folderName)?",
             isPresented: Binding(

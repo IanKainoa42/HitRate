@@ -107,6 +107,7 @@ struct RootView: View {
         .onChange(of: didOnboard) { _, now in
             if now { openFolderID = currentTeamID }
         }
+        .task { await CoachEntitlement.shared.start() }
         .onAppear {
             minBuild.evaluate()
             guard !minBuild.isBlocked else { return }

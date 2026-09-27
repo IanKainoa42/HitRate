@@ -32,6 +32,9 @@ struct FolderListView: View {
     @State private var joinOpen = false
     @State private var pendingTrash: Team?
     @State private var accountOpen = false
+    /// Non-nil presents the Coach paywall, carrying what the coach was trying to do.
+    @State private var paywallReason: CoachPaywallView.Reason?
+    @ObservedObject private var coach = CoachEntitlement.shared
 
     /// Two states, one row. Unsaved it's the nudge; saved it's the only path to
     /// Account — and so to account deletion — from the launch root. Saved state
@@ -150,6 +153,9 @@ struct FolderListView: View {
                 .presentationDetents([.large])
                 .presentationBackground(Theme.appBGBottom)
         }
+        .sheet(item: $paywallReason) { reason in
+            CoachPaywallView(reason: reason)
+        }
         .sheet(isPresented: $joinOpen) {
             JoinFolderSheet()
                 .presentationDetents([.height(300)])
@@ -254,7 +260,7 @@ struct FolderListView: View {
                 // Visible Share affordance. Green once a code exists (= shared),
                 // muted before. Tapping opens the code sheet directly.
                 Button {
-                    sharing = t
+                    if coach.isCoach { sharing = t } else { paywallReason = .share }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold))
@@ -287,7 +293,7 @@ struct FolderListView: View {
             } label: { Label("Rename", systemImage: "pencil") }
             if isOwner(t) {
                 Button {
-                    sharing = t
+                    if coach.isCoach { sharing = t } else { paywallReason = .share }
                 } label: { Label(isShared(t) ? "Sharing code" : "Share folder",
                                  systemImage: "person.2.fill") }
             }
@@ -353,7 +359,11 @@ struct FolderListView: View {
 
     private var newFolderButton: some View {
         Button {
-            addOpen = true
+            if CoachGate.allowsNewFolder(existingCount: teams.active.count) {
+                addOpen = true
+            } else {
+                paywallReason = .secondFolder
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
