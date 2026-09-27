@@ -47,8 +47,9 @@ final class CoachEntitlement: ObservableObject {
     private let log = Logger(subsystem: "com.ianrichardson.HitRate", category: "CoachEntitlement")
 
     private init() {
-        isGrandfathered = defaults.bool(forKey: grandfatherKey)
-        isCoach = isGrandfathered || defaults.bool(forKey: cachedKey)
+        let grandfathered = UserDefaults.standard.bool(forKey: "coach.grandfathered")
+        isGrandfathered = grandfathered
+        isCoach = grandfathered || UserDefaults.standard.bool(forKey: "coach.entitled")
         updatesTask = Task { [weak self] in
             for await result in Transaction.updates {
                 guard let self else { return }
