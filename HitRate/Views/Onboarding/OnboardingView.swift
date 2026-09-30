@@ -154,7 +154,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.white)
             Text(restoring
                  ? "Signed in — checking whether you've logged with HitRate before."
-                 : "Reps live on this phone unless you save them. Sign in and they follow you to a new phone — and if you've had HitRate before, this is how you get your folders back.")
+                 : "Reps live on this phone unless you save them. Sign in and they follow you to a new phone — and if you've had HitRate before, this is how you get your decks back.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(.bottom, 10)

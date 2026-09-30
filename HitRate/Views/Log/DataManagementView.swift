@@ -46,7 +46,7 @@ struct DataManagementView: View {
     private var trashedGroups: [StuntGroup] { groups.trashed }
     private var hasTrash: Bool { !trashedTeams.isEmpty || !trashedGroups.isEmpty }
 
-    private var folderName: String { team?.name ?? "this folder" }
+    private var folderName: String { team?.name ?? "this deck" }
     private var folderAttempts: [Attempt] { attempts.filter { $0.group?.team?.id == team?.id } }
     private var hasFolderReps: Bool { !folderAttempts.isEmpty }
 
@@ -98,8 +98,8 @@ struct DataManagementView: View {
             } header: {
                 Text("From the same coach")
             } footer: {
-                Text(coach.isCoach ? "Sharing, unlimited folders, homework and CSV are unlocked on this Apple ID."
-                                   : "Athletes track free. Coach unlocks sharing by code, unlimited folders, homework and CSV backup.")
+                Text(coach.isCoach ? "Sharing, unlimited decks, homework and CSV are unlocked on this Apple ID."
+                                   : "Athletes track free. Coach unlocks sharing by code, unlimited decks, homework and CSV backup.")
             }
             .listRowBackground(glassRow)
 
@@ -122,7 +122,7 @@ struct DataManagementView: View {
                 Section {
                     ForEach(trashedTeams) { t in
                         trashRow(name: t.name,
-                                 detail: "Folder · \(allActiveSkills(t)) \(mode.nounPlural)",
+                                 detail: "Deck · \(allActiveSkills(t)) \(mode.nounPlural)",
                                  restore: { restore(team: t) },
                                  purge: { purge(team: t) })
                     }
@@ -149,9 +149,9 @@ struct DataManagementView: View {
                     }
                     .disabled(!hasFolderReps)
                 } header: {
-                    Text("This folder")
+                    Text("This deck")
                 } footer: {
-                    Text("Deletes only \(folderName)'s logged reps and sessions. Its \(mode.nounPlural) stay, and your other folders aren't touched.")
+                    Text("Deletes only \(folderName)'s logged reps and sessions. Its \(mode.nounPlural) stay, and your other decks aren't touched.")
                 }
                 .listRowBackground(glassRow)
             }
@@ -160,13 +160,13 @@ struct DataManagementView: View {
                 Button(role: .destructive) {
                     confirm = .clearHistory
                 } label: {
-                    Label("Clear history in every folder", systemImage: "clock.arrow.circlepath")
+                    Label("Clear history in every deck", systemImage: "clock.arrow.circlepath")
                 }
                 .disabled(!hasReps)
             } header: {
-                Text("All folders")
+                Text("All decks")
             } footer: {
-                Text("Deletes every logged rep and session across ALL your folders — not just \(folderName). Your \(mode.nounPlural) stay everywhere. Stats reset to zero.")
+                Text("Deletes every logged rep and session across ALL your decks — not just \(folderName). Your \(mode.nounPlural) stay everywhere. Stats reset to zero.")
             }
             .listRowBackground(glassRow)
 
@@ -174,13 +174,13 @@ struct DataManagementView: View {
                 Button(role: .destructive) {
                     confirm = .eraseAll
                 } label: {
-                    Label("Erase every folder", systemImage: "trash")
+                    Label("Erase every deck", systemImage: "trash")
                 }
                 .disabled(!hasAnything)
             } header: {
-                Text("Danger zone — all folders")
+                Text("Danger zone — all decks")
             } footer: {
-                Text("Deletes every folder on this device (including \(folderName)), every skill, rep, and session — a clean slate. Your name and custom outcome labels stay.")
+                Text("Deletes every deck on this device (including \(folderName)), every skill, rep, and session — a clean slate. Your name and custom outcome labels stay.")
             }
             .listRowBackground(glassRow)
         }
@@ -203,10 +203,10 @@ struct DataManagementView: View {
             Button("Clear history", role: .destructive) { clearFolderHistory() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("\(folderAttempts.count) rep\(folderAttempts.count == 1 ? "" : "s") in \(folderName) will be deleted. Its \(mode.nounPlural) stay, and your other folders aren't touched. This can't be undone.")
+            Text("\(folderAttempts.count) rep\(folderAttempts.count == 1 ? "" : "s") in \(folderName) will be deleted. Its \(mode.nounPlural) stay, and your other decks aren't touched. This can't be undone.")
         }
         .alert(
-            "Clear history in every folder?",
+            "Clear history in every deck?",
             isPresented: Binding(
                 get: { confirm == .clearHistory },
                 set: { if !$0 { confirm = nil } })
@@ -214,10 +214,10 @@ struct DataManagementView: View {
             Button("Clear history", role: .destructive) { clearHistory() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All \(attempts.count) reps and \(sessions.count) sessions across every folder — not just \(folderName) — will be deleted. Your \(mode.nounPlural) stay. This can't be undone.")
+            Text("All \(attempts.count) reps and \(sessions.count) sessions across every deck — not just \(folderName) — will be deleted. Your \(mode.nounPlural) stay. This can't be undone.")
         }
         .alert(
-            "Erase every folder?",
+            "Erase every deck?",
             isPresented: Binding(
                 get: { confirm == .eraseAll },
                 set: { if !$0 { confirm = nil } })
@@ -225,7 +225,7 @@ struct DataManagementView: View {
             Button("Erase everything", role: .destructive) { eraseAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every folder on this device (including \(folderName)) — \(groups.count) \(mode.nounPlural), \(attempts.count) reps, and \(sessions.count) sessions — will be permanently deleted.")
+            Text("Every deck on this device (including \(folderName)) — \(groups.count) \(mode.nounPlural), \(attempts.count) reps, and \(sessions.count) sessions — will be permanently deleted.")
         }
         .alert(
             "Delete \(pendingPurge?.name ?? "") permanently?",

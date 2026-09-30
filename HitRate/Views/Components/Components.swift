@@ -403,7 +403,7 @@ struct QRCodeView: View {
         .padding(12)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .accessibilityLabel("QR code to join this folder")
+        .accessibilityLabel("QR code to join this deck")
     }
 
     private static func render(_ text: String) -> UIImage? {

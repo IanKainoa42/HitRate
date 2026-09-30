@@ -128,17 +128,17 @@ struct FolderListView: View {
             .safeAreaInset(edge: .bottom) { newFolderCTA }
         }
         .background(FloorBackdrop().ignoresSafeArea())
-        .alert("New folder", isPresented: $addOpen) {
-            TextField("Folder name", text: $newName)
+        .alert("New deck", isPresented: $addOpen) {
+            TextField("Deck name", text: $newName)
             Button("Create") { addFolder() }
             Button("Cancel", role: .cancel) { newName = "" }
         } message: {
-            Text("Each folder keeps its own skills and stats — a team, an athlete, a private lesson, whatever you track separately.")
+            Text("Each deck keeps its own skills and stats — a team, an athlete, a private lesson, whatever you track separately.")
         }
-        .alert("Rename folder", isPresented: Binding(
+        .alert("Rename deck", isPresented: Binding(
             get: { renaming != nil },
             set: { if !$0 { renaming = nil } })) {
-            TextField("Folder name", text: $renameText)
+            TextField("Deck name", text: $renameText)
             Button("Save") {
                 let t = renameText.trimmingCharacters(in: .whitespaces)
                 if let f = renaming, !t.isEmpty { f.name = t; try? context.save() }
@@ -177,7 +177,7 @@ struct FolderListView: View {
             Button("Cancel", role: .cancel) {}
         } message: { t in
             let s = folderSummaries[t.id.uuidString] ?? .init()
-            Text("This folder, its \(s.skillCount) skill\(s.skillCount == 1 ? "" : "s"), and \(s.repCount) rep\(s.repCount == 1 ? "" : "s") move to the Trash. Restore anytime from Data Management.")
+            Text("This deck, its \(s.skillCount) skill\(s.skillCount == 1 ? "" : "s"), and \(s.repCount) rep\(s.repCount == 1 ? "" : "s") move to the Trash. Restore anytime from Data Management.")
         }
     }
 
@@ -205,7 +205,7 @@ struct FolderListView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text("\(teams.active.count) FOLDER\(teams.active.count == 1 ? "" : "S")")
+            Text("\(teams.active.count) DECK\(teams.active.count == 1 ? "" : "S")")
                 .font(.system(size: 9, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label3)
@@ -232,9 +232,7 @@ struct FolderListView: View {
                 onOpen(t)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(active ? Theme.accent : Theme.label2)
+                    DeckIcon(tint: active ? Theme.accent : Theme.label2)
                         .frame(width: 38, height: 38)
                         .background(Theme.iconTile)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -294,7 +292,7 @@ struct FolderListView: View {
             if isOwner(t) {
                 Button {
                     if coach.isCoach { sharing = t } else { paywallReason = .share }
-                } label: { Label(isShared(t) ? "Sharing code" : "Share folder",
+                } label: { Label(isShared(t) ? "Sharing code" : "Share deck",
                                  systemImage: "person.2.fill") }
             }
             if teams.active.count > 1 {
@@ -330,7 +328,7 @@ struct FolderListView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "person.badge.plus")
                         .font(.system(size: 14, weight: .semibold))
-                    Text("Join a folder with a code")
+                    Text("Join a deck with a code")
                         .font(.system(size: 14, weight: .semibold))
                 }
                 .foregroundStyle(Theme.label)
@@ -368,7 +366,7 @@ struct FolderListView: View {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .heavy))
-                Text("NEW FOLDER")
+                Text("NEW DECK")
                     .font(.system(size: 13, weight: .heavy))
                     .tracking(1.5)
             }
@@ -388,7 +386,7 @@ struct FolderListView: View {
 
     private func addFolder() {
         let name = newName.trimmingCharacters(in: .whitespaces)
-        let t = Team(name: name.isEmpty ? "Folder \(teams.active.count + 1)" : name,
+        let t = Team(name: name.isEmpty ? "Deck \(teams.active.count + 1)" : name,
                      orderIndex: teams.count)
         context.insert(t)
         try? context.save()
@@ -419,7 +417,7 @@ private struct ShareFolderSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text("SHARE FOLDER")
+            Text("SHARE DECK")
                 .font(.system(size: 11, weight: .heavy)).tracking(2)
                 .foregroundStyle(Theme.label3)
                 .padding(.top, 22)
@@ -467,7 +465,7 @@ private struct ShareFolderSheet: View {
                     // The link is tappable on the receiving phone (it opens
                     // straight into the join sheet); the code is spelled out for
                     // anyone reading it off a screenshot.
-                    ShareLink(item: "Join my HitRate folder “\(team.name)” with code \(code): \(DeepLink.join(code: code).absoluteString)") {
+                    ShareLink(item: "Join my HitRate deck “\(team.name)” with code \(code): \(DeepLink.join(code: code).absoluteString)") {
                         Label("Share", systemImage: "square.and.arrow.up")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.label)
@@ -496,7 +494,7 @@ private struct ShareFolderSheet: View {
                         accountOpen = true
                     } label: {
                         VStack(spacing: 5) {
-                            Text("This folder is tied to this phone")
+                            Text("This deck is tied to this phone")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.label2)
                             Label("Save your account", systemImage: "checkmark.shield.fill")
@@ -552,7 +550,7 @@ private struct ShareFolderSheet: View {
             NavigationStack { AccountView(showsDone: true) }
         }
         .confirmationDialog(
-            "Remove folder access?",
+            "Remove deck access?",
             isPresented: Binding(
                 get: { pendingMemberRemoval != nil },
                 set: { if !$0 { pendingMemberRemoval = nil } }
@@ -567,13 +565,13 @@ private struct ShareFolderSheet: View {
             }
             Button("Cancel", role: .cancel) { pendingMemberRemoval = nil }
         } message: {
-            Text("They’ll stop receiving this folder. Every rep they already logged stays in your history.")
+            Text("They’ll stop receiving this deck. Every rep they already logged stays in your history.")
         }
     }
 
     private var memberAccessSection: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("FOLDER ACCESS")
+            Text("DECK ACCESS")
                 .font(.system(size: 9, weight: .heavy))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label3)
@@ -649,7 +647,7 @@ struct JoinFolderSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("JOIN A FOLDER")
+            Text("JOIN A DECK")
                 .font(.system(size: 11, weight: .heavy)).tracking(2)
                 .foregroundStyle(Theme.label3)
                 .padding(.top, 22)
@@ -705,7 +703,7 @@ struct JoinFolderSheet: View {
             case .joined:
                 dismiss()
             case .invalidCode:
-                error = "No folder found for that code."
+                error = "No deck found for that code."
             case .notSignedIn:
                 error = "Sign-in isn’t ready yet — try again in a moment."
             case .failed(let msg):
@@ -713,5 +711,34 @@ struct JoinFolderSheet: View {
             }
             busy = false
         }
+    }
+}
+
+/// A folder is technically a deck of cards — three stacked cards fanned back
+/// from a front card with a rule and a corner pip. Flat strokes, no glow.
+private struct DeckIcon: View {
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            card.rotationEffect(.degrees(-14)).opacity(0.35)
+            card.rotationEffect(.degrees(-7)).opacity(0.6)
+            card
+                .overlay(alignment: .topLeading) {
+                    Capsule().fill(tint).frame(width: 5, height: 2).padding(4)
+                }
+                .overlay(alignment: .bottom) {
+                    Capsule().fill(tint.opacity(0.7)).frame(width: 9, height: 1.5).padding(.bottom, 4)
+                }
+        }
+        .offset(y: 1)
+    }
+
+    private var card: some View {
+        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+            .fill(Theme.iconTile)
+            .overlay(RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                .strokeBorder(tint, lineWidth: 1.3))
+            .frame(width: 15, height: 21)
     }
 }

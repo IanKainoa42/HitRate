@@ -361,8 +361,8 @@ class AuthViewModel: NSObject, ObservableObject {
     private func announceSignIn() {
         let provider = providerName
         signInConfirmation = provider.isEmpty
-            ? "Signed in. Your folders follow this account now."
-            : "Saved with \(provider). Your folders follow this account now."
+            ? "Signed in. Your decks follow this account now."
+            : "Saved with \(provider). Your decks follow this account now."
         confirmationTask?.cancel()
         confirmationTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 6_000_000_000)

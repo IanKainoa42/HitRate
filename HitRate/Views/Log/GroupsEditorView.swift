@@ -228,8 +228,8 @@ struct GroupsEditorView: View {
                     Text("Account")
                 } footer: {
                     Text(auth.isUpgraded
-                         ? "Saved with \(auth.providerName) — your folders follow your account to any phone."
-                         : "Your folders live under this phone until you save your account.")
+                         ? "Saved with \(auth.providerName) — your decks follow your account to any phone."
+                         : "Your decks live under this phone until you save your account.")
                 }
                 .listRowBackground(glassRow)
 
@@ -436,7 +436,7 @@ struct GroupsEditorView: View {
         } header: {
             Text("Issues · \(currentTeam?.name ?? "")")
         } footer: {
-            Text("Issues this folder tracks — anything that comes up that you want to count (e.g. timing off, wrong count, dropped). They appear as their own tap buttons in practice and tally separately, so they never change your hit-rate.")
+            Text("Issues this deck tracks — anything that comes up that you want to count (e.g. timing off, wrong count, dropped). They appear as their own tap buttons in practice and tally separately, so they never change your hit-rate.")
         }
         .listRowBackground(glassRow)
     }

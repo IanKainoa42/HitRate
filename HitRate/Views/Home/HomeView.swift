@@ -422,7 +422,7 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 iconGuideRow(icon: "slider.horizontal.3", title: "Skills",
-                             detail: "Manage what you're tracking and folder settings.")
+                             detail: "Manage what you're tracking and deck settings.")
                 iconGuideRow(icon: "applewatch", title: "Watch",
                              detail: "Log reps right from your wrist mid-practice.")
                 iconGuideRow(icon: "trophy", title: "Trophy Room",
@@ -1031,7 +1031,7 @@ struct HomeView: View {
     private var noRosterState: some View {
         FeedCard {
             VStack(spacing: 14) {
-                Image(systemName: "plus.rectangle.on.folder")
+                Image(systemName: "rectangle.stack.badge.plus")
                     .font(.system(size: 34))
                     .foregroundStyle(Theme.label3)
                 Text("\(teamLabel) has no \(mode.nounPlural) yet")

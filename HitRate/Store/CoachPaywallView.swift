@@ -13,7 +13,7 @@ struct CoachPaywallView: View {
 
         var headline: String {
             switch self {
-            case .share:        return "Share this folder with your team"
+            case .share:        return "Share this deck with your team"
             case .secondFolder: return "Track more than one team"
             case .csv:          return "Take your season with you"
             case .general:      return "HitRate Coach"
@@ -89,10 +89,10 @@ struct CoachPaywallView: View {
 
     private var featureWell: some View {
         VStack(alignment: .leading, spacing: 12) {
-            featureRow("person.2.fill", "Share any folder by code",
+            featureRow("person.2.fill", "Share any deck by code",
                        "Athletes join from their own phones. Every rep they log lands on your dashboard.")
-            featureRow("folder.fill.badge.plus", "Unlimited folders",
-                       "A folder per team, per stunt group, per private lesson. Stats stay separate.")
+            featureRow("rectangle.stack.fill.badge.plus", "Unlimited decks",
+                       "A deck per team, per stunt group, per private lesson. Stats stay separate.")
             featureRow("list.clipboard.fill", "Homework",
                        "Assign skills between practices and see who did the reps.")
             featureRow("arrow.down.doc.fill", "CSV backup",

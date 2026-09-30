@@ -61,7 +61,7 @@ struct AccountView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your account and every folder you own are removed from the cloud — teammates who joined them lose access too. Reps saved on this phone stay on this phone. This can't be undone.")
+            Text("Your account and every deck you own are removed from the cloud — teammates who joined them lose access too. Reps saved on this phone stay on this phone. This can't be undone.")
         }
         // Reauth landed mid-deletion — finish the job (the view owns the
         // ModelContext, so the retry has to come from here).
@@ -101,7 +101,7 @@ struct AccountView: View {
         } header: {
             Text("Save your account")
         } footer: {
-            Text("Your folders live under this phone right now — a new phone (or a reinstall) starts from zero. Saving links them to your Apple or Google account so they follow you. Same folders, same reps, nothing moves.")
+            Text("Your decks live under this phone right now — a new phone (or a reinstall) starts from zero. Saving links them to your Apple or Google account so they follow you. Same decks, same reps, nothing moves.")
         }
     }
 
@@ -124,7 +124,7 @@ struct AccountView: View {
             }
             .padding(.vertical, 2)
         } footer: {
-            Text("Your folders follow this account — sign in with \(auth.providerName) on any phone to pick them up.")
+            Text("Your decks follow this account — sign in with \(auth.providerName) on any phone to pick them up.")
         }
         .listRowBackground(glassRow)
     }
@@ -161,7 +161,7 @@ struct AccountView: View {
                             Text("Deleting…")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(Theme.label)
-                            Text("A big folder can take a minute.")
+                            Text("A big deck can take a minute.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.label2)
                         }
@@ -179,7 +179,7 @@ struct AccountView: View {
                 if case .failed(let message) = auth.deletion {
                     Text("Deletion failed: \(message)")
                 } else {
-                    Text("Removes your account and every folder you own from the cloud, and drops you from folders you joined. Reps on this phone stay on this phone.")
+                    Text("Removes your account and every deck you own from the cloud, and drops you from decks you joined. Reps on this phone stay on this phone.")
                 }
             }
             .listRowBackground(glassRow)

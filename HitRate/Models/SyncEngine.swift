@@ -1323,7 +1323,7 @@ final class SyncEngine: ObservableObject {
     /// their contribution to the owner's folder history.
     func removeMember(_ memberID: String, from team: Team) async -> Bool {
         guard let uid, team.ownerUID == uid else {
-            lastError = "Only the folder owner can remove members."
+            lastError = "Only the deck owner can remove members."
             return false
         }
         let remaining = SyncRosterMembershipPolicy.remainingMemberIDs(
