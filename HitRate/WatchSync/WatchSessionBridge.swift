@@ -49,6 +49,8 @@ final class WatchSessionBridge: NSObject, WCSessionDelegate {
         guard lastSnapshot != snapshot else { return }
         lastSnapshot = snapshot
 
+        guard WCSession.default.activationState == .activated else { return }
+
         let message = WatchPayloadCodec.message(type: WatchPayloadCodec.snapshot,
                                                 payload: snapshot)
         try? WCSession.default.updateApplicationContext(message)

@@ -3,8 +3,11 @@ import SwiftData
 import FirebaseCore
 import GoogleSignIn
 
+class AppDelegate: NSObject, UIApplicationDelegate {}
+
 @main
 struct HitRateApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     let container: ModelContainer
 
     init() {
