@@ -75,16 +75,16 @@ struct DeckGridCard: View {
             .padding(.trailing, 6)
             .padding(.bottom, 7)
             .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(DeckGridCardCopy.accessibilityLabel(
+                name: name,
+                skillCount: summary.skillCount,
+                repCount: summary.repCount,
+                sharingState: sharingState
+            ))
+            .accessibilityHint("Opens this deck")
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(DeckGridCardCopy.accessibilityLabel(
-            name: name,
-            skillCount: summary.skillCount,
-            repCount: summary.repCount,
-            sharingState: sharingState
-        ))
-        .accessibilityHint("Opens this deck")
         .accessibilityAction(named: "Rename", onRename)
         .modifier(OptionalShareAccessibilityAction(action: onShare))
         .modifier(OptionalTrashAccessibilityAction(
