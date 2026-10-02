@@ -39,4 +39,10 @@ final class DeckGridCardTests: XCTestCase {
             "Kainoa deck, 1 skill, 1 rep, shared deck"
         )
     }
+
+    func testOnlySharedDecksExposeABadgeLabel() {
+        XCTAssertNil(DeckSharingState.privateDeck.badgeLabel)
+        XCTAssertEqual(DeckSharingState.shared.badgeLabel, "SHARED")
+        XCTAssertEqual(DeckSharingState.joined.badgeLabel, "JOINED")
+    }
 }
