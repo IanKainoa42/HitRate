@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		012E5E8BD75645838ED7845E /* AssignmentEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */; };
 		01D8CC26007D6735221DD2AB /* HomeworkEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */; };
-		10757E7F931CDCA4A35580C2 /* HitRate.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRate.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0545801EE9DA971ED89EDBCD /* ExecutionSheet.swift */; };
 		17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */; };
@@ -33,6 +33,7 @@
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
 		65A4B766E0CC8748963DA6DA /* CoachEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB9361EE59B4DF7229F74E6 /* CoachEntitlement.swift */; };
 		65D9D8E51C6843C95C7888B4 /* CardStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B388C58D179536F550D19A /* CardStage.swift */; };
+		6FCAEF629F115F7FCFE7A6AB /* DeckGridCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EEECB0ED12AEEF82CBB56F /* DeckGridCardTests.swift */; };
 		704E818CCA99AB6B14E5553E /* AssignmentLinkingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15A25F9B033AE13CA534C51 /* AssignmentLinkingTests.swift */; };
 		717400631A5F615CBACE7CEB /* PracticeWatchLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F15A6202537B73B6FB84 /* PracticeWatchLauncher.swift */; };
 		743D3B86B2B641E8F07DEA84 /* DeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */; };
@@ -71,6 +72,7 @@
 		C10605968604404EB3090A19 /* AssignmentLinking.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC92400D34218D419164CB4 /* AssignmentLinking.swift */; };
 		C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724ED0A599E2826857191AD3 /* DataManagementView.swift */; };
 		C15242CA4F0E359ABB205F5D /* SyncPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341C704BF36D8A9731D5A827 /* SyncPolicies.swift */; };
+		C25F273F46C46939C0222975 /* DeckGridCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A48476574E7FD0FD475B28 /* DeckGridCard.swift */; };
 		C3D91D1EFFBD17AD2D9D0882 /* FolderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404429588572142C218018D5 /* FolderListView.swift */; };
 		C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */; };
 		C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */; };
@@ -119,7 +121,7 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				10757E7F931CDCA4A35580C2 /* HitRate.app in Embed Watch Content */,
+				10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -138,7 +140,6 @@
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
 		1CB9361EE59B4DF7229F74E6 /* CoachEntitlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachEntitlement.swift; sourceTree = "<group>"; };
 		1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInButtons.swift; sourceTree = "<group>"; };
-		1F5CFA48306D34A600C30274 /* HitRate.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = HitRate.storekit; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
 		26B388C58D179536F550D19A /* CardStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStage.swift; sourceTree = "<group>"; };
@@ -155,10 +156,11 @@
 		3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTapeCard.swift; sourceTree = "<group>"; };
 		404429588572142C218018D5 /* FolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderListView.swift; sourceTree = "<group>"; };
 		41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkEngine.swift; sourceTree = "<group>"; };
+		46A48476574E7FD0FD475B28 /* DeckGridCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGridCard.swift; sourceTree = "<group>"; };
 		479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		47A7CA763A1CACA8F38CEEFE /* ShareCardsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardsSheet.swift; sourceTree = "<group>"; };
 		48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveAccountPrompt.swift; sourceTree = "<group>"; };
-		49A344CA1D109DBBE1B63C8B /* HitRate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRateWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C3EF67FEE9CF381AA3AE19B /* PuckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckView.swift; sourceTree = "<group>"; };
 		4F3598697BD81EA78D42F507 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		52C560E527E5730D7DB1B4D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -200,16 +202,17 @@
 		CC415EA0BFCE65C314EF7C16 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		CF869A47C5A23756EDEA1A34 /* CardStageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStageTests.swift; sourceTree = "<group>"; };
 		D047AEE6F79270EE4548869F /* SeededRNG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeededRNG.swift; sourceTree = "<group>"; };
-		D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HitRateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HitRateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6CDC6EBB47016F441B33020 /* TakeawaysCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeawaysCard.swift; sourceTree = "<group>"; };
 		D8957D930EDEABBAF6E32BF0 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
 		DA1D8D88E388C1695A810593 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
-		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesTests.swift; sourceTree = "<group>"; };
 		E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentEditorSheet.swift; sourceTree = "<group>"; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
 		F10D80170A14AF97590DC817 /* HomeworkDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeworkDetailSheet.swift; sourceTree = "<group>"; };
+		F1EEECB0ED12AEEF82CBB56F /* DeckGridCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGridCardTests.swift; sourceTree = "<group>"; };
 		F7E79B7537D2F0142D78A8B7 /* WatchLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLogStore.swift; sourceTree = "<group>"; };
 		FD43B95EF95B81D63EBFC8D6 /* StatsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngine.swift; sourceTree = "<group>"; };
 		FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsCard.swift; sourceTree = "<group>"; };
@@ -260,6 +263,7 @@
 			isa = PBXGroup;
 			children = (
 				E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */,
+				46A48476574E7FD0FD475B28 /* DeckGridCard.swift */,
 				9C7E3006F9D9D6763DFA5E8D /* ExecutionCard.swift */,
 				404429588572142C218018D5 /* FolderListView.swift */,
 				FEFB9CD1AB4195B7BE9D7437 /* GroupsCard.swift */,
@@ -295,7 +299,6 @@
 		3EF647EFDCE1CAC10DBB845E = {
 			isa = PBXGroup;
 			children = (
-				1F5CFA48306D34A600C30274 /* HitRate.storekit */,
 				9CBF43E65D81D52A8C010E7C /* HitRate */,
 				D1E2326231807F8A6765157B /* HitRateTests */,
 				D61303D10F0D3692EF85FFBE /* HitRateWatch */,
@@ -410,6 +413,7 @@
 			children = (
 				A15A25F9B033AE13CA534C51 /* AssignmentLinkingTests.swift */,
 				CF869A47C5A23756EDEA1A34 /* CardStageTests.swift */,
+				F1EEECB0ED12AEEF82CBB56F /* DeckGridCardTests.swift */,
 				5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */,
 				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
 				8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */,
@@ -482,7 +486,7 @@
 			children = (
 				E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */,
 				D46E8BCCEAF62AF813446428 /* HitRateTests.xctest */,
-				49A344CA1D109DBBE1B63C8B /* HitRate.app */,
+				49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -505,7 +509,7 @@
 			packageProductDependencies = (
 			);
 			productName = HitRateWatch;
-			productReference = 49A344CA1D109DBBE1B63C8B /* HitRate.app */;
+			productReference = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 		9443CF6401BC7D64AF31AE31 /* HitRateTests */ = {
@@ -559,7 +563,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					0F8C1A10770E28C7B23F8162 = {
 						DevelopmentTeam = WC46K49VFA;
@@ -641,6 +645,7 @@
 				C9FE55652E7E9DE934ACD234 /* CoachPaywallView.swift in Sources */,
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
+				C25F273F46C46939C0222975 /* DeckGridCard.swift in Sources */,
 				743D3B86B2B641E8F07DEA84 /* DeepLink.swift in Sources */,
 				4A2264B0343EFAB8B8AA10D2 /* ExecutionCard.swift in Sources */,
 				14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */,
@@ -694,6 +699,7 @@
 			files = (
 				704E818CCA99AB6B14E5553E /* AssignmentLinkingTests.swift in Sources */,
 				9E4D0EB4C2394325DFE85296 /* CardStageTests.swift in Sources */,
+				6FCAEF629F115F7FCFE7A6AB /* DeckGridCardTests.swift in Sources */,
 				1A7F98E7C46D927597534F8B /* HomeworkEngineTests.swift in Sources */,
 				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
 				C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */,
@@ -802,11 +808,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -826,7 +830,6 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -868,11 +871,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -885,7 +886,6 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
