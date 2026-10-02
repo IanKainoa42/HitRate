@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import os
 
 /// The app's launch root: every folder (`Team`) the user keeps, each with its
 /// own roster and stats. Tap one to drop into its dashboard. Lives in the
