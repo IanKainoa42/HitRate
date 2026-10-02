@@ -20,6 +20,11 @@ enum DeckSharingState: Equatable {
         case .joined: "JOINED"
         }
     }
+
+    static func resolve(isOwner: Bool, isShared: Bool) -> Self {
+        guard isOwner else { return .joined }
+        return isShared ? .shared : .privateDeck
+    }
 }
 
 enum DeckGridCardCopy {

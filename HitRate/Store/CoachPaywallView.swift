@@ -14,7 +14,7 @@ struct CoachPaywallView: View {
         var headline: String {
             switch self {
             case .share:        return "Share this deck with your team"
-            case .secondFolder: return "Track more than one team"
+            case .secondFolder: return "Track more than one deck"
             case .csv:          return "Take your season with you"
             case .general:      return "HitRate Coach"
             }

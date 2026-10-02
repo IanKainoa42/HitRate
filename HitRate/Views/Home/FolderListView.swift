@@ -80,6 +80,10 @@ struct FolderListView: View {
     }
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
+    private let deckColumns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
 
     private var identityLabel: String {
         mode == .athlete
@@ -116,16 +120,17 @@ struct FolderListView: View {
             }
 
             ScrollView {
-                VStack(spacing: 9) {
+                LazyVGrid(columns: deckColumns, alignment: .leading, spacing: 24) {
                     ForEach(teams.active) { t in
-                        folderRow(t, summary: summaries[t.id.uuidString] ?? .init())
+                        deckCard(t, summary: summaries[t.id.uuidString] ?? .init())
                     }
+                    NewDeckGridCard(action: beginAddingDeck)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 2)
-                .padding(.bottom, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
-            .safeAreaInset(edge: .bottom) { newFolderCTA }
+            .safeAreaInset(edge: .bottom) { joinDeckCTA }
         }
         .background(FloorBackdrop().ignoresSafeArea())
         .alert("New deck", isPresented: $addOpen) {
@@ -217,111 +222,33 @@ struct FolderListView: View {
         .padding(.top, 2)
     }
 
-    // MARK: Folder row
+    // MARK: Deck grid
 
-    private func folderRow(_ t: Team, summary: FolderSummaryIndex.Summary) -> some View {
-        let count = summary.skillCount
-        let reps = summary.repCount
-        let active = t.id.uuidString == currentTeamID
-        // Row = a big "open" button + separate trailing controls (a share icon
-        // for folders you own, a JOINED chip for ones you joined). Kept as
-        // sibling buttons, NOT nested — a Button inside a Button's label doesn't
-        // route taps. The open button still fills the row for a fat tap target.
-        return HStack(spacing: 8) {
-            Button {
-                onOpen(t)
-            } label: {
-                HStack(spacing: 12) {
-                    DeckIcon(tint: active ? Theme.accent : Theme.label2)
-                        .frame(width: 38, height: 38)
-                        .background(Theme.iconTile)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(Theme.iconTileEdge.opacity(0.85), lineWidth: 1))
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(t.name)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.label)
-                            .lineLimit(1)
-                        Text("\(count) skill\(count == 1 ? "" : "s") · \(reps) rep\(reps == 1 ? "" : "s")")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.label2)
-                    }
-                    Spacer(minLength: 6)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if isOwner(t) {
-                // Visible Share affordance. Green once a code exists (= shared),
-                // muted before. Tapping opens the code sheet directly.
-                Button {
-                    if coach.isCoach { sharing = t } else { paywallReason = .share }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(isShared(t) ? Theme.accent : Theme.label2)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.iconTile)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder((isShared(t) ? Theme.accent : Theme.iconTileEdge)
-                                .opacity(isShared(t) ? 0.55 : 0.85), lineWidth: 1))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isShared(t) ? "Sharing code for \(t.name)" : "Share \(t.name)")
-            } else if isShared(t) {
-                sharedBadge(owner: false)   // a folder you joined — not yours to share
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.label3)
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .wellBackground()
-        .contextMenu {
-            Button {
-                renameText = t.name
-                renaming = t
-            } label: { Label("Rename", systemImage: "pencil") }
-            if isOwner(t) {
-                Button {
-                    if coach.isCoach { sharing = t } else { paywallReason = .share }
-                } label: { Label(isShared(t) ? "Sharing code" : "Share deck",
-                                 systemImage: "person.2.fill") }
-            }
-            if teams.active.count > 1 {
-                Button(role: .destructive) {
-                    pendingTrash = t
-                } label: { Label("Move to Trash", systemImage: "trash") }
-            }
-        }
+    private func deckCard(_ team: Team, summary: FolderSummaryIndex.Summary) -> some View {
+        let owner = isOwner(team)
+        let shareAction: (() -> Void)? = owner ? {
+            if coach.isCoach { sharing = team } else { paywallReason = .share }
+        } : nil
+        return DeckGridCard(
+            name: team.name,
+            summary: summary,
+            sharingState: .resolve(isOwner: owner, isShared: isShared(team)),
+            isActive: team.id.uuidString == currentTeamID,
+            canTrash: teams.active.count > 1,
+            onOpen: { onOpen(team) },
+            onShare: shareAction,
+            onRename: {
+                renameText = team.name
+                renaming = team
+            },
+            onTrash: { pendingTrash = team }
+        )
     }
 
-    /// Small chalk chip marking a folder as shared — "SHARED" if you own it,
-    /// "JOINED" if you're logging into someone else's.
-    private func sharedBadge(owner: Bool) -> some View {
-        Text(owner ? "SHARED" : "JOINED")
-            .font(.system(size: 8.5, weight: .heavy))
-            .tracking(1.1)
-            .foregroundStyle(owner ? Theme.accent : Theme.label2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(Theme.iconTile)
-                    .overlay(Capsule().strokeBorder(
-                        (owner ? Theme.accent : Theme.label3).opacity(0.4), lineWidth: 1)))
-    }
+    // MARK: Join and create
 
-    // MARK: New folder
-
-    private var newFolderCTA: some View {
-        VStack(spacing: 10) {
+    private var joinDeckCTA: some View {
+        VStack(spacing: 0) {
             Button {
                 joinOpen = true
             } label: {
@@ -343,7 +270,6 @@ struct FolderListView: View {
             }
             .buttonStyle(.plain)
 
-            newFolderButton
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -355,33 +281,12 @@ struct FolderListView: View {
         )
     }
 
-    private var newFolderButton: some View {
-        Button {
-            if CoachGate.allowsNewFolder(existingCount: teams.active.count) {
-                addOpen = true
-            } else {
-                paywallReason = .secondFolder
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .heavy))
-                Text("NEW DECK")
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(1.5)
-            }
-            .foregroundStyle(Theme.accentText)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Theme.accent)
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(.white.opacity(0.28), lineWidth: 1))
-                    .shadow(color: Theme.accent.opacity(0.24), radius: 8, y: 3))
-            .contentShape(Rectangle())
+    private func beginAddingDeck() {
+        if CoachGate.allowsNewFolder(existingCount: teams.active.count) {
+            addOpen = true
+        } else {
+            paywallReason = .secondFolder
         }
-        .buttonStyle(.plain)
     }
 
     private func addFolder() {
@@ -711,34 +616,5 @@ struct JoinFolderSheet: View {
             }
             busy = false
         }
-    }
-}
-
-/// A folder is technically a deck of cards — three stacked cards fanned back
-/// from a front card with a rule and a corner pip. Flat strokes, no glow.
-private struct DeckIcon: View {
-    let tint: Color
-
-    var body: some View {
-        ZStack {
-            card.rotationEffect(.degrees(-14)).opacity(0.35)
-            card.rotationEffect(.degrees(-7)).opacity(0.6)
-            card
-                .overlay(alignment: .topLeading) {
-                    Capsule().fill(tint).frame(width: 5, height: 2).padding(4)
-                }
-                .overlay(alignment: .bottom) {
-                    Capsule().fill(tint.opacity(0.7)).frame(width: 9, height: 1.5).padding(.bottom, 4)
-                }
-        }
-        .offset(y: 1)
-    }
-
-    private var card: some View {
-        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-            .fill(Theme.iconTile)
-            .overlay(RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                .strokeBorder(tint, lineWidth: 1.3))
-            .frame(width: 15, height: 21)
     }
 }

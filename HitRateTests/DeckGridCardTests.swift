@@ -45,4 +45,38 @@ final class DeckGridCardTests: XCTestCase {
         XCTAssertEqual(DeckSharingState.shared.badgeLabel, "SHARED")
         XCTAssertEqual(DeckSharingState.joined.badgeLabel, "JOINED")
     }
+
+    func testPrivateDeckHasNoAccessibilitySuffix() {
+        XCTAssertEqual(
+            DeckGridCardCopy.accessibilityLabel(
+                name: "Solo",
+                skillCount: 0,
+                repCount: 0,
+                sharingState: .privateDeck
+            ),
+            "Solo deck, 0 skills, 0 reps"
+        )
+    }
+
+    func testSharingStatePrefersJoinedForNonOwners() {
+        XCTAssertEqual(
+            DeckSharingState.resolve(isOwner: false, isShared: true),
+            .joined
+        )
+        XCTAssertEqual(
+            DeckSharingState.resolve(isOwner: false, isShared: false),
+            .joined
+        )
+    }
+
+    func testOwnerSharingStateReflectsPublishedState() {
+        XCTAssertEqual(
+            DeckSharingState.resolve(isOwner: true, isShared: true),
+            .shared
+        )
+        XCTAssertEqual(
+            DeckSharingState.resolve(isOwner: true, isShared: false),
+            .privateDeck
+        )
+    }
 }
