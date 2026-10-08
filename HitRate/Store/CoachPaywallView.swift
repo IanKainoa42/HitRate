@@ -62,7 +62,7 @@ struct CoachPaywallView: View {
             HStack {
                 HStack(spacing: 6) {
                     BrandSignalDot(size: 8)
-                    Text("COACH")
+                    Text("HITRATE COACH")
                         .font(.system(size: 11, weight: .heavy))
                         .tracking(1.6)
                         .foregroundStyle(Theme.accent)
@@ -121,10 +121,22 @@ struct CoachPaywallView: View {
     @ViewBuilder
     private var productWells: some View {
         if store.products.isEmpty {
-            HStack {
-                if store.isLoadingProducts { ProgressView().tint(Theme.accent) }
-                Text(store.lastError ?? "Loading plans…")
-                    .font(.system(size: 13)).foregroundStyle(Theme.label2)
+            VStack(spacing: 10) {
+                HStack {
+                    if store.isLoadingProducts { ProgressView().tint(Theme.accent) }
+                    Text(store.lastError ?? "Loading plans…")
+                        .font(.system(size: 13)).foregroundStyle(Theme.label2)
+                }
+                // A failed product load must render a way past itself — a
+                // dead "Couldn't reach the App Store" well is a silent failure.
+                if store.lastError != nil, !store.isLoadingProducts {
+                    Button { Task { await store.loadProducts() } } label: {
+                        Text("Try again")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .frame(maxWidth: .infinity).padding(18).wellBackground()
         } else {
@@ -180,7 +192,7 @@ struct CoachPaywallView: View {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        Text(featured ? "YEARLY" : "MONTHLY")
+                        Text(featured ? "COACH YEARLY" : "COACH MONTHLY")
                             .font(.system(size: 11, weight: .heavy)).tracking(1.4)
                             .foregroundStyle(featured ? Theme.accentText : Theme.label2)
                         if featured, let trial, trial.paymentMode == .freeTrial {
@@ -220,7 +232,7 @@ struct CoachPaywallView: View {
         }
         .buttonStyle(.plain)
         .disabled(busyID != nil)
-        .accessibilityLabel("\(featured ? "Yearly" : "Monthly"), \(product.displayPrice) \(perLabel)")
+        .accessibilityLabel("\(featured ? "Coach Yearly" : "Coach Monthly"), \(product.displayPrice) \(perLabel)")
     }
 
     private var unlockedWell: some View {

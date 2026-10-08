@@ -1,6 +1,5 @@
-Your skill deck is ready for a bigger practice day.
+HitRate is now free for athletes. Coach unlocks sharing, unlimited decks, homework and CSV backup. Bought HitRate before? You already have Coach — tap Restore if it doesn't show.
 
-• Every skill now has its own card, with progression that grows from your logged reps and achievements.
-• Build Practice Pages to run up to nine skills together with an armed outcome.
-• Shared-folder join codes now publish atomically, so a freshly sent code cannot point at a missing folder.
-• Clearer sharing errors distinguish an invalid code from a permissions or connection problem.
+• Your decks now live on a card-shaped launch grid.
+• Every skill has its own card that levels up with your reps and achievements.
+• Build Practice Pages to run up to nine skills together.

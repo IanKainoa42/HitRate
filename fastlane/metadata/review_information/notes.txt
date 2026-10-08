@@ -1,0 +1,12 @@
+No login needed to review. Athlete path: onboarding -> "Just mine" -> mint a skill -> tap the green practice pill to log reps.
+
+IN-APP PURCHASES — HitRate Coach (auto-renewable): Coach Yearly $29.99/year (14-day free trial) and Coach Monthly $4.99/month. The app is free; Coach unlocks sharing a deck by code, more than one deck, homework, and CSV backup.
+
+WHERE THE PAYWALL IS (title, length, price, Privacy Policy + Terms of Use links, Restore purchase):
+1. Launch grid (the screen with the deck cards — you land on it after onboarding, or tap the back chevron at the top-left of the dashboard): tap the COACH chip in the header well.
+2. Launch grid: tap the NEW DECK card (a second deck is a Coach feature).
+3. Dashboard -> SKILLS (header button) -> Account section -> "HitRate Coach".
+4. Dashboard -> SKILLS -> Manage data -> "Export CSV backup" (COACH badge) or "HitRate Coach".
+Long-pressing a deck card -> Share opens the same paywall.
+
+Users who bought HitRate while it was a paid app (builds before 36) are grandfathered into Coach; sandbox receipts are never grandfathered, so the paywall always shows in review. Joining a coach's deck by code stays free.

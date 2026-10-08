@@ -31,6 +31,8 @@ struct GroupsEditorView: View {
     @State private var pendingDelete: StuntGroup?
     @State private var editingOutcomesFor: StuntGroup?
     @State private var editingTemplate: OutcomeTemplate?
+    @State private var paywallOpen = false
+    @ObservedObject private var coach = CoachEntitlement.shared
 
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
 
@@ -224,6 +226,12 @@ struct GroupsEditorView: View {
                                 ? "person.crop.circle.badge.checkmark"
                                 : "person.crop.circle.badge.plus")
                     }
+                    // The settings-shaped door to the subscription — plans,
+                    // price, restore. Gated actions open the same paywall.
+                    Button { paywallOpen = true } label: {
+                        Label(coach.isCoach ? "HitRate Coach · active" : "HitRate Coach",
+                              systemImage: coach.isCoach ? "checkmark.seal.fill" : "person.2.fill")
+                    }
                 } header: {
                     Text("Account")
                 } footer: {
@@ -281,6 +289,9 @@ struct GroupsEditorView: View {
                     }
                     .fontWeight(.semibold)
                 }
+            }
+            .sheet(isPresented: $paywallOpen) {
+                CoachPaywallView(reason: .general)
             }
             .sheet(item: $editingOutcomesFor) { g in
                 SkillOutcomesEditor(group: g)

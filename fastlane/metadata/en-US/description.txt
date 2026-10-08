@@ -22,7 +22,13 @@ BUILT FOR THE GYM
 • One-tap logging with big targets — made for fast hands at practice
 • Rename outcomes to match your gym's language
 • Undo mis-taps instantly
-• CSV export of every rep
-• Works completely offline — your data never leaves your phone
 
-No accounts. No ads. No tracking. Just counts.
+FREE FOR ATHLETES. COACH FOR TEAMS.
+HitRate is free to download and track your own skills. Coach unlocks shared folders with your athletes, unlimited decks, homework, and CSV backup. Sharing uses sign-in so your team sees the same folder.
+
+Coach is an auto-renewable subscription: Coach Monthly ($4.99/month) or Coach Yearly ($29.99/year). Payment is charged to your Apple Account at confirmation. It renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your Apple Account settings. Bought HitRate before? You already have Coach — tap Restore.
+
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://iankainoa42.github.io/HitRate/privacy-policy.html
+
+No ads. Just counts, cards, and clearer practice.

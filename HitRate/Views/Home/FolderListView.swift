@@ -213,12 +213,41 @@ struct FolderListView: View {
                 .font(.system(size: 9, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(Theme.label3)
+
+            coachChip
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .wellBackground()
         .padding(.horizontal, 16)
         .padding(.top, 2)
+    }
+
+    /// The always-visible door to HitRate Coach from the launch root. The gated
+    /// actions (second deck, share, CSV) still open the paywall with their own
+    /// reason; this is the "where do I upgrade / what did I buy" path, and the
+    /// one App Review can find without knowing the gates (1.8 build 37 was
+    /// rejected under 2.1(b) because the reviewer couldn't locate the IAP).
+    /// Chalk, not accent — green stays the go/hit signal.
+    private var coachChip: some View {
+        Button { paywallReason = .general } label: {
+            HStack(spacing: 4) {
+                Image(systemName: coach.isCoach ? "checkmark.seal.fill" : "person.2.fill")
+                    .font(.system(size: 9, weight: .bold))
+                Text("COACH")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(1.4)
+            }
+            .foregroundStyle(coach.isCoach ? Theme.label3 : Theme.label)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule().fill(Theme.well)
+                    .overlay(Capsule().strokeBorder(Theme.iconTileEdge.opacity(0.9), lineWidth: 1)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(coach.isCoach ? "HitRate Coach, active" : "HitRate Coach")
     }
 
     // MARK: Deck grid

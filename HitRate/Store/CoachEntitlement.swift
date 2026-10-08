@@ -119,7 +119,11 @@ final class CoachEntitlement: ObservableObject {
             let loaded = try await Product.products(for: Self.productIDs)
             // Yearly first — it's the one we lead with.
             products = loaded.sorted { $0.id == Self.yearlyID && $1.id != Self.yearlyID }
-            lastError = nil
+            // An empty result does NOT throw — without this the paywall would sit
+            // on "Loading plans…" forever with no spinner and no way past it.
+            lastError = loaded.isEmpty
+                ? "Coach plans aren't available right now. Try again in a moment."
+                : nil
         } catch {
             lastError = "Couldn't reach the App Store. Check your connection and try again."
             log.error("Product load failed: \(error.localizedDescription, privacy: .public)")
