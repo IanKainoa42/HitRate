@@ -8,6 +8,15 @@ options:
 settings:
   base:
     SWIFT_VERSION: 5.0
+    # Enhanced Security (Xcode 26+): hardened heap / dyld-ro / platform
+    # restrictions / stack zero-init / typed allocators. Pointer authentication
+    # stays OFF project-wide: every Firebase 10.28.0 binary xcframework (grpc,
+    # absl, FirebaseAnalytics, FirestoreInternal, GoogleAppMeasurement) ships
+    # ios:arm64 only — no arm64e slice — so an arm64e app slice cannot link.
+    # Re-check the slices after any Firebase bump before flipping these to YES.
+    ENABLE_ENHANCED_SECURITY: YES
+    ENABLE_POINTER_AUTHENTICATION: NO
+    ENABLE_HARDWARE_CHECKED_POINTER_ARITHMETIC_SLICE: NO
 configs:
   Debug: debug
   Release: release
@@ -58,6 +67,13 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.applesignin: ["Default"]
+        # Enhanced Security runtime protections (pairs with
+        # ENABLE_ENHANCED_SECURITY above). MTE (checked-allocations) left off.
+        com.apple.security.hardened-process: true
+        com.apple.security.hardened-process.enhanced-security-version-string: "2"
+        com.apple.security.hardened-process.hardened-heap: true
+        com.apple.security.hardened-process.dyld-ro: true
+        com.apple.security.hardened-process.platform-restrictions-string: "2"
     info:
       path: HitRate/Info.plist
       properties:
