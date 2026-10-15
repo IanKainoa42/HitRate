@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import os
 
 /// The unified capture screen (replaces the Pad/Grid split for normal practice).
 ///
