@@ -37,6 +37,13 @@ targets:
     platform: iOS
     sources:
       - path: HitRate
+    # Shared scheme is generated from here — `xcodegen generate` deletes any
+    # scheme the spec doesn't declare, and fastlane + `xcodebuild -scheme`
+    # depend on this one. storeKitConfiguration path is relative to the repo.
+    scheme:
+      testTargets:
+        - HitRateTests
+      storeKitConfiguration: HitRate.storekit
     dependencies:
       - target: HitRateWatch
         embed: true
@@ -155,3 +162,25 @@ targets:
         NSHealthShareUsageDescription: HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.
         NSHealthUpdateUsageDescription: HitRate keeps a practice workout running so this app stays open and ready to log reps from your wrist.
         ITSAppUsesNonExemptEncryption: false
+schemes:
+  # HitRateWatch is a single-target watch app (`type: application`), so a
+  # target-level `scheme:` would build only the watch app — xcodegen adds the
+  # iOS host automatically only for `watch2App` targets. Spell the build list
+  # out so Run on a paired simulator also installs the HitRate companion,
+  # matching the scheme Xcode originally created.
+  HitRateWatch:
+    build:
+      targets:
+        HitRateWatch: all
+        HitRate: all
+    run:
+      config: Debug
+      executable: HitRateWatch
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
