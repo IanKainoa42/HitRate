@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import AuthenticationServices
 
 /// Save-your-account + account deletion (editor → Account).
 ///
