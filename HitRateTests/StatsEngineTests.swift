@@ -144,6 +144,49 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(stats.stability?.reps, 1)
     }
 
+    func testStabilitySplitsByThePositionTheAthleteHeld() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .hit, .bobble])
+        let context = fixture.container.mainContext
+        let maya = Subject(name: "Maya", orderIndex: 0)
+        let jo = Subject(name: "Jo", orderIndex: 1)
+        context.insert(maya)
+        context.insert(jo)
+        let reps = fixture.session.sortedAttempts
+        // Rep 0: Maya flew over Jo — 90% on base.
+        reps[0].athleteIDs = [maya.id, jo.id]
+        reps[0].rolesRaw = "flyer=\(maya.id.uuidString)\nmainBase=\(jo.id.uuidString)"
+        reps[0].onBasePercent = 90
+        // Rep 1: they swapped — Maya based under Jo — 60% on base.
+        reps[1].athleteIDs = [maya.id, jo.id]
+        reps[1].rolesRaw = "flyer=\(jo.id.uuidString)\nmainBase=\(maya.id.uuidString)"
+        reps[1].onBasePercent = 60
+        // Rep 2: video-scored, but Maya wasn't in the group.
+        reps[2].athleteIDs = [jo.id]
+        reps[2].rolesRaw = "flyer=\(jo.id.uuidString)"
+        reps[2].onBasePercent = 20
+        try context.save()
+
+        let stats = StatsEngine.compute(
+            sessions: [fixture.session], groups: [fixture.group], timeframe: .all, subject: maya)
+
+        let stability = try XCTUnwrap(stats.stability)
+        XCTAssertEqual(stability.reps, 2)
+        XCTAssertEqual(stability.onBase, 75, "the headline still averages both of her reps")
+        XCTAssertEqual(stability.byRole, [
+            StabilityRoleStat(role: .flyer, reps: 1, onBase: 90),
+            StabilityRoleStat(role: .mainBase, reps: 1, onBase: 60),
+        ], "flying and basing must not average into one number")
+        // The layer never touches the hit rate.
+        XCTAssertEqual(stats.total, 2)
+        XCTAssertEqual(stats.rate, 100)
+
+        // A whole-floor compute has nobody to split by.
+        let floor = StatsEngine.compute(
+            sessions: [fixture.session], groups: [fixture.group], timeframe: .all)
+        XCTAssertEqual(floor.stability?.reps, 3)
+        XCTAssertEqual(floor.stability?.byRole.isEmpty, true)
+    }
+
     func testStuntRoleMapRoundTripsThroughRolesRaw() throws {
         let fixture = try makeFixture(outcomes: [.hit])
         let rep = fixture.session.sortedAttempts[0]

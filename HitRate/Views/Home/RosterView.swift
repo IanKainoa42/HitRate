@@ -119,6 +119,9 @@ struct RosterView: View {
                                 .foregroundStyle(d > 0 ? Theme.accent : Theme.majorFall)
                             }
                         }
+                        if let stability = s.stability, !stability.byRole.isEmpty {
+                            roleLine(stability.byRole)
+                        }
                     } else {
                         Text("No reps logged")
                             .font(.system(size: 11, weight: .medium))
@@ -147,5 +150,35 @@ struct RosterView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// One compact line of StuntScope on-base by the position this athlete
+    /// held — "FLYER 82% · MAIN BASE 71%" — so flying and basing never average
+    /// into one number. Shown only when a video-scored rep in range named her.
+    private func roleLine(_ roles: [StabilityRoleStat]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(Array(roles.enumerated()), id: \.element.id) { i, r in
+                if i > 0 {
+                    Text("·")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.label3)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(r.role.label.uppercased())
+                        .font(.system(size: 9, weight: .heavy))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.label3)
+                    Text("\(r.onBase)%")
+                        .font(Theme.barlow(12, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.rateColor(r.onBase))
+                }
+            }
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("On base by position")
+        .accessibilityValue(roles.map { "\($0.role.label) \($0.onBase) percent over \($0.reps) reps" }
+            .joined(separator: ", "))
     }
 }

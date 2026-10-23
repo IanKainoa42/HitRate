@@ -113,6 +113,9 @@ struct SessionSnapshot {
     let start: Date
     let end: Date
     let roughPatch: Range<Int>?  // index range of the worst stretch, if bad enough
+    /// Parallel to `outcomes`: true where StuntScope scored that rep from video
+    /// (`Attempt.hasStability`) — the tape marks those reps with a tick.
+    let videoScored: [Bool]
 }
 
 /// One row of the EXECUTION breakdown (Feature B): how often a single United
@@ -162,6 +165,20 @@ struct StabilityBreakdown {
     let trend: [Int]
     let hitTrend: [Int]
     let groups: [StabilityGroupStat]   // ranked by onBase desc
+    /// The same video reps split by the POSITION the filtered athlete held on
+    /// each one (`Attempt.roles`), so a flyer's on-base and her base's on-base
+    /// never average into one number. Only a person-filtered compute fills it
+    /// (`subject` non-nil); a whole-floor compute, or reps whose `rolesRaw`
+    /// never named the athlete, leave it empty. `StuntRole.allCases` order.
+    let byRole: [StabilityRoleStat]
+}
+
+/// One stunt position's share of an athlete's video-scored reps.
+struct StabilityRoleStat: Identifiable, Equatable {
+    let role: StuntRole
+    let reps: Int
+    let onBase: Int   // mean on-base percent over `reps`
+    var id: StuntRole { role }
 }
 
 struct FloorStats {
@@ -400,6 +417,27 @@ enum StatsEngine {
                 longestHoldSeconds: scored.compactMap(\.holdSeconds).max() ?? 0))
         }
         guard reps > 0 else { return nil }
+
+        // Per-role split — only meaningful for one athlete; a role on a rep is
+        // hers when `rolesRaw` maps it to her `Subject.id` (the wire id, like
+        // `involves`). A hand-logged rep has no roles and so no bucket.
+        var roleBuckets: [StuntRole: (reps: Int, sum: Int)] = [:]
+        if let subject {
+            for attempt in currentAttempts.values.joined() where attempt.hasStability {
+                for (role, athleteID) in attempt.roles where athleteID == subject.id {
+                    let bucket = roleBuckets[role] ?? (reps: 0, sum: 0)
+                    roleBuckets[role] = (reps: bucket.reps + 1,
+                                         sum: bucket.sum + (attempt.onBasePercent ?? 0))
+                }
+            }
+        }
+        let byRole: [StabilityRoleStat] = StuntRole.allCases.compactMap { role in
+            guard let bucket = roleBuckets[role], bucket.reps > 0 else { return nil }
+            return StabilityRoleStat(
+                role: role, reps: bucket.reps,
+                onBase: Int((Double(bucket.sum) / Double(bucket.reps)).rounded()))
+        }
+
         return StabilityBreakdown(
             reps: reps,
             onBase: Int((Double(onBaseSum) / Double(reps)).rounded()),
@@ -409,7 +447,8 @@ enum StatsEngine {
             hitTrend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe,
                                   now: now, subject: subject, logger: logger,
                                   metric: { $0.hasStability ? $0.creditValue : nil }),
-            groups: rows.sorted { $0.onBase > $1.onBase })
+            groups: rows.sorted { $0.onBase > $1.onBase },
+            byRole: byRole)
     }
 
     // MARK: Execution breakdown (Feature B)
@@ -535,7 +574,8 @@ enum StatsEngine {
             outcomes: outcomes,
             start: attempts.first!.timestamp,
             end: last.endedAt ?? attempts.last!.timestamp,
-            roughPatch: roughPatch(in: outcomes))
+            roughPatch: roughPatch(in: outcomes),
+            videoScored: attempts.map(\.hasStability))
     }
 
     /// Worst sliding window of 7 attempts; flagged if it has >=4 misses.
