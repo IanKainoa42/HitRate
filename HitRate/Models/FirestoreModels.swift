@@ -100,4 +100,18 @@ struct FAttempt: Codable {
     var loggerId: String
     var deletedAt: Date?
     var updatedAt: Date
+    /// StuntScope's OPTIONAL video-analysis layer (see `Attempt.hasStability`).
+    /// Every field decodes nil on a document that predates it or that HitRate
+    /// wrote by hand; firestore.rules type-checks each when present. Kept on
+    /// the attempt itself — not a sibling collection — so a video-scored rep
+    /// reaches every existing listener, stat and card with no new sync path.
+    var source: String? = nil
+    var athleteIds: [String]? = nil
+    var rolesRaw: String? = nil
+    var onBasePercent: Int? = nil
+    var holdSeconds: Double? = nil
+    var wobbleCount: Int? = nil
+    var worstWobbleSecond: Double? = nil
+    var flightSeconds: [Double]? = nil
+    var videoRef: String? = nil
 }

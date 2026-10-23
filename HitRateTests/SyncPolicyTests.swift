@@ -583,3 +583,24 @@ final class AccountDeletionPolicyTests: XCTestCase {
         XCTAssertEqual(AuthViewModel.AccountDeletion.failed("anything").step, .failed)
     }
 }
+
+final class SharedIdentityPolicyTests: XCTestCase {
+    func testHitRateIdentityCarriesIntoAnEmptySharedGroup() {
+        XCTAssertEqual(SharedIdentityPolicy.resolve(privateUID: "coach", sharedUID: nil), .adoptPrivate)
+    }
+
+    func testHitRateIdentityWinsOverAStrangerInTheSharedGroup() {
+        // StuntScope got there first with its own anonymous user: HitRate's uid
+        // owns the folders, so it replaces that user rather than orphaning them.
+        XCTAssertEqual(SharedIdentityPolicy.resolve(privateUID: "coach", sharedUID: "stuntscope-anon"), .adoptPrivate)
+    }
+
+    func testSharedGroupAlreadyHoldingTheSameUserIsLeftAlone() {
+        XCTAssertEqual(SharedIdentityPolicy.resolve(privateUID: "coach", sharedUID: "coach"), .keepShared)
+    }
+
+    func testFreshInstallAdoptsWhateverTheSharedGroupHolds() {
+        XCTAssertEqual(SharedIdentityPolicy.resolve(privateUID: nil, sharedUID: "coach"), .keepShared)
+        XCTAssertEqual(SharedIdentityPolicy.resolve(privateUID: nil, sharedUID: nil), .keepShared)
+    }
+}

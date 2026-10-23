@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// StuntScope stunt video + per-frame stability JSON, one folder per rep:
+//   teams/{teamId}/stunts/{attemptId}/clip.mov
+//   teams/{teamId}/stunts/{attemptId}/frames.json
+// The attempt document's `videoRef` points here (firestore.rules checks the
+// prefix INCLUDING the attempt id). Access mirrors the folder for reads; a
+// write is tied to the attempt: the Firestore attempt doc must already exist
+// and its `loggerId` must be the caller, so nobody can plant an object under
+// another logger's rep — not by overwriting it and not by getting there
+// first. Nothing else lives in the bucket; HitRate itself stores no files.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function teamData(teamId) {
+      return firestore.get(/databases/(default)/documents/teams/$(teamId)).data;
+    }
+    function inTeam(teamId) {
+      let t = teamData(teamId);
+      return request.auth != null
+        && (t.ownerUID == request.auth.uid || request.auth.uid in t.memberIds);
+    }
+
+    // The rep this object belongs to, as Firestore has it. Writing the attempt
+    // doc FIRST is the contract: an upload for an attempt that doesn't exist
+    // yet, or that someone else logged, is refused.
+    function attemptLoggedByCaller(teamId, attemptId) {
+      let path = /databases/(default)/documents/teams/$(teamId)/attempts/$(attemptId);
+      return firestore.exists(path)
+        && firestore.get(path).data.loggerId == request.auth.uid;
+    }
+    function uploadIsSane() {
+      return request.resource.size < 200 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*|application/json');
+    }
+
+    match /teams/{teamId}/stunts/{attemptId}/{file} {
+      allow read:   if inTeam(teamId);
+      allow write:  if inTeam(teamId)
+        && attemptLoggedByCaller(teamId, attemptId)
+        && (request.resource == null || uploadIsSane());
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

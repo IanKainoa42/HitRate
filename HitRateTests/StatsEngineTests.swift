@@ -78,6 +78,82 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(streak, 0)
     }
 
+    func testStabilityBreakdownCountsOnlyVideoScoredReps() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .bobble, .hit, .majorFall])
+        let reps = fixture.session.sortedAttempts
+        // Two reps filmed by StuntScope, two logged by hand.
+        reps[0].onBasePercent = 90
+        reps[0].wobbleCount = 0
+        reps[0].holdSeconds = 2.0
+        reps[1].onBasePercent = 70
+        reps[1].wobbleCount = 2
+        reps[1].holdSeconds = 3.5
+        try fixture.container.mainContext.save()
+
+        let stats = StatsEngine.compute(
+            sessions: [fixture.session], groups: [fixture.group], timeframe: .all)
+
+        let stability = try XCTUnwrap(stats.stability)
+        XCTAssertEqual(stability.reps, 2)
+        XCTAssertEqual(stability.onBase, 80)
+        XCTAssertEqual(stability.groups.count, 1)
+        XCTAssertEqual(stability.groups[0].hits, 1)
+        XCTAssertEqual(stability.groups[0].hitRate, 50)
+        XCTAssertEqual(stability.groups[0].wobbles, 2)
+        XCTAssertEqual(stability.groups[0].longestHoldSeconds, 3.5)
+        XCTAssertEqual(stability.trend, [80], "one session → one point, video reps only")
+        XCTAssertEqual(stability.hitTrend, [84], "(100 + 67) / 2 over the same two reps")
+        // The headline rate is untouched by the layer: all four reps, as before.
+        XCTAssertEqual(stats.total, 4)
+        XCTAssertEqual(stats.rate, 67)
+    }
+
+    func testHandLoggedPracticeHasNoStabilityBreakdown() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .hit])
+
+        let stats = StatsEngine.compute(
+            sessions: [fixture.session], groups: [fixture.group], timeframe: .all)
+
+        XCTAssertNil(stats.stability)
+        XCTAssertFalse(stats.hasStability)
+    }
+
+    func testAthleteTaggedInAStuntGroupRepSeesItUnderTheirOwnFilter() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .majorFall, .hit])
+        let context = fixture.container.mainContext
+        let flyer = Subject(name: "Maya", orderIndex: 0)
+        let stuntGroup = Subject(name: "Group 3", kind: .group, orderIndex: 1)
+        context.insert(flyer)
+        context.insert(stuntGroup)
+        let reps = fixture.session.sortedAttempts
+        // Rep 0: StuntScope logged it against the group and tagged the flyer.
+        reps[0].subject = stuntGroup
+        reps[0].athleteIDs = [flyer.id]
+        reps[0].onBasePercent = 88
+        // Rep 1: the coach logged it against Maya by hand.
+        reps[1].subject = flyer
+        // Rep 2: somebody else's rep.
+        reps[2].subject = stuntGroup
+        try context.save()
+
+        let stats = StatsEngine.compute(
+            sessions: [fixture.session], groups: [fixture.group], timeframe: .all, subject: flyer)
+
+        XCTAssertEqual(stats.total, 2, "the group rep she was tagged on plus her own hand-logged rep")
+        XCTAssertEqual(stats.overall, [1, 0, 0, 1])
+        XCTAssertEqual(stats.stability?.reps, 1)
+    }
+
+    func testStuntRoleMapRoundTripsThroughRolesRaw() throws {
+        let fixture = try makeFixture(outcomes: [.hit])
+        let rep = fixture.session.sortedAttempts[0]
+        let flyer = UUID(), base = UUID()
+        rep.rolesRaw = "flyer=\(flyer.uuidString)\nmainBase=\(base.uuidString)\nbogus=nope"
+
+        XCTAssertEqual(rep.roles, [.flyer: flyer, .mainBase: base])
+        XCTAssertFalse(rep.hasStability)
+    }
+
     private func makeFixture(
         outcomes: [Outcome],
         loggerIDs: [String]? = nil

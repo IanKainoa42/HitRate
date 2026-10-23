@@ -9,7 +9,9 @@ rules_version = '2';
 //   teams/{teamId}/templates/{id}           FTemplate  (owner writes, members read)
 //   teams/{teamId}/assignments/{id}         FAssignment (owner writes, members read)
 //   teams/{teamId}/sessions/{id}            FSession   (logger-owned)
-//   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps)
+//   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps;
+//                                                       StuntScope adds optional
+//                                                       stability fields, validated)
 //   joinCodes/{code}                        { teamId } — public code→team lookup
 //
 // Roster is OWNER-authoritative; attempts are append-only and tagged with the
@@ -53,6 +55,35 @@ service cloud.firestore {
           // Re-entering the same code is an idempotent membership update.
           || (uid() in before && teamAcceptsMembers() && after == before)
         );
+    }
+
+    // StuntScope writes its video-scored reps as ordinary attempts, carrying a
+    // few OPTIONAL stability fields (see FAttempt). Each is either absent, null
+    // (the Firestore encoder's spelling of a nil optional) or well-typed, so a
+    // bad client can't park junk where HitRate's stability card reads. A
+    // legacy or HitRate-logged rep carries none and passes untouched.
+    function absentOrNull(d, k) {
+      return !(k in d) || d[k] == null;
+    }
+    function stuntFieldsValid(teamId, attemptId) {
+      let d = request.resource.data;
+      return (absentOrNull(d, 'onBasePercent')
+              || (d.onBasePercent is int && d.onBasePercent >= 0 && d.onBasePercent <= 100))
+          && (absentOrNull(d, 'wobbleCount')
+              || (d.wobbleCount is int && d.wobbleCount >= 0))
+          && (absentOrNull(d, 'holdSeconds')
+              || (d.holdSeconds is number && d.holdSeconds >= 0))
+          && (absentOrNull(d, 'worstWobbleSecond')
+              || (d.worstWobbleSecond is number && d.worstWobbleSecond >= 0))
+          && (absentOrNull(d, 'flightSeconds')
+              || (d.flightSeconds is list && d.flightSeconds.size() <= 16))
+          && (absentOrNull(d, 'athleteIds')
+              || (d.athleteIds is list && d.athleteIds.size() <= 8))
+          && (absentOrNull(d, 'rolesRaw') || d.rolesRaw is string)
+          && (absentOrNull(d, 'source') || d.source is string)
+          && (absentOrNull(d, 'videoRef')
+              || (d.videoRef is string
+                  && d.videoRef.matches('teams/' + teamId + '/stunts/' + attemptId + '/.*')));
     }
 
     function teamAcceptsMembers() {
@@ -126,12 +157,14 @@ service cloud.firestore {
       }
       match /attempts/{docId} {
         allow read:   if inTeam(teamId);
-        allow create: if inTeam(teamId) && request.resource.data.loggerId == uid();
+        allow create: if inTeam(teamId) && request.resource.data.loggerId == uid()
+          && stuntFieldsValid(teamId, docId);
         // Attribution is immutable. Only the original logger can edit or
         // tombstone a rep; a folder owner cannot rewrite a member's history.
         allow update: if inTeam(teamId)
           && resource.data.loggerId == uid()
-          && request.resource.data.loggerId == resource.data.loggerId;
+          && request.resource.data.loggerId == resource.data.loggerId
+          && stuntFieldsValid(teamId, docId);
         allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
       }
     }
