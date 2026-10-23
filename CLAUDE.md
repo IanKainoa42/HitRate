@@ -462,7 +462,10 @@ Key invariants:
 - Latest-session snapshot must skip attempt-less sessions or an ended empty
   session hides the tape card.
 - Rules tests: `npm run test:rules` runs BOTH suites in `FirestoreRulesTests/`
-  under the Firestore + Storage emulators; `test:firestore-rules` and
+  under the Firestore + Storage emulators, with `--test-concurrency=1` because
+  node runs test FILES in parallel and both suites `clearFirestore()` in
+  `beforeEach` against the one emulator — on a 24-core Mac that raced to
+  42/47 (`Null value error` on `get` for docs the other file had just wiped); `test:firestore-rules` and
   `test:storage-rules` run one each. `storage.rules` calls `firestore.get` /
   `firestore.exists`, so the storage suite needs both emulators up
   (`emulators:exec --only firestore,storage`). The storage emulator's internal

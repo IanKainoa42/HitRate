@@ -74,6 +74,10 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.applesignin: ["Default"]
+        # Shared keychain with StuntScope (FlipForm) — both apps read the same
+        # Firebase user. xcodegen owns this file: add entitlements HERE, not in
+        # HitRate.entitlements, or the next generate strips them.
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.ianrichardson.shared"]
         # Enhanced Security runtime protections (pairs with
         # ENABLE_ENHANCED_SECURITY above). MTE (checked-allocations) left off.
         com.apple.security.hardened-process: true

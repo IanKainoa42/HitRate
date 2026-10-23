@@ -2,7 +2,7 @@
   "name": "hitrate-firestore-rules",
   "private": true,
   "scripts": {
-    "test:rules": "firebase emulators:exec --project demo-hitrate-rules --only firestore,storage \"node --test FirestoreRulesTests/*.test.mjs\"",
+    "test:rules": "firebase emulators:exec --project demo-hitrate-rules --only firestore,storage \"node --test --test-concurrency=1 FirestoreRulesTests/*.test.mjs\"",
     "test:firestore-rules": "firebase emulators:exec --project demo-hitrate-rules --only firestore \"node --test FirestoreRulesTests/firestore.rules.test.mjs\"",
     "test:storage-rules": "firebase emulators:exec --project demo-hitrate-rules --only firestore,storage \"node --test FirestoreRulesTests/storage.rules.test.mjs\""
   },
