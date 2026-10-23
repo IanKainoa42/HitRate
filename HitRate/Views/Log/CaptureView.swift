@@ -831,6 +831,13 @@ struct CaptureView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(a.lostDrivers.isEmpty ? Theme.accent : Theme.buildingFall)
             }
+            if a.hasStability {
+                // StuntScope scored this rep from video — a marker, not a verdict.
+                Image(systemName: "video.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.label3)
+                    .accessibilityLabel("Scored from video")
+            }
         }
         .fixedSize()
         .padding(.horizontal, 9)

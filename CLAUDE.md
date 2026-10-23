@@ -461,10 +461,20 @@ Key invariants:
 - `figure.cheerleading` SF Symbol doesn't exist; use `figure.gymnastics`.
 - Latest-session snapshot must skip attempt-less sessions or an ended empty
   session hides the tape card.
-- Firestore rules tests (`npm run test:firestore-rules`) need a JVM the
-  emulator can find. `openjdk@21` is installed but keg-only, so plain `npm run`
-  fails with "Unable to locate a Java Runtime" — run it as
-  `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run test:firestore-rules`.
+- Rules tests: `npm run test:rules` runs BOTH suites in `FirestoreRulesTests/`
+  under the Firestore + Storage emulators; `test:firestore-rules` and
+  `test:storage-rules` run one each. `storage.rules` calls `firestore.get` /
+  `firestore.exists`, so the storage suite needs both emulators up
+  (`emulators:exec --only firestore,storage`). The storage emulator's internal
+  Firestore lookup swallows EVERY transport error as "doc missing" (surfacing
+  as `Null value error` at `storage.rules` line 15 and only the allow cases
+  failing) — firebase-tools' own HTTP client honours `https_proxy` but not
+  `NO_PROXY`, so under a proxied sandbox the loopback call gets proxied and the
+  three allow cases fail while the deny cases pass; a plain Mac is fine. Hosts
+  are pinned to `127.0.0.1` in `firebase.json` so the emulators never race
+  `::1`. They all need a JVM the emulator can find. `openjdk@21` is installed
+  but keg-only, so plain `npm run` fails with "Unable to locate a Java Runtime"
+  — run as `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm run test:rules`.
 - WatchConnectivity is force-disabled on the simulator (`WatchLogStore.session`
   returns nil under `targetEnvironment(simulator)`) — `WCSession` has an XPC/IPC
   bug on iOS 18 / watchOS 11 paired simulators that crashes in

@@ -51,6 +51,13 @@ struct StabilityCard: View {
                 }
                 .padding(.bottom, 8)
 
+                // Person filter only: the same reps by the position she held, so
+                // a flyer's number and a base's number read apart.
+                if !s.byRole.isEmpty {
+                    roleLine(s.byRole)
+                        .padding(.bottom, 10)
+                }
+
                 if s.trend.count >= 2 {
                     LineChart(data: s.trend, accent: Theme.accent,
                               secondary: s.hitTrend, secondaryColor: Theme.label2)
@@ -96,6 +103,34 @@ struct StabilityCard: View {
                 .tracking(1)
                 .foregroundStyle(Theme.label3)
         }
+    }
+
+    /// "FLYER 82% · 3 reps   MAIN BASE 71% · 1 rep" — one compact line.
+    private func roleLine(_ roles: [StabilityRoleStat]) -> some View {
+        HStack(spacing: 14) {
+            ForEach(roles) { r in
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(r.role.label.uppercased())
+                        .font(.system(size: 9, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Theme.label3)
+                    Text("\(r.onBase)%")
+                        .font(Theme.barlow(16, .extrabold))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.rateColor(r.onBase))
+                    Text("\(r.reps) rep\(r.reps == 1 ? "" : "s")")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.label3)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("On base by position")
+        .accessibilityValue(roles.map { "\($0.role.label) \($0.onBase) percent over \($0.reps) reps" }
+            .joined(separator: ", "))
     }
 
     private func groupRow(_ row: StabilityGroupStat) -> some View {

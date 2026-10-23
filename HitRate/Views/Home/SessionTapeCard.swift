@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// "LATEST SESSION" — the chronological tape: one thin bar per attempt,
-/// height/color by outcome, with a rough-patch bracket when one exists.
+/// height/color by outcome, with a rough-patch bracket when one exists. A rep
+/// StuntScope scored from video gets a 1pt chalk-grey tick under its bar
+/// (`snapshot.videoScored`) — a marker, not a colour: green stays the hit signal.
 struct SessionTapeCard: View {
     let snapshot: SessionSnapshot
     var kind: SkillKind = .stunt   // legend wording (FloorStats.aggregateKind)
@@ -9,6 +11,11 @@ struct SessionTapeCard: View {
     private let heights: [Outcome: CGFloat] = [
         .hit: 34, .bobble: 26, .buildingFall: 22, .majorFall: 18,
     ]
+    /// Room under the bars for the video tick (1pt) and its 2pt breathing gap.
+    private let tickInset: CGFloat = 3
+
+    private var hasVideo: Bool { snapshot.videoScored.contains(true) }
+    private var videoCount: Int { snapshot.videoScored.filter { $0 }.count }
 
     var body: some View {
         FeedCard {
@@ -27,12 +34,17 @@ struct SessionTapeCard: View {
                 let barW = max(0.6, step - gap)
                 for (i, o) in snapshot.outcomes.enumerated() {
                     let h = heights[o] ?? 20
-                    let rect = CGRect(x: CGFloat(i) * step, y: size.height - h, width: barW, height: h)
+                    let rect = CGRect(x: CGFloat(i) * step, y: size.height - tickInset - h,
+                                      width: barW, height: h)
                     ctx.fill(Path(roundedRect: rect, cornerRadius: min(2, barW / 2)),
                              with: .color(o.color.opacity(o.isHit ? 0.9 : 1)))
+                    if i < snapshot.videoScored.count, snapshot.videoScored[i] {
+                        let tick = CGRect(x: rect.minX, y: size.height - 1, width: barW, height: 1)
+                        ctx.fill(Path(tick), with: .color(Theme.label3))
+                    }
                 }
             }
-            .frame(height: 36)
+            .frame(height: 36 + tickInset)
             .accessibilityLabel("Session tape")
             .accessibilityValue(tapeSummary)
 
@@ -70,7 +82,7 @@ struct SessionTapeCard: View {
             }
             .padding(.top, 4)
 
-            // Outcome legend
+            // Outcome legend (+ the video tick, only when a rep in the tape has one)
             HStack(spacing: 12) {
                 ForEach(Outcome.allCases) { o in
                     HStack(spacing: 5) {
@@ -78,6 +90,18 @@ struct SessionTapeCard: View {
                             .fill(o.color)
                             .frame(width: 8, height: 8)
                         Text(o.label(kind))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.label2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                if hasVideo {
+                    HStack(spacing: 5) {
+                        Rectangle()
+                            .fill(Theme.label3)
+                            .frame(width: 8, height: 1)
+                        Text("Video")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.label2)
                             .lineLimit(1)
@@ -97,7 +121,8 @@ struct SessionTapeCard: View {
         let parts = Outcome.allCases.compactMap { o in
             counts[o.rawValue] > 0 ? "\(counts[o.rawValue]) \(o.label(kind).lowercased())" : nil
         }
-        return "\(snapshot.outcomes.count) reps: " + parts.joined(separator: ", ")
+        let video = videoCount > 0 ? ". \(videoCount) scored from video" : ""
+        return "\(snapshot.outcomes.count) reps: " + parts.joined(separator: ", ") + video
     }
 
     /// Midpoint timestamp of the rough patch, interpolated across the session.
