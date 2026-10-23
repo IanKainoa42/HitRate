@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// StuntScope stunt video + per-frame stability JSON, one object pair per rep:
+//   teams/{teamId}/stunts/{attemptId}.mov
+//   teams/{teamId}/stunts/{attemptId}.json
+// The attempt document's `videoRef` points here (firestore.rules checks the
+// prefix). Access mirrors the folder: owner or member reads, any member
+// uploads. Nothing else lives in the bucket — HitRate itself stores no files.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function teamData(teamId) {
+      return firestore.get(/databases/(default)/documents/teams/$(teamId)).data;
+    }
+    function inTeam(teamId) {
+      let t = teamData(teamId);
+      return request.auth != null
+        && (t.ownerUID == request.auth.uid || request.auth.uid in t.memberIds);
+    }
+
+    match /teams/{teamId}/stunts/{file} {
+      allow read: if inTeam(teamId);
+      allow write: if inTeam(teamId)
+        && request.resource.size < 200 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*|application/json');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

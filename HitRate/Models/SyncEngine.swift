@@ -581,7 +581,18 @@ final class SyncEngine: ObservableObject {
             lostDriversRaw: attempt.lostDriversRaw,
             loggerId: loggerID,
             deletedAt: nil,
-            updatedAt: .now
+            updatedAt: .now,
+            // A StuntScope rep the shared uid logged re-uploads from HitRate
+            // too (same logger); carrying the layer keeps that upsert lossless.
+            source: attempt.sourceRaw.isEmpty ? nil : attempt.sourceRaw,
+            athleteIds: attempt.athleteIDsRaw.isEmpty ? nil : attempt.athleteIDs.map(\.uuidString),
+            rolesRaw: attempt.rolesRaw.isEmpty ? nil : attempt.rolesRaw,
+            onBasePercent: attempt.onBasePercent,
+            holdSeconds: attempt.holdSeconds,
+            wobbleCount: attempt.wobbleCount,
+            worstWobbleSecond: attempt.worstWobbleSecond,
+            flightSeconds: attempt.flightSecondsRaw.isEmpty ? nil : attempt.flightSeconds,
+            videoRef: attempt.videoRef.isEmpty ? nil : attempt.videoRef
         )
         return setDoc(teamDoc(teamID).collection("attempts").document(docID), doc,
                       key: key,
@@ -1727,6 +1738,7 @@ final class SyncEngine: ObservableObject {
                     attempt.lostDriversRaw = remote.lostDriversRaw
                     changed = true
                 }
+                if applyStability(from: remote, to: attempt) { changed = true }
 
                 if (index + 1).isMultiple(of: 250) {
                     knownAttemptIDsByTeam[teamID] = known
@@ -1751,6 +1763,30 @@ final class SyncEngine: ObservableObject {
         } catch {
             lastError = "Sync pull failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Copy StuntScope's optional video layer off the wire. Returns whether
+    /// anything moved. Absent fields clear the local value, so a rep whose
+    /// score was withdrawn upstream stops reading as video-backed.
+    private func applyStability(from remote: FAttempt, to attempt: Attempt) -> Bool {
+        var changed = false
+        let source = remote.source ?? ""
+        if attempt.sourceRaw != source { attempt.sourceRaw = source; changed = true }
+        let athleteIDs = (remote.athleteIds ?? []).compactMap(UUID.init(uuidString:))
+        if attempt.athleteIDs != athleteIDs { attempt.athleteIDs = athleteIDs; changed = true }
+        let roles = remote.rolesRaw ?? ""
+        if attempt.rolesRaw != roles { attempt.rolesRaw = roles; changed = true }
+        if attempt.onBasePercent != remote.onBasePercent { attempt.onBasePercent = remote.onBasePercent; changed = true }
+        if attempt.holdSeconds != remote.holdSeconds { attempt.holdSeconds = remote.holdSeconds; changed = true }
+        if attempt.wobbleCount != remote.wobbleCount { attempt.wobbleCount = remote.wobbleCount; changed = true }
+        if attempt.worstWobbleSecond != remote.worstWobbleSecond {
+            attempt.worstWobbleSecond = remote.worstWobbleSecond; changed = true
+        }
+        let flights = remote.flightSeconds ?? []
+        if attempt.flightSeconds != flights { attempt.flightSeconds = flights; changed = true }
+        let video = remote.videoRef ?? ""
+        if attempt.videoRef != video { attempt.videoRef = video; changed = true }
+        return changed
     }
 
     // MARK: - Sync fingerprints
@@ -1814,13 +1850,25 @@ final class SyncEngine: ObservableObject {
               attempt.outcomeRaw, attempt.timestamp, attempt.waveID?.uuidString,
               attempt.session?.cloudID,
               attempt.executionScored, attempt.lostDriversRaw, loggerID,
-              Optional<Date>.none)
+              Optional<Date>.none,
+              attempt.sourceRaw.isEmpty ? nil : attempt.sourceRaw,
+              attempt.athleteIDsRaw.isEmpty ? nil : attempt.athleteIDs.map(\.uuidString),
+              attempt.rolesRaw.isEmpty ? nil : attempt.rolesRaw,
+              attempt.onBasePercent, attempt.holdSeconds, attempt.wobbleCount,
+              attempt.worstWobbleSecond,
+              attempt.flightSecondsRaw.isEmpty ? nil : attempt.flightSeconds,
+              attempt.videoRef.isEmpty ? nil : attempt.videoRef)
     }
 
     private func remoteAttemptFingerprint(_ attempt: FAttempt) -> String {
         stamp(attempt.teamId, attempt.groupId, attempt.subjectId, attempt.outcomeRaw,
               attempt.timestamp, attempt.waveID, attempt.sessionId,
               attempt.executionScored, attempt.lostDriversRaw, attempt.loggerId,
-              attempt.deletedAt)
+              attempt.deletedAt,
+              attempt.source, attempt.athleteIds.flatMap { $0.isEmpty ? nil : $0 },
+              attempt.rolesRaw,
+              attempt.onBasePercent, attempt.holdSeconds, attempt.wobbleCount,
+              attempt.worstWobbleSecond,
+              attempt.flightSeconds.flatMap { $0.isEmpty ? nil : $0 }, attempt.videoRef)
     }
 }

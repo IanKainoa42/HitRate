@@ -31,6 +31,11 @@ struct TrendCard: View {
 struct LineChart: View {
     let data: [Int]
     let accent: Color
+    /// An optional second series on the same axes, drawn dashed and muted
+    /// UNDER the main line (same length as `data`; extra points are ignored).
+    /// The stability card uses it to lay the hit rate behind the on-base line.
+    var secondary: [Int] = []
+    var secondaryColor: Color = Theme.label2
 
     private let padTop: CGFloat = 12
     private let padBot: CGFloat = 22
@@ -47,8 +52,9 @@ struct LineChart: View {
     }
 
     private func y(_ v: Int, _ size: CGSize) -> CGFloat {
-        let lo = Double(data.min() ?? 0) - 5
-        let hi = Double(data.max() ?? 100) + 5
+        let all = data + secondary.prefix(data.count)
+        let lo = Double(all.min() ?? 0) - 5
+        let hi = Double(all.max() ?? 100) + 5
         return padTop + (1 - (Double(v) - lo) / (hi - lo)) * (size.height - padTop - padBot)
     }
 
@@ -80,6 +86,19 @@ struct LineChart: View {
                     p.closeSubpath()
                 }
                 .fill(accent.opacity(0.08))
+
+                // Secondary series (dashed, muted) sits under the main line.
+                if secondary.count >= 2 {
+                    let pts = Array(secondary.prefix(n))
+                    Path { p in
+                        p.move(to: CGPoint(x: x(0), y: y(pts[0])))
+                        for (i, v) in pts.enumerated().dropFirst() {
+                            p.addLine(to: CGPoint(x: x(i), y: y(v)))
+                        }
+                    }
+                    .stroke(secondaryColor, style: StrokeStyle(lineWidth: 1.5, lineCap: .round,
+                                                               lineJoin: .round, dash: [4, 4]))
+                }
 
                 // Line
                 Path { p in

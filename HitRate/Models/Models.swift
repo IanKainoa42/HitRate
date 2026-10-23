@@ -55,6 +55,21 @@ enum SkillKind: String, CaseIterable, Identifiable {
 /// slot either way — only the icon/word differ. Orthogonal to `SkillKind`
 /// (which is about outcome WORDS): a person can throw a stunt or a tumbling
 /// pass, a group can be graded on either.
+/// The four positions in a stunt group, as StuntScope tags them on a rep
+/// (`Attempt.rolesRaw`). Raw values are the wire spelling — don't rename.
+enum StuntRole: String, CaseIterable, Identifiable, Codable {
+    case flyer, mainBase, sideBase, backspot
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .flyer: "Flyer"
+        case .mainBase: "Main base"
+        case .sideBase: "Side base"
+        case .backspot: "Backspot"
+        }
+    }
+}
+
 enum SubjectKind: String, CaseIterable, Identifiable, Codable {
     case person, group
 
@@ -831,6 +846,25 @@ final class Attempt {
     /// additive with defaults → lightweight migration.
     var executionScored: Bool = false
     var lostDriversRaw: String = ""
+    /// OPTIONAL video-analysis layer, written by StuntScope (the FlightFilter
+    /// coach app) through the shared Firestore. A rep HitRate logs carries none
+    /// of it. Every field is additive with a default → lightweight migration;
+    /// `onBasePercent` nil means "no video score" and gates the whole layer
+    /// (`hasStability`). Like execution, this NEVER touches the hit rate,
+    /// streaks, cards or the tournament — it is a separate breakdown only.
+    /// `sourceRaw` names the writer ("stuntscope"); `athleteIDsRaw` is the
+    /// newline-joined `Subject.id` list of everyone in the stunt group so a
+    /// person filter can find a flyer's or base's stunt reps; `rolesRaw` maps
+    /// `role=subjectId` per line (flyer / mainBase / sideBase / backspot).
+    var sourceRaw: String = ""
+    var athleteIDsRaw: String = ""
+    var rolesRaw: String = ""
+    var onBasePercent: Int? = nil
+    var holdSeconds: Double? = nil
+    var wobbleCount: Int? = nil
+    var worstWobbleSecond: Double? = nil
+    var flightSecondsRaw: String = ""
+    var videoRef: String = ""
 
     init(outcome: Outcome, group: StuntGroup?, session: PracticeSession?, subject: Subject? = nil, timestamp: Date = .now, waveID: UUID? = nil) {
         self.outcomeRaw = outcome.rawValue
@@ -890,6 +924,43 @@ final class Attempt {
         executionScored = false
         lostDriversRaw = ""
     }
+    // MARK: Stability (StuntScope video analysis — optional, read-only here)
+
+    /// True when StuntScope scored this rep from video.
+    var hasStability: Bool { onBasePercent != nil }
+    /// Everyone in the stunt group on this rep, by `Subject.id`. Empty for a
+    /// rep logged by hand.
+    var athleteIDs: [UUID] {
+        get { athleteIDsRaw.split(separator: "\n").compactMap { UUID(uuidString: String($0)) } }
+        set { athleteIDsRaw = newValue.map(\.uuidString).joined(separator: "\n") }
+    }
+    /// Role → `Subject.id` for the four stunt positions, parsed from `rolesRaw`.
+    var roles: [StuntRole: UUID] {
+        var map: [StuntRole: UUID] = [:]
+        for line in rolesRaw.split(separator: "\n") {
+            let parts = line.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2,
+                  let role = StuntRole(rawValue: String(parts[0])),
+                  let id = UUID(uuidString: String(parts[1])) else { continue }
+            map[role] = id
+        }
+        return map
+    }
+    /// Seconds airborne per release → catch (toss, basket), in clip order.
+    var flightSeconds: [Double] {
+        get { flightSecondsRaw.split(separator: "\n").compactMap { Double($0) } }
+        set { flightSecondsRaw = newValue.map { String($0) }.joined(separator: "\n") }
+    }
+    /// Does this rep involve `subject` at all — logged against them, or one of
+    /// the athletes StuntScope tagged in the stunt group. Compares `Subject.id`
+    /// (the cross-device id), not the store-local persistent id, because the
+    /// tag came over the wire.
+    func involves(_ subject: Subject) -> Bool {
+        if self.subject?.persistentModelID == subject.persistentModelID { return true }
+        guard !athleteIDsRaw.isEmpty else { return false }
+        return athleteIDs.contains(subject.id)
+    }
+
     /// The legacy severity `Outcome` this rep maps to by credit TIER (hit/decent/
     /// rough/miss → hit/bobble/buildingFall/majorFall). Used only by aggregate
     /// stats/visuals (tape color, tier histograms) so they stay 4-bucket and

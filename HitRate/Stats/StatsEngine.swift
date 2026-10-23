@@ -132,6 +132,38 @@ struct ExecutionDriverStat: Identifiable {
     var holdRate: Int { scored > 0 ? Int((Double(held) / Double(scored) * 100).rounded()) : 0 }
 }
 
+/// One skill's row in the STUNT STABILITY breakdown: only the reps StuntScope
+/// scored from video count, so a skill logged by hand never reads as "steady".
+struct StabilityGroupStat: Identifiable {
+    let id: PersistentIdentifierBox
+    let name: String
+    let number: Int
+    let colorIndex: Int
+    let reps: Int                  // video-scored reps
+    let hits: Int                  // clean hits among them
+    let onBase: Int                // mean on-base %, 0–100
+    let wobbles: Int               // total wobbles across those reps
+    let longestHoldSeconds: Double
+
+    /// Clean-hit rate of the video-scored reps alone, 0–100.
+    var hitRate: Int { reps > 0 ? Int((Double(hits) / Double(reps) * 100).rounded()) : 0 }
+    var wobblesPerRep: Double { reps > 0 ? Double(wobbles) / Double(reps) : 0 }
+}
+
+/// The stability layer StuntScope writes onto attempts, aggregated. Mean
+/// on-base percent (where the flyer's centre of mass sat over her bases) is the
+/// headline; `trend` is it over the same buckets as the hit-rate trend, with
+/// `hitTrend` the credit-weighted rate of the SAME video-scored reps so the
+/// two lines can be read against each other — stability sliding while hits
+/// still land is the early warning the card exists for. Never feeds `rate`.
+struct StabilityBreakdown {
+    let reps: Int
+    let onBase: Int
+    let trend: [Int]
+    let hitTrend: [Int]
+    let groups: [StabilityGroupStat]   // ranked by onBase desc
+}
+
 struct FloorStats {
     let timeframe: Timeframe
     let groups: [GroupStat]      // display order
@@ -154,6 +186,10 @@ struct FloorStats {
 
     /// True once at least one rep in range was execution-scored — gates the card.
     var hasExecution: Bool { executionScoredReps > 0 && !execution.isEmpty }
+    /// StuntScope video-stability breakdown; nil until a rep in range carries
+    /// an on-base score — gates the STUNT STABILITY card.
+    let stability: StabilityBreakdown?
+    var hasStability: Bool { stability != nil }
 
     var falls: Int { overall[Outcome.buildingFall.rawValue] + overall[Outcome.majorFall.rawValue] }
     var best: GroupStat? { ranked.first }
@@ -313,6 +349,9 @@ enum StatsEngine {
 
         let (execution, executionScoredReps) = executionBreakdown(
             attempts: currentAttempts.values.flatMap { $0 })
+        let stability = stabilityBreakdown(
+            ordered: ordered, currentAttempts: currentAttempts, sorted: sorted,
+            allowed: allowed, timeframe: timeframe, now: now, subject: subject, logger: logger)
 
         return FloorStats(
             timeframe: timeframe,
@@ -325,7 +364,52 @@ enum StatsEngine {
                                now: now, subject: subject, logger: logger),
             latest: latestSnapshot(sorted: sorted, allowed: allowed,
                                    subject: subject, logger: logger),
-            execution: execution, executionScoredReps: executionScoredReps)
+            execution: execution, executionScoredReps: executionScoredReps,
+            stability: stability)
+    }
+
+    // MARK: Stability breakdown (StuntScope video layer)
+
+    /// Aggregate the optional on-base scores across the passed groups. Only reps
+    /// with `hasStability` count; a hand-logged rep contributes nothing, so the
+    /// card can't read "steady" off practices nobody filmed. nil when no rep in
+    /// range was scored.
+    private static func stabilityBreakdown(
+        ordered: [StuntGroup],
+        currentAttempts: [PersistentIdentifier: [Attempt]],
+        sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
+        timeframe: Timeframe, now: Date, subject: Subject?, logger: LoggerFilter
+    ) -> StabilityBreakdown? {
+        var rows: [StabilityGroupStat] = []
+        var reps = 0
+        var onBaseSum = 0
+        for g in ordered {
+            let scored = (currentAttempts[g.persistentModelID] ?? []).filter(\.hasStability)
+            guard !scored.isEmpty else { continue }
+            let sum = scored.reduce(0) { $0 + ($1.onBasePercent ?? 0) }
+            reps += scored.count
+            onBaseSum += sum
+            rows.append(StabilityGroupStat(
+                id: PersistentIdentifierBox(raw: "\(g.persistentModelID)"),
+                name: g.name, number: g.number,
+                colorIndex: (g.number - 1) % Theme.groupRainbow.count,
+                reps: scored.count,
+                hits: scored.filter(\.isHitRep).count,
+                onBase: Int((Double(sum) / Double(scored.count)).rounded()),
+                wobbles: scored.reduce(0) { $0 + ($1.wobbleCount ?? 0) },
+                longestHoldSeconds: scored.compactMap(\.holdSeconds).max() ?? 0))
+        }
+        guard reps > 0 else { return nil }
+        return StabilityBreakdown(
+            reps: reps,
+            onBase: Int((Double(onBaseSum) / Double(reps)).rounded()),
+            trend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe,
+                               now: now, subject: subject, logger: logger,
+                               metric: { $0.onBasePercent }),
+            hitTrend: trendSeries(sorted: sorted, allowed: allowed, timeframe: timeframe,
+                                  now: now, subject: subject, logger: logger,
+                                  metric: { $0.hasStability ? $0.creditValue : nil }),
+            groups: rows.sorted { $0.onBase > $1.onBase })
     }
 
     // MARK: Execution breakdown (Feature B)
@@ -376,9 +460,13 @@ enum StatsEngine {
 
     // MARK: Trend series
 
+    /// `metric` is the per-rep value averaged into each point (default: the
+    /// outcome credit → hit rate); nil leaves the rep out of that point's
+    /// denominator, which is how the stability lines count only video reps.
     private static func trendSeries(sorted: [PracticeSession], allowed: Set<PersistentIdentifier>,
                                     timeframe: Timeframe, now: Date, subject: Subject? = nil,
-                                    logger: LoggerFilter = .unfiltered) -> [Int] {
+                                    logger: LoggerFilter = .unfiltered,
+                                    metric: @escaping (Attempt) -> Int? = { $0.creditValue }) -> [Int] {
         let cal = Calendar.current
         func rate(of sessions: [PracticeSession], within interval: DateInterval? = nil) -> Int? {
             var credit = 0, total = 0
@@ -387,8 +475,9 @@ enum StatsEngine {
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
                     if let interval, !interval.contains(a.timestamp) { continue }
                     guard subjectMatch(a, subject), logger.matches(a) else { continue }
+                    guard let value = metric(a) else { continue }
                     total += 1
-                    credit += a.creditValue
+                    credit += value
                 }
             }
             return total > 0 ? Int((Double(credit) / Double(total)).rounded()) : nil
@@ -495,11 +584,12 @@ enum StatsEngine {
     }
 
     /// Cross-cutting person filter: nil subject = everyone; otherwise the rep
-    /// must be attributed to that subject. Compares by persistent id so it holds
-    /// across model contexts.
+    /// must be attributed to that subject — logged against them, or tagged with
+    /// them in a StuntScope stunt group (`Attempt.involves`), which is what
+    /// gives an athlete a stunt hit rate off reps logged against the group.
     private static func subjectMatch(_ a: Attempt, _ subject: Subject?) -> Bool {
         guard let subject else { return true }
-        return a.subject?.persistentModelID == subject.persistentModelID
+        return a.involves(subject)
     }
 
     /// Weighted hit rate (0–100): average credit across the four fixed credit

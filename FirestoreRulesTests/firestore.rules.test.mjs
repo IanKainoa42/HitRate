@@ -111,6 +111,74 @@ describe("HitRate Firestore team authorization", () => {
     assert.equal(attempt.data().loggerId, memberBId);
   });
 
+  it("lets a member log a StuntScope rep carrying stability fields", async () => {
+    const db = firestoreFor(memberAId);
+    await assertSucceeds(setDoc(doc(db, "teams", teamId, "attempts", "stunt-rep"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      subjectId: "6E2D1C9B-3F4A-4E5B-8C7D-1A2B3C4D5E6F",
+      outcomeRaw: 1,
+      timestamp: new Date("2026-10-23T18:00:00Z"),
+      loggerId: memberAId,
+      executionScored: false,
+      lostDriversRaw: "",
+      source: "stuntscope",
+      athleteIds: ["a", "b", "c", "d"],
+      rolesRaw: "flyer=a\nmainBase=b\nsideBase=c\nbackspot=d",
+      onBasePercent: 82,
+      holdSeconds: 3.4,
+      wobbleCount: 1,
+      worstWobbleSecond: 1.2,
+      flightSeconds: [],
+      videoRef: `teams/${teamId}/stunts/stunt-rep.mov`,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("still accepts a HitRate rep whose optional stunt fields are null", async () => {
+    const db = firestoreFor(memberAId);
+    await assertSucceeds(setDoc(doc(db, "teams", teamId, "attempts", "plain-rep"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      subjectId: null,
+      outcomeRaw: 0,
+      timestamp: new Date("2026-10-23T18:00:00Z"),
+      loggerId: memberAId,
+      executionScored: false,
+      lostDriversRaw: "",
+      onBasePercent: null,
+      videoRef: null,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("denies a stability score outside 0–100", async () => {
+    const db = firestoreFor(memberAId);
+    await assertFails(setDoc(doc(db, "teams", teamId, "attempts", "bad-rep"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      outcomeRaw: 0,
+      timestamp: new Date("2026-10-23T18:00:00Z"),
+      loggerId: memberAId,
+      onBasePercent: 140,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("denies a video ref outside the folder's own storage prefix", async () => {
+    const db = firestoreFor(memberAId);
+    await assertFails(setDoc(doc(db, "teams", teamId, "attempts", "bad-video"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      outcomeRaw: 0,
+      timestamp: new Date("2026-10-23T18:00:00Z"),
+      loggerId: memberAId,
+      onBasePercent: 90,
+      videoRef: "teams/some-other-team/stunts/x.mov",
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
   it("lets an athlete read the homework assigned to them", async () => {
     const db = firestoreFor(memberAId);
     const assignment = await getDoc(doc(db, "teams", teamId, "assignments", assignmentId));

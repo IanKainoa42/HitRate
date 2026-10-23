@@ -83,9 +83,27 @@ class AuthViewModel: NSObject, ObservableObject {
     }
     @Published var deletion: AccountDeletion = .idle
 
+    /// The private-keychain user being re-saved into the shared access group
+    /// (`SharedIdentity`). The anonymous bootstrap waits on it: signing in
+    /// anonymously while the carry-over is in flight would mint a second uid
+    /// that owns nothing, exactly the orphan the group exists to prevent.
+    private var identityCarryOver: Task<Void, Never>?
+
     override init() {
+        // Before reading `currentUser`: the shared group decides who that is.
+        let carryOver = SharedIdentity.activate()
         super.init()
         apply(Auth.auth().currentUser)
+        if let carryOver {
+            identityCarryOver = Task { @MainActor [weak self] in
+                do {
+                    try await Auth.auth().updateCurrentUser(carryOver)
+                } catch {
+                    print("Shared keychain carry-over failed: \(error.localizedDescription)")
+                }
+                self?.identityCarryOver = nil
+            }
+        }
         // The hop is EXPLICIT. `apply` publishes the state SwiftUI renders, and
         // Firebase does not contract which queue this listener fires on — a
         // callback that lands off-main mutates @Published from a background
@@ -130,12 +148,18 @@ class AuthViewModel: NSObject, ObservableObject {
     /// Anonymous-first launch: only signs in if there's no session at all, so we
     /// never clobber an upgraded (Apple/Google) account or a live anonymous one.
     func signInAnonymouslyIfNeeded() {
-        guard Auth.auth().currentUser == nil, anonymousBootstrap == nil else { return }
+        guard anonymousBootstrap == nil else { return }
+        guard Auth.auth().currentUser == nil || identityCarryOver != nil else { return }
         anonymousBootstrap = Task { @MainActor [weak self] in
-            do {
-                _ = try await Auth.auth().signInAnonymously()
-            } catch {
-                print("Anonymous sign-in error: \(error.localizedDescription)")
+            // A carry-over in flight IS the sign-in; only an empty shared group
+            // after it settles gets a fresh anonymous user.
+            await self?.identityCarryOver?.value
+            if Auth.auth().currentUser == nil {
+                do {
+                    _ = try await Auth.auth().signInAnonymously()
+                } catch {
+                    print("Anonymous sign-in error: \(error.localizedDescription)")
+                }
             }
             self?.anonymousBootstrap = nil
         }

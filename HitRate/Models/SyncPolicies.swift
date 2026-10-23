@@ -57,6 +57,25 @@ enum SyncSessionIdentity {
     }
 }
 
+/// Which identity survives the move onto the keychain access group HitRate
+/// shares with StuntScope. HitRate's uid owns every folder and stamps every rep,
+/// so it wins whenever it exists; the shared slot is only kept when it already
+/// holds that same user, or when HitRate had nobody to carry over.
+enum SharedIdentityPolicy {
+    enum Resolution: Equatable {
+        /// Leave Firebase on whoever the shared group holds (possibly nobody —
+        /// the anonymous bootstrap then creates the first shared identity).
+        case keepShared
+        /// Re-save HitRate's private-keychain user into the shared group.
+        case adoptPrivate
+    }
+
+    static func resolve(privateUID: String?, sharedUID: String?) -> Resolution {
+        guard let privateUID else { return .keepShared }
+        return sharedUID == privateUID ? .keepShared : .adoptPrivate
+    }
+}
+
 /// Publishing `joinCodes/{code}` makes the code a server-side fact the moment the
 /// write lands, but the acknowledgement can outlive the client's timeout — a quota
 /// rejection is retried inside the Firestore SDK rather than thrown, so the
