@@ -130,7 +130,7 @@ describe("HitRate Firestore team authorization", () => {
       wobbleCount: 1,
       worstWobbleSecond: 1.2,
       flightSeconds: [],
-      videoRef: `teams/${teamId}/stunts/stunt-rep.mov`,
+      videoRef: `teams/${teamId}/stunts/stunt-rep/clip.mov`,
       updatedAt: serverTimestamp(),
     }));
   });
@@ -174,7 +174,21 @@ describe("HitRate Firestore team authorization", () => {
       timestamp: new Date("2026-10-23T18:00:00Z"),
       loggerId: memberAId,
       onBasePercent: 90,
-      videoRef: "teams/some-other-team/stunts/x.mov",
+      videoRef: "teams/some-other-team/stunts/bad-video/clip.mov",
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("denies a video ref pointing at another attempt's folder", async () => {
+    const db = firestoreFor(memberAId);
+    await assertFails(setDoc(doc(db, "teams", teamId, "attempts", "bad-video-2"), {
+      teamId,
+      groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+      outcomeRaw: 0,
+      timestamp: new Date("2026-10-23T18:00:00Z"),
+      loggerId: memberAId,
+      onBasePercent: 90,
+      videoRef: `teams/${teamId}/stunts/member-attempt/clip.mov`,
       updatedAt: serverTimestamp(),
     }));
   });

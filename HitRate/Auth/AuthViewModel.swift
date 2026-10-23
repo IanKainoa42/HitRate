@@ -88,20 +88,35 @@ class AuthViewModel: NSObject, ObservableObject {
     /// anonymously while the carry-over is in flight would mint a second uid
     /// that owns nothing, exactly the orphan the group exists to prevent.
     private var identityCarryOver: Task<Void, Never>?
+    /// While the carry-over is in flight, the only user `apply` may publish is
+    /// the one being carried. The shared slot can briefly hold a stranger
+    /// (StuntScope's anonymous user, minted before HitRate first ran with the
+    /// group) and publishing that uid would let RootView start SyncEngine —
+    /// which stamps `ownerUID` and attaches listeners — under the wrong
+    /// identity; `startSyncing` is idempotent, so it would then keep running
+    /// as that user after the restore.
+    private var carryOverUID: String?
 
     override init() {
         // Before reading `currentUser`: the shared group decides who that is.
         let carryOver = SharedIdentity.activate()
         super.init()
+        carryOverUID = carryOver?.uid
         apply(Auth.auth().currentUser)
         if let carryOver {
             identityCarryOver = Task { @MainActor [weak self] in
                 do {
                     try await Auth.auth().updateCurrentUser(carryOver)
                 } catch {
-                    print("Shared keychain carry-over failed: \(error.localizedDescription)")
+                    // Never run as whoever happened to be in the group: fall
+                    // back to the private keychain, where HitRate's own user
+                    // still lives, exactly as every build before this one.
+                    print("Shared keychain carry-over failed, staying private: \(error.localizedDescription)")
+                    try? Auth.auth().useUserAccessGroup(nil)
                 }
+                self?.carryOverUID = nil
                 self?.identityCarryOver = nil
+                self?.apply(Auth.auth().currentUser)
             }
         }
         // The hop is EXPLICIT. `apply` publishes the state SwiftUI renders, and
@@ -116,6 +131,9 @@ class AuthViewModel: NSObject, ObservableObject {
     }
 
     private func apply(_ user: User?) {
+        // A stranger in the shared slot is never published mid-carry-over;
+        // the task above re-applies once Firebase holds the intended user.
+        if let carryOverUID, user?.uid != carryOverUID { return }
         currentUser = user
         uid = user?.uid
         let upgraded = (user.map { !$0.isAnonymous }) ?? false
