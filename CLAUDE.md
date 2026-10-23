@@ -251,7 +251,10 @@ Key invariants:
   the person filter now uses — an athlete's roster line includes reps logged
   against their stunt group when StuntScope tagged them. `StuntRole` raw values
   are the wire spelling. Video + per-frame JSON live in Cloud Storage under
-  `teams/{teamId}/stunts/` (`storage.rules`, folder-scoped like the rest);
+  `teams/{teamId}/stunts/` (`storage.rules`: folder-scoped reads, and objects
+  are LOGGER-OWNED like attempts — the uploader must stamp custom metadata
+  `loggerId` = its uid, create never overwrites, only that uid may replace
+  or delete);
   `firestore.indexes.json` holds the one composite index (`athleteIds`
   array-contains + `timestamp` desc) the per-athlete query needs.
 - **SHARED IDENTITY (keychain access group)** — `Auth/SharedIdentity.swift`:

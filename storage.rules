@@ -17,11 +17,27 @@ service firebase.storage {
         && (t.ownerUID == request.auth.uid || request.auth.uid in t.memberIds);
     }
 
-    match /teams/{teamId}/stunts/{file} {
-      allow read: if inTeam(teamId);
-      allow write: if inTeam(teamId)
+    // Objects are LOGGER-OWNED, like attempts: the uploader stamps its uid
+    // into custom metadata (`loggerId`) and only that uid may replace or
+    // delete the object. A member can't swap in a different clip under a rep
+    // that still attributes to someone else. Create is create-only — an
+    // existing object is never silently overwritten by a second upload.
+    function uploadIsOwn() {
+      return request.resource.metadata != null
+        && request.resource.metadata.loggerId == request.auth.uid
         && request.resource.size < 200 * 1024 * 1024
         && request.resource.contentType.matches('video/.*|application/json');
+    }
+    function ownsObject() {
+      return resource.metadata != null
+        && resource.metadata.loggerId == request.auth.uid;
+    }
+
+    match /teams/{teamId}/stunts/{file} {
+      allow read:   if inTeam(teamId);
+      allow create: if inTeam(teamId) && resource == null && uploadIsOwn();
+      allow update: if inTeam(teamId) && ownsObject() && uploadIsOwn();
+      allow delete: if inTeam(teamId) && ownsObject();
     }
 
     match /{allPaths=**} {
