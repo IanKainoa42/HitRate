@@ -33,6 +33,8 @@
 		5704105C4E397519158188B7 /* SaveAccountPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48149C78F341FC13FAA96AF6 /* SaveAccountPrompt.swift */; };
 		6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A053415866660A35A4745 /* SummaryCard.swift */; };
 		65A4B766E0CC8748963DA6DA /* CoachEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB9361EE59B4DF7229F74E6 /* CoachEntitlement.swift */; };
+		7C3A9E2F1D8B4C6A0E5F9012 /* CoachGrandfatherPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A8C2D1E4B5678901234AB1 /* CoachGrandfatherPolicy.swift */; };
+		8D4B0F3A2E9C5D7B1F6A0123 /* CoachGrandfatherPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E4F6A8C0D123456789ABCD /* CoachGrandfatherPolicyTests.swift */; };
 		65D9D8E51C6843C95C7888B4 /* CardStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B388C58D179536F550D19A /* CardStage.swift */; };
 		6FCAEF629F115F7FCFE7A6AB /* DeckGridCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EEECB0ED12AEEF82CBB56F /* DeckGridCardTests.swift */; };
 		704E818CCA99AB6B14E5553E /* AssignmentLinkingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15A25F9B033AE13CA534C51 /* AssignmentLinkingTests.swift */; };
@@ -141,6 +143,8 @@
 		168A537A9DBCA16D9D49620A /* FirestoreModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreModels.swift; sourceTree = "<group>"; };
 		1BC3387F44C40BCAAE8C9AEB /* WeeklyTournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyTournament.swift; sourceTree = "<group>"; };
 		1CB9361EE59B4DF7229F74E6 /* CoachEntitlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachEntitlement.swift; sourceTree = "<group>"; };
+		B2E4F6A8C0D123456789ABCD /* CoachGrandfatherPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachGrandfatherPolicyTests.swift; sourceTree = "<group>"; };
+		F3A8C2D1E4B5678901234AB1 /* CoachGrandfatherPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachGrandfatherPolicy.swift; sourceTree = "<group>"; };
 		1E6625971614C8CEC5B3280B /* AccountSignInButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInButtons.swift; sourceTree = "<group>"; };
 		20184832604D05CBF0C04210 /* HoloCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloCardView.swift; sourceTree = "<group>"; };
 		245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillInsightsCard.swift; sourceTree = "<group>"; };
@@ -332,6 +336,7 @@
 			isa = PBXGroup;
 			children = (
 				1CB9361EE59B4DF7229F74E6 /* CoachEntitlement.swift */,
+				F3A8C2D1E4B5678901234AB1 /* CoachGrandfatherPolicy.swift */,
 				0D99133EDC1350A67D9E311B /* CoachPaywallView.swift */,
 				0D6FF81ECB5EA96E4A803F5E /* MoreCoachingAppsView.swift */,
 			);
@@ -418,6 +423,7 @@
 			children = (
 				A15A25F9B033AE13CA534C51 /* AssignmentLinkingTests.swift */,
 				CF869A47C5A23756EDEA1A34 /* CardStageTests.swift */,
+				B2E4F6A8C0D123456789ABCD /* CoachGrandfatherPolicyTests.swift */,
 				F1EEECB0ED12AEEF82CBB56F /* DeckGridCardTests.swift */,
 				5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */,
 				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
@@ -648,6 +654,7 @@
 				E033839C9325BA8B73DF9AA4 /* CardCatalogRenderer.swift in Sources */,
 				65D9D8E51C6843C95C7888B4 /* CardStage.swift in Sources */,
 				65A4B766E0CC8748963DA6DA /* CoachEntitlement.swift in Sources */,
+				7C3A9E2F1D8B4C6A0E5F9012 /* CoachGrandfatherPolicy.swift in Sources */,
 				C9FE55652E7E9DE934ACD234 /* CoachPaywallView.swift in Sources */,
 				BCE51CFCDF80D0B06799A811 /* Components.swift in Sources */,
 				C13DB89FD3B814ED5D4CDB99 /* DataManagementView.swift in Sources */,
@@ -707,6 +714,7 @@
 			files = (
 				704E818CCA99AB6B14E5553E /* AssignmentLinkingTests.swift in Sources */,
 				9E4D0EB4C2394325DFE85296 /* CardStageTests.swift in Sources */,
+				8D4B0F3A2E9C5D7B1F6A0123 /* CoachGrandfatherPolicyTests.swift in Sources */,
 				6FCAEF629F115F7FCFE7A6AB /* DeckGridCardTests.swift in Sources */,
 				1A7F98E7C46D927597534F8B /* HomeworkEngineTests.swift in Sources */,
 				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
@@ -752,7 +760,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.9;
@@ -770,7 +778,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HitRateWatch/HitRateWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
 				MARKETING_VERSION = 1.9;
@@ -915,7 +923,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -973,7 +981,7 @@
 				CODE_SIGN_ENTITLEMENTS = HitRate/HitRate.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRate/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

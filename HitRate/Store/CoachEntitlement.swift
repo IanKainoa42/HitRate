@@ -2,13 +2,14 @@ import StoreKit
 import SwiftUI
 import os
 
-/// HitRate Coach — the paid tier, introduced when the app went free (build 36,
-/// Oct 2026). Athletes log, see their dashboard, earn cards and use the watch
-/// for free. Coaches pay for the TEAM features: more than one folder, sharing a
-/// folder by join code, and the CSV backup.
+/// HitRate Coach — the paid tier, introduced when the app went free (v1.9 /
+/// build 41, Oct 2026). Athletes log, see their dashboard, earn cards and use
+/// the watch for free. Coaches pay for the TEAM features: more than one folder,
+/// sharing a folder by join code, homework, and the CSV backup.
 ///
-/// Anyone who BOUGHT HitRate while it was a $2.99 paid app is grandfathered
-/// into Coach for life — they paid for everything once and keep everything.
+/// Anyone who installed HitRate before the first free App Store build is
+/// grandfathered into Coach for life — including everyone who paid $2.99 on
+/// builds 36–40 while Coach subscriptions were already in the binary.
 ///
 /// Rules carried over from FormationFlow's EntitlementManager (IAN-517/544):
 /// - never revoke because `Transaction.currentEntitlements` came back empty —
@@ -22,11 +23,6 @@ final class CoachEntitlement: ObservableObject {
     static let yearlyID  = "com.ianrichardson.HitRate.coach.yearly"
     static let monthlyID = "com.ianrichardson.HitRate.coach.monthly"
     static let productIDs: Set<String> = [yearlyID, monthlyID]
-
-    /// First CFBundleVersion shipped with price = Free. `AppTransaction.
-    /// originalAppVersion` is the build number on iOS; anything below this was
-    /// a $2.99 purchase. Keep in lockstep with project.yml when shipping.
-    static let firstFreeBuild = 36
 
     /// Days past a subscription's expiry before we actually lock team features.
     /// Covers billing retry + a weekend without signal at a competition venue.
@@ -75,10 +71,10 @@ final class CoachEntitlement: ObservableObject {
     private func checkGrandfather() async {
         guard !isGrandfathered else { return }
         guard case .verified(let tx) = try? await AppTransaction.shared else { return }
-        // Sandbox/TestFlight receipts report "1.0" here; treat non-numeric as
-        // "not grandfathered" so testers exercise the real paywall.
-        if let build = Int(tx.originalAppVersion), build < Self.firstFreeBuild {
-            log.info("Grandfathered: original build \(build) < \(Self.firstFreeBuild)")
+        if CoachGrandfatherPolicy.qualifies(originalAppVersion: tx.originalAppVersion) {
+            log.info(
+                "Grandfathered: original build \(tx.originalAppVersion, privacy: .public) < \(CoachGrandfatherPolicy.firstFreeBuild)"
+            )
             setGrandfathered()
         }
     }

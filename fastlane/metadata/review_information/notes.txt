@@ -9,4 +9,4 @@ WHERE THE PAYWALL IS (title, length, price, Privacy Policy + Terms of Use links,
 4. Dashboard -> SKILLS -> Manage data -> "Export CSV backup" (COACH badge) or "HitRate Coach".
 Long-pressing a deck card -> Share opens the same paywall.
 
-Users who bought HitRate while it was a paid app (builds before 36) are grandfathered into Coach; sandbox receipts are never grandfathered, so the paywall always shows in review. Joining a coach's deck by code stays free.
+Users who installed HitRate before the first free App Store build (original install build number below 41, including paid builds 36–40) are grandfathered into Coach. Sandbox/TestFlight receipts report originalAppVersion "1.0" and are never grandfathered, so the paywall always shows in review. Joining a coach's deck by code stays free.
