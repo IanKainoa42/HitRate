@@ -126,6 +126,22 @@ describe("HitRate Firestore team authorization", () => {
     await assertFails(updateDoc(ref, { storagePath: `teams/${teamId}/tumbles/OTHER/analysis.json` }));
   });
 
+  it("lets the recording logger and folder owner review blocks, but not another member", async () => {
+    await assertSucceeds(setDoc(doc(firestoreFor(memberAId), "teams", teamId, "tumbles", tumbleId),
+      tumbleDocument()));
+    const editPath = ["teams", teamId, "tumbleEdits", tumbleId];
+    const review = (editorId) => ({ editorId, excludedBlockKeys: ["t7_10_20"],
+      skillOverrides: { t7_10_20: "Back handspring" }, hiddenRecording: false,
+      updatedAt: serverTimestamp() });
+    await assertSucceeds(setDoc(doc(firestoreFor(memberAId), ...editPath), review(memberAId)));
+    await assertSucceeds(getDoc(doc(firestoreFor(memberBId), ...editPath)));
+    await assertFails(setDoc(doc(firestoreFor(memberBId), ...editPath), review(memberBId)));
+    await assertSucceeds(setDoc(doc(firestoreFor(ownerId), ...editPath), review(ownerId)));
+    await assertFails(setDoc(doc(firestoreFor(memberAId), ...editPath), {
+      ...review(memberAId), hiddenRecording: "yes" }));
+    await assertFails(deleteDoc(doc(firestoreFor(ownerId), ...editPath)));
+  });
+
   it("allows the owner to remove access without deleting the member's history", async () => {
     const db = firestoreFor(ownerId);
     await assertSucceeds(updateDoc(teamRef(db), {

@@ -11,6 +11,7 @@ struct TumbleArchive: Decodable {
                 let boundary: String
                 let frameIndex: Int?
                 let status: String
+                let note: String?
             }
             let marks: [Mark]?
         }
@@ -25,6 +26,12 @@ struct TumbleArchive: Decodable {
             let frameIndex: Int
             let flip: Double?
             let twist: Double?
+            let flagged: Bool?
+            let flipSamples: Int?
+            let twistSamples: Int?
+            let flipIsKeyed: Bool?
+            let twistIsMarked: Bool?
+            let airtimeSeconds: Double?
         }
         struct Stroke: Decodable {
             let inDegrees: Double
@@ -41,6 +48,10 @@ struct TumbleArchive: Decodable {
         let takeoffSpeeds: [Speed]
         let inOutStroke: Stroke?
         let launchDegrees: Double?
+
+        /// Stable across a re-sync of the same video. Automatically found blocks get a
+        /// new UUID on export, so the tag ID cannot identify a coach's review.
+        var reviewKey: String { "t\(trackID)_\(firstFrame)_\(lastFrame)" }
     }
     let version: Int
     let recordingID: UUID
@@ -58,6 +69,25 @@ struct TumbleArchive: Decodable {
         let bodyAngleDegrees: Double?
     }
     let poses: [PoseFrame]
+
+    func applying(_ review: TumbleReview) -> TumbleArchive {
+        let visibleBlocks: [Block] = review.hiddenRecording ? [] : blocks.compactMap { block in
+            guard !review.excludedBlockKeys.contains(block.reviewKey) else { return nil }
+            return Block(tagID: block.tagID, trackID: block.trackID,
+                skill: review.skillOverrides[block.reviewKey] ?? block.skill,
+                firstFrame: block.firstFrame, lastFrame: block.lastFrame,
+                phases: block.phases, takeoffRatings: block.takeoffRatings,
+                takeoffSpeeds: block.takeoffSpeeds, inOutStroke: block.inOutStroke,
+                launchDegrees: block.launchDegrees)
+        }
+        let byTrack = Dictionary(grouping: visibleBlocks, by: \.trackID)
+        let visiblePoses = poses.filter { pose in
+            byTrack[pose.trackID]?.contains { pose.frameIndex >= $0.firstFrame && pose.frameIndex <= $0.lastFrame } == true
+        }
+        return TumbleArchive(version: version, recordingID: recordingID,
+            recordingTitle: recordingTitle, framesPerSecond: framesPerSecond,
+            blocks: visibleBlocks, poses: visiblePoses)
+    }
 
     static func importFile(_ source: URL) throws -> TumbleArchive {
         let data = try Data(contentsOf: source)
@@ -90,6 +120,14 @@ struct TumbleArchive: Decodable {
         case unsupported
         var errorDescription: String? { "This tumble file is empty or uses an unsupported format." }
     }
+}
+
+/// Coach review lives in a separate Firestore document so StuntScope can re-sync raw
+/// measurements without overwriting exclusions or corrected skill names.
+struct TumbleReview: Equatable {
+    var excludedBlockKeys: Set<String> = []
+    var skillOverrides: [String: String] = [:]
+    var hiddenRecording = false
 }
 
 struct TumbleSpreadsheet: Transferable {

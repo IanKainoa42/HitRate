@@ -13,6 +13,7 @@ rules_version = '2';
 //                                                       StuntScope adds optional
 //                                                       stability fields, validated)
 //   teams/{teamId}/tumbles/{recordingId}     StuntScope tumbling analysis manifest
+//   teams/{teamId}/tumbleEdits/{recordingId}  HitRate coach review of that analysis
 //   joinCodes/{code}                        { teamId } — public code→team lookup
 //
 // Roster is OWNER-authoritative; attempts are append-only and tagged with the
@@ -99,6 +100,23 @@ service cloud.firestore {
         && d.storagePath == 'teams/' + teamId + '/tumbles/' + recordingId + '/analysis.json'
         && d.blockCount is int && d.blockCount > 0 && d.blockCount <= 1000
         && d.ready is bool && d.updatedAt is timestamp;
+    }
+
+    function canReviewTumble(teamId, recordingId) {
+      let manifest = /databases/$(database)/documents/teams/$(teamId)/tumbles/$(recordingId);
+      return inTeam(teamId) && exists(manifest)
+        && (ownsTeam(teamId) || get(manifest).data.loggerId == uid());
+    }
+    function tumbleReviewFieldsValid() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['editorId', 'excludedBlockKeys', 'skillOverrides',
+          'hiddenRecording', 'updatedAt'])
+        && d.keys().hasAll(['editorId', 'excludedBlockKeys', 'skillOverrides',
+          'hiddenRecording', 'updatedAt'])
+        && d.editorId == uid()
+        && d.excludedBlockKeys is list && d.excludedBlockKeys.size() <= 1000
+        && d.skillOverrides is map && d.skillOverrides.size() <= 1000
+        && d.hiddenRecording is bool && d.updatedAt is timestamp;
     }
 
     function teamAcceptsMembers() {
@@ -194,6 +212,11 @@ service cloud.firestore {
           && request.resource.data.loggerId == resource.data.loggerId
           && tumbleFieldsValid(teamId, docId);
         allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
+      }
+      match /tumbleEdits/{docId} {
+        allow read: if inTeam(teamId);
+        allow create, update: if canReviewTumble(teamId, docId) && tumbleReviewFieldsValid();
+        allow delete: if false;
       }
     }
 

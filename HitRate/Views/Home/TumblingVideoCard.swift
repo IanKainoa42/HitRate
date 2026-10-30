@@ -1,60 +1,58 @@
 import SwiftUI
 
-/// Account-synced video measurements, beside the existing stunt stability card.
-/// These are measured skill blocks, not logged outcomes, so they do not change hit rate.
+/// Entry point for account-synced StuntScope recordings. A recording stays visible
+/// even when hidden, so a coach can restore it after a mistaken review.
 struct TumblingVideoCard: View {
     let teamID: String?
+    let ownerUID: String?
     let subjects: [Subject]
 
     @EnvironmentObject private var auth: AuthViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var recordings: [TumbleCloudSync.Recording] = []
+    @State private var selected: Selection?
     @State private var error: String?
 
-    private var syncKey: String { "\(teamID ?? ""):\(auth.uid ?? "")" }
-
-    private struct Row: Identifiable {
-        let id: String
-        let recordingTitle: String
-        let block: TumbleArchive.Block
-        let athlete: String
+    private struct Selection: Identifiable {
+        let recording: TumbleCloudSync.Recording
+        var id: UUID { recording.archive.recordingID }
     }
 
-    private var rows: [Row] {
-        let names = Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) })
-        var result: [Row] = []
-        for recording in recordings {
-            for block in recording.archive.blocks {
-                let athleteID = recording.athleteIDs[String(block.trackID)]
-                let athlete = athleteID.flatMap { names[$0] } ?? "Track \(block.trackID)"
-                result.append(Row(id: "\(recording.archive.recordingID):\(block.tagID)",
-                    recordingTitle: recording.archive.recordingTitle,
-                    block: block, athlete: athlete))
-            }
-        }
-        return Array(result.prefix(8))
+    private var syncKey: String { "\(teamID ?? ""):\(auth.uid ?? "")" }
+    private var athleteNames: [String: String] {
+        Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) })
     }
 
     var body: some View {
-        if !rows.isEmpty || error != nil {
+        if !recordings.isEmpty || error != nil {
             FeedCard {
                 CardHead("TUMBLING VIDEO") {
                     Text("\(recordings.count) synced video\(recordings.count == 1 ? "" : "s")")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Theme.label3)
                 }
-                if let error {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
-                ForEach(rows) { row in
-                    VStack(alignment: .leading, spacing: 2) {
-                        TumbleBlockRow(block: row.block, athlete: row.athlete)
-                        Text(row.recordingTitle)
-                            .font(.caption2)
-                            .foregroundStyle(Theme.label3)
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                ForEach(recordings, id: \.archive.recordingID) { recording in
+                    Button { selected = Selection(recording: recording) } label: {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(recording.archive.recordingTitle)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(summary(for: recording))
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.label3)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Theme.label3)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .padding(.vertical, 6)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Open skill measurements and review false detections")
                 }
             }
         }
@@ -63,6 +61,20 @@ struct TumblingVideoCard: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await refresh() } }
             }
+            .sheet(item: $selected, onDismiss: { Task { await refresh() } }) { selection in
+                TumbleRecordingDetailSheet(recording: selection.recording,
+                    teamID: teamID ?? "", ownerUID: ownerUID, athleteNames: athleteNames)
+            }
+    }
+
+    private func summary(for recording: TumbleCloudSync.Recording) -> String {
+        if recording.review.hiddenRecording { return "Hidden from stats · Tap to restore" }
+        let blocks = recording.reviewedArchive.blocks
+        let excluded = recording.review.excludedBlockKeys.count
+        let athletes = Set(blocks.compactMap { recording.athleteIDs[String($0.trackID)] })
+        let athleteText = athletes.count == 1 ? "1 athlete" : "\(athletes.count) athletes"
+        return "\(blocks.count) skill block\(blocks.count == 1 ? "" : "s") · \(athleteText)" +
+            (excluded > 0 ? " · \(excluded) excluded" : "")
     }
 
     private func refresh() async {

@@ -62,7 +62,7 @@ struct DataManagementView: View {
     private var hasFolderReps: Bool { !folderAttempts.isEmpty }
     private var cloudKey: String { "\(team?.id.uuidString ?? ""):\(auth.uid ?? "")" }
     private var allTumbleArchives: [TumbleArchive] {
-        let cloud = cloudRecordings.map(\.archive)
+        let cloud = cloudRecordings.map(\.reviewedArchive)
         let cloudIDs = Set(cloud.map(\.recordingID))
         return cloud + tumbleArchives.filter { !cloudIDs.contains($0.recordingID) }
     }
