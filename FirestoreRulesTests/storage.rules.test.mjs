@@ -20,6 +20,7 @@ const memberAId = "member-a-uid";
 const memberBId = "member-b-uid";
 const strangerId = "stranger-uid";
 const attemptId = "4F0C2B6E-0E9A-4C1D-9A3B-7E5D2F1A0B9C";
+const framesPath = `teams/${teamId}/stunts/${attemptId}/frames.json`;
 const clipPath = `teams/${teamId}/stunts/${attemptId}/clip.mov`;
 const tumbleId = "C934B11A-6290-4F1E-8EF5-C86DF630F145";
 const tumblePath = `teams/${teamId}/tumbles/${tumbleId}/analysis.json`;
@@ -32,11 +33,11 @@ function storageFor(uid) {
   return testEnv.authenticatedContext(uid).storage();
 }
 
-function upload(uid, path, contentType = "video/quicktime") {
+function upload(uid, path, contentType = "application/json") {
   return uploadBytes(ref(storageFor(uid), path), clipBytes, { contentType });
 }
 
-describe("HitRate Storage rules — StuntScope stunt clips", () => {
+describe("HitRate Storage rules — StuntScope stunt stats", () => {
   before(async () => {
     testEnv = await initializeTestEnvironment({
       projectId,
@@ -61,7 +62,7 @@ describe("HitRate Storage rules — StuntScope stunt clips", () => {
         joinCode: "ABC234",
         updatedAt: new Date("2026-10-23T00:00:00Z"),
       });
-      // The rep the clip belongs to — written FIRST, by member A.
+      // The rep the stats belong to — written FIRST, by member A.
       await setDoc(doc(db, "teams", teamId, "attempts", attemptId), {
         teamId,
         groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
@@ -70,7 +71,6 @@ describe("HitRate Storage rules — StuntScope stunt clips", () => {
         loggerId: memberAId,
         source: "stuntscope",
         onBasePercent: 82,
-        videoRef: clipPath,
         updatedAt: new Date("2026-10-23T18:00:00Z"),
       });
       await setDoc(doc(db, "teams", teamId, "tumbles", tumbleId), {
@@ -86,54 +86,55 @@ describe("HitRate Storage rules — StuntScope stunt clips", () => {
     await testEnv.cleanup();
   });
 
-  it("lets the member who logged the attempt upload its clip", async () => {
-    await assertSucceeds(upload(memberAId, clipPath));
+  it("lets the member who logged the attempt upload its per-frame JSON", async () => {
+    await assertSucceeds(upload(memberAId, framesPath));
   });
 
-  it("lets the same logger upload the per-frame JSON next to the clip", async () => {
-    await assertSucceeds(upload(memberAId, `teams/${teamId}/stunts/${attemptId}/frames.json`,
-      "application/json"));
+  it("denies any video upload, even from the logger (stats only)", async () => {
+    await assertFails(upload(memberAId, clipPath, "video/quicktime"));
+    await assertFails(upload(memberAId, framesPath, "video/quicktime"));
+    await assertFails(upload(memberAId, `teams/${teamId}/stunts/${attemptId}/clip.json`));
   });
 
   it("denies another member uploading under that attempt", async () => {
-    await assertFails(upload(memberBId, clipPath));
+    await assertFails(upload(memberBId, framesPath));
   });
 
   it("denies the folder owner uploading under a member's attempt", async () => {
-    await assertFails(upload(ownerId, clipPath));
+    await assertFails(upload(ownerId, framesPath));
   });
 
   it("denies an upload for an attempt doc that doesn't exist yet", async () => {
-    const orphan = `teams/${teamId}/stunts/NO-SUCH-ATTEMPT/clip.mov`;
+    const orphan = `teams/${teamId}/stunts/NO-SUCH-ATTEMPT/frames.json`;
     await assertFails(upload(memberAId, orphan));
     await assertFails(upload(ownerId, orphan));
   });
 
   it("denies a wrong content type even from the logger", async () => {
-    await assertFails(upload(memberAId, clipPath, "application/octet-stream"));
-    await assertFails(upload(memberAId, clipPath, "text/html"));
+    await assertFails(upload(memberAId, framesPath, "application/octet-stream"));
+    await assertFails(upload(memberAId, framesPath, "text/html"));
   });
 
-  it("lets any folder member read the clip", async () => {
+  it("lets any folder member read the per-frame JSON", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadBytes(ref(context.storage(), clipPath), clipBytes,
-        { contentType: "video/quicktime" });
+      await uploadBytes(ref(context.storage(), framesPath), clipBytes,
+        { contentType: "application/json" });
     });
-    await assertSucceeds(getBytes(ref(storageFor(memberBId), clipPath)));
-    await assertSucceeds(getBytes(ref(storageFor(ownerId), clipPath)));
+    await assertSucceeds(getBytes(ref(storageFor(memberBId), framesPath)));
+    await assertSucceeds(getBytes(ref(storageFor(ownerId), framesPath)));
   });
 
-  it("denies a non-member reading the clip", async () => {
+  it("denies a non-member reading the per-frame JSON", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadBytes(ref(context.storage(), clipPath), clipBytes,
-        { contentType: "video/quicktime" });
+      await uploadBytes(ref(context.storage(), framesPath), clipBytes,
+        { contentType: "application/json" });
     });
-    await assertFails(getBytes(ref(storageFor(strangerId), clipPath)));
-    await assertFails(getBytes(ref(testEnv.unauthenticatedContext().storage(), clipPath)));
+    await assertFails(getBytes(ref(storageFor(strangerId), framesPath)));
+    await assertFails(getBytes(ref(testEnv.unauthenticatedContext().storage(), framesPath)));
   });
 
   it("denies a non-member uploading even when the attempt exists", async () => {
-    await assertFails(upload(strangerId, clipPath));
+    await assertFails(upload(strangerId, framesPath));
   });
 
   it("denies anything outside the stunts tree", async () => {

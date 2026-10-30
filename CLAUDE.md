@@ -250,8 +250,10 @@ Key invariants:
   group's `Subject.id`s, uppercase `uuidString`) feeds `Attempt.involves`, which
   the person filter now uses — an athlete's roster line includes reps logged
   against their stunt group when StuntScope tagged them. `StuntRole` raw values
-  are the wire spelling. Video + per-frame JSON live in Cloud Storage under
-  `teams/{teamId}/stunts/{attemptId}/` (`storage.rules`: folder-scoped reads;
+  are the wire spelling. Stats only, no video (Ian, 2026-10-30): the per-frame
+  JSON lives in Cloud Storage at `teams/{teamId}/stunts/{attemptId}/frames.json`
+  and `storage.rules` admits nothing else there (no clip upload, `videoRef`
+  stays absent) — don't re-open it to video. Folder-scoped reads;
   a WRITE requires the Firestore attempt doc to already exist with
   `loggerId` = the caller, so the attempt is written first and nobody can
   plant or replace an object under another logger's rep; `videoRef` must sit

@@ -1,12 +1,11 @@
 rules_version = '2';
 
-// StuntScope stunt video + per-frame stability JSON, one folder per rep:
-//   teams/{teamId}/stunts/{attemptId}/clip.mov
+// StuntScope per-frame stability JSON, one folder per rep (stats only — no
+// video is ever uploaded, Ian 2026-10-30):
 //   teams/{teamId}/stunts/{attemptId}/frames.json
 // Tumbling analysis (skill blocks + pose frames), one file per recording:
 //   teams/{teamId}/tumbles/{recordingId}/analysis.json
-// The attempt document's `videoRef` points here (firestore.rules checks the
-// prefix INCLUDING the attempt id). Access mirrors the folder for reads; a
+// Access mirrors the folder for reads; a
 // write is tied to the attempt: the Firestore attempt doc must already exist
 // and its `loggerId` must be the caller, so nobody can plant an object under
 // another logger's rep — not by overwriting it and not by getting there
@@ -35,16 +34,13 @@ service firebase.storage {
       return firestore.exists(path)
         && firestore.get(path).data.loggerId == request.auth.uid;
     }
-    function uploadIsSane() {
-      return request.resource.size < 200 * 1024 * 1024
-        && request.resource.contentType.matches('video/.*|application/json');
-    }
-
-    match /teams/{teamId}/stunts/{attemptId}/{file} {
+    match /teams/{teamId}/stunts/{attemptId}/frames.json {
       allow read:   if inTeam(teamId);
       allow write:  if inTeam(teamId)
         && attemptLoggedByCaller(teamId, attemptId)
-        && (request.resource == null || uploadIsSane());
+        && (request.resource == null ||
+            (request.resource.size < 100 * 1024 * 1024
+             && request.resource.contentType == 'application/json'));
     }
 
     match /teams/{teamId}/tumbles/{recordingId}/analysis.json {
