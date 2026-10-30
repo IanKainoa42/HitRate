@@ -2,8 +2,8 @@ import CoreTransferable
 import Foundation
 import UniformTypeIdentifiers
 
-/// StuntScope's versioned, per-recording tumble transfer. The detailed poses stay in the
-/// imported JSON; the spreadsheet presents one row per tagged skill block.
+/// StuntScope's versioned, per-recording tumble analysis. It normally arrives through the
+/// shared HitRate account; the file importer remains for older exports.
 struct TumbleArchive: Decodable {
     struct Block: Decodable {
         struct Phases: Decodable {
@@ -61,11 +61,16 @@ struct TumbleArchive: Decodable {
 
     static func importFile(_ source: URL) throws -> TumbleArchive {
         let data = try Data(contentsOf: source)
-        let archive = try JSONDecoder().decode(TumbleArchive.self, from: data)
-        guard archive.version == 1, !archive.blocks.isEmpty else { throw ImportError.unsupported }
+        let archive = try decode(data)
         let directory = storeDirectory
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try data.write(to: directory.appendingPathComponent(archive.recordingID.uuidString + ".json"), options: .atomic)
+        return archive
+    }
+
+    static func decode(_ data: Data) throws -> TumbleArchive {
+        let archive = try JSONDecoder().decode(TumbleArchive.self, from: data)
+        guard archive.version == 1, !archive.blocks.isEmpty else { throw ImportError.unsupported }
         return archive
     }
 

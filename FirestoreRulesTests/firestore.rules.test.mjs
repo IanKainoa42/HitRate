@@ -29,6 +29,20 @@ const memberAId = "member-a-uid";
 const memberBId = "member-b-uid";
 const joiningId = "joining-uid";
 const assignmentId = "5C1B9E44-7A21-4D6E-9C10-9F0B3A2E7C55";
+const tumbleId = "C934B11A-6290-4F1E-8EF5-C86DF630F145";
+
+function tumbleDocument(loggerId = memberAId) {
+  return {
+    teamId,
+    recordingTitle: "RO BHS full",
+    loggerId,
+    athleteIDs: { "7": "A32A17BA-5DBB-4618-BB44-D2136F0F2812" },
+    storagePath: `teams/${teamId}/tumbles/${tumbleId}/analysis.json`,
+    blockCount: 2,
+    ready: false,
+    updatedAt: new Date("2026-10-30T00:00:00Z"),
+  };
+}
 
 let testEnv;
 
@@ -94,6 +108,22 @@ describe("HitRate Firestore team authorization", () => {
 
   after(async () => {
     await testEnv.cleanup();
+  });
+
+  it("lets the recording's logger publish and finish a tumble analysis", async () => {
+    const ref = doc(firestoreFor(memberAId), "teams", teamId, "tumbles", tumbleId);
+    await assertSucceeds(setDoc(ref, tumbleDocument()));
+    await assertSucceeds(updateDoc(ref, { ready: true }));
+    const copy = await getDoc(doc(firestoreFor(memberBId), "teams", teamId, "tumbles", tumbleId));
+    assert.equal(copy.data().ready, true);
+  });
+
+  it("keeps another member from replacing or redirecting a tumble analysis", async () => {
+    const ref = doc(firestoreFor(memberAId), "teams", teamId, "tumbles", tumbleId);
+    await assertSucceeds(setDoc(ref, tumbleDocument()));
+    await assertFails(setDoc(doc(firestoreFor(memberBId), "teams", teamId, "tumbles", tumbleId),
+      tumbleDocument(memberBId)));
+    await assertFails(updateDoc(ref, { storagePath: `teams/${teamId}/tumbles/OTHER/analysis.json` }));
   });
 
   it("allows the owner to remove access without deleting the member's history", async () => {

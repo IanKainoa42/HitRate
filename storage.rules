@@ -3,12 +3,14 @@ rules_version = '2';
 // StuntScope stunt video + per-frame stability JSON, one folder per rep:
 //   teams/{teamId}/stunts/{attemptId}/clip.mov
 //   teams/{teamId}/stunts/{attemptId}/frames.json
+// Tumbling analysis (skill blocks + pose frames), one file per recording:
+//   teams/{teamId}/tumbles/{recordingId}/analysis.json
 // The attempt document's `videoRef` points here (firestore.rules checks the
 // prefix INCLUDING the attempt id). Access mirrors the folder for reads; a
 // write is tied to the attempt: the Firestore attempt doc must already exist
 // and its `loggerId` must be the caller, so nobody can plant an object under
 // another logger's rep — not by overwriting it and not by getting there
-// first. Nothing else lives in the bucket; HitRate itself stores no files.
+// first. Tumbling uploads likewise require their Firestore manifest first.
 service firebase.storage {
   match /b/{bucket}/o {
     function teamData(teamId) {
@@ -28,6 +30,11 @@ service firebase.storage {
       return firestore.exists(path)
         && firestore.get(path).data.loggerId == request.auth.uid;
     }
+    function tumbleLoggedByCaller(teamId, recordingId) {
+      let path = /databases/(default)/documents/teams/$(teamId)/tumbles/$(recordingId);
+      return firestore.exists(path)
+        && firestore.get(path).data.loggerId == request.auth.uid;
+    }
     function uploadIsSane() {
       return request.resource.size < 200 * 1024 * 1024
         && request.resource.contentType.matches('video/.*|application/json');
@@ -38,6 +45,15 @@ service firebase.storage {
       allow write:  if inTeam(teamId)
         && attemptLoggedByCaller(teamId, attemptId)
         && (request.resource == null || uploadIsSane());
+    }
+
+    match /teams/{teamId}/tumbles/{recordingId}/analysis.json {
+      allow read: if inTeam(teamId);
+      allow write: if inTeam(teamId)
+        && tumbleLoggedByCaller(teamId, recordingId)
+        && (request.resource == null ||
+            (request.resource.size < 100 * 1024 * 1024
+             && request.resource.contentType == 'application/json'));
     }
 
     match /{allPaths=**} {

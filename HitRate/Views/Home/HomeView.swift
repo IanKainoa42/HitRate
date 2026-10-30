@@ -285,6 +285,7 @@ struct HomeView: View {
                     } else {
                         emptyState
                     }
+                    TumblingVideoCard(teamID: currentTeam?.id.uuidString, subjects: subjects)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)

@@ -12,6 +12,7 @@ rules_version = '2';
 //   teams/{teamId}/attempts/{id}            FAttempt   (any member logs own reps;
 //                                                       StuntScope adds optional
 //                                                       stability fields, validated)
+//   teams/{teamId}/tumbles/{recordingId}     StuntScope tumbling analysis manifest
 //   joinCodes/{code}                        { teamId } — public code→team lookup
 //
 // Roster is OWNER-authoritative; attempts are append-only and tagged with the
@@ -84,6 +85,20 @@ service cloud.firestore {
           && (absentOrNull(d, 'videoRef')
               || (d.videoRef is string
                   && d.videoRef.matches('teams/' + teamId + '/stunts/' + attemptId + '/.*')));
+    }
+
+    function tumbleFieldsValid(teamId, recordingId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['teamId', 'recordingTitle', 'loggerId',
+        'athleteIDs', 'storagePath', 'blockCount', 'ready', 'updatedAt'])
+        && d.keys().hasAll(['teamId', 'recordingTitle', 'loggerId',
+          'athleteIDs', 'storagePath', 'blockCount', 'ready', 'updatedAt'])
+        && d.teamId == teamId
+        && d.recordingTitle is string && d.recordingTitle.size() <= 200
+        && d.athleteIDs is map && d.athleteIDs.size() <= 20
+        && d.storagePath == 'teams/' + teamId + '/tumbles/' + recordingId + '/analysis.json'
+        && d.blockCount is int && d.blockCount > 0 && d.blockCount <= 1000
+        && d.ready is bool && d.updatedAt is timestamp;
     }
 
     function teamAcceptsMembers() {
@@ -165,6 +180,19 @@ service cloud.firestore {
           && resource.data.loggerId == uid()
           && request.resource.data.loggerId == resource.data.loggerId
           && stuntFieldsValid(teamId, docId);
+        allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
+      }
+      // One analysis per recording. Only its original logger can replace it;
+      // ready becomes true after the matching Storage upload finishes.
+      match /tumbles/{docId} {
+        allow read: if inTeam(teamId);
+        allow create: if inTeam(teamId)
+          && request.resource.data.loggerId == uid()
+          && tumbleFieldsValid(teamId, docId);
+        allow update: if inTeam(teamId)
+          && resource.data.loggerId == uid()
+          && request.resource.data.loggerId == resource.data.loggerId
+          && tumbleFieldsValid(teamId, docId);
         allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
       }
     }

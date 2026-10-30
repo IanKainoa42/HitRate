@@ -19,6 +19,8 @@ struct DataManagementView: View {
     let team: Team?
 
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var auth: AuthViewModel
     @Query(sort: \StuntGroup.orderIndex) private var groups: [StuntGroup]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var sessions: [PracticeSession]
@@ -37,6 +39,9 @@ struct DataManagementView: View {
     @State private var moreAppsOpen = false
     @State private var importingTumble = false
     @State private var tumbleArchives = TumbleArchive.all()
+    @State private var cloudRecordings: [TumbleCloudSync.Recording] = []
+    @State private var cloudError: String?
+    @State private var loadingTumbles = false
     @State private var tumbleMessage: String?
     @State private var tumbleAthletes = UserDefaults.standard.dictionary(forKey: "tumbleAthleteIDs") as? [String: String] ?? [:]
     @ObservedObject private var coach = CoachEntitlement.shared
@@ -55,6 +60,26 @@ struct DataManagementView: View {
     private var folderName: String { team?.name ?? "this deck" }
     private var folderAttempts: [Attempt] { attempts.filter { $0.group?.team?.id == team?.id } }
     private var hasFolderReps: Bool { !folderAttempts.isEmpty }
+    private var cloudKey: String { "\(team?.id.uuidString ?? ""):\(auth.uid ?? "")" }
+    private var allTumbleArchives: [TumbleArchive] {
+        let cloud = cloudRecordings.map(\.archive)
+        let cloudIDs = Set(cloud.map(\.recordingID))
+        return cloud + tumbleArchives.filter { !cloudIDs.contains($0.recordingID) }
+    }
+    private var effectiveTumbleAthletes: [String: String] {
+        var mapped = cloudRecordings.reduce(into: [String: String]()) { result, recording in
+            for (track, athleteID) in recording.athleteIDs {
+                result["\(recording.archive.recordingID.uuidString):\(track)"] = athleteID
+            }
+        }
+        mapped.merge(tumbleAthletes) { _, local in local }
+        return mapped
+    }
+    private var tumbleAthleteNames: [String: String] {
+        Dictionary(uniqueKeysWithValues: subjects.filter {
+            $0.team?.id == team?.id && $0.deletedAt == nil
+        }.map { ($0.id.uuidString, $0.name) })
+    }
 
     var body: some View {
         List {
@@ -90,29 +115,22 @@ struct DataManagementView: View {
             .listRowBackground(glassRow)
 
             Section {
-                Button { importingTumble = true } label: {
-                    Label("Import tagged tumble data", systemImage: "square.and.arrow.down")
+                if loadingTumbles { ProgressView("Syncing from StuntScope…") }
+                Button { Task { await refreshTumbles() } } label: {
+                    Label("Refresh tumbling data", systemImage: "arrow.clockwise")
                 }
-                let spreadsheet = TumbleSpreadsheet(archives: tumbleArchives, athleteIDs: tumbleAthletes,
-                    athleteNamesByID: Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) }))
-                let poseSpreadsheet = TumblePoseSpreadsheet(archives: tumbleArchives, athleteIDs: tumbleAthletes,
-                    athleteNamesByID: Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) }))
+                if let cloudError { Text(cloudError).foregroundStyle(.red) }
+                let spreadsheet = TumbleSpreadsheet(archives: allTumbleArchives, athleteIDs: effectiveTumbleAthletes,
+                    athleteNamesByID: tumbleAthleteNames)
+                let poseSpreadsheet = TumblePoseSpreadsheet(archives: allTumbleArchives, athleteIDs: effectiveTumbleAthletes,
+                    athleteNamesByID: tumbleAthleteNames)
                 if spreadsheet.hasData {
-                    ForEach(tumbleArchives, id: \.recordingID) { archive in
+                    ForEach(allTumbleArchives, id: \.recordingID) { archive in
                         ForEach(Array(Set(archive.blocks.map(\.trackID))).sorted(), id: \.self) { track in
-                            let key = "\(archive.recordingID.uuidString):\(track)"
-                            Picker("\(archive.recordingTitle) · track \(track)", selection: Binding(
-                                get: { tumbleAthletes[key] ?? "" },
-                                set: { value in
-                                    if value.isEmpty { tumbleAthletes.removeValue(forKey: key) }
-                                    else { tumbleAthletes[key] = value }
-                                    UserDefaults.standard.set(tumbleAthletes, forKey: "tumbleAthleteIDs")
-                                })) {
-                                Text("Assign athlete").tag("")
-                                ForEach(subjects.filter { $0.deletedAt == nil }) { subject in
-                                    Text(subject.name).tag(subject.id.uuidString)
-                                }
-                            }
+                            tumbleTrackPicker(archive: archive, track: track)
+                        }
+                        ForEach(Array(archive.blocks.enumerated()), id: \.offset) { item in
+                            tumbleBlockRow(archive: archive, block: item.element)
                         }
                     }
                     if coach.isCoach {
@@ -129,11 +147,16 @@ struct DataManagementView: View {
                             Label("Export tumble spreadsheet", systemImage: "tablecells")
                         }
                     }
-                    Text("\(tumbleArchives.count) imported video\(tumbleArchives.count == 1 ? "" : "s")")
+                    Text("\(cloudRecordings.count) synced video\(cloudRecordings.count == 1 ? "" : "s")")
                         .foregroundStyle(.secondary)
                 }
+                Button { importingTumble = true } label: {
+                    Label("Import older tumble file…", systemImage: "square.and.arrow.down")
+                }
                 if let tumbleMessage { Text(tumbleMessage).foregroundStyle(.secondary) }
-            } header: { Text("Tumbling analysis") }
+            } header: { Text("Tumbling analysis") } footer: {
+                Text("StuntScope syncs tracked athletes and skill blocks here through your HitRate account.")
+            }
             .listRowBackground(glassRow)
 
             Section {
@@ -241,6 +264,10 @@ struct DataManagementView: View {
         .background(FloorBackdrop().ignoresSafeArea())
         .navigationTitle("Manage Data")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: cloudKey) { await refreshTumbles() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refreshTumbles() } }
+        }
         .fileImporter(isPresented: $importingTumble, allowedContentTypes: [.json]) { result in
             do {
                 let url = try result.get()
@@ -303,6 +330,42 @@ struct DataManagementView: View {
         } message: {
             Text("This can't be undone.")
         }
+    }
+
+    private func refreshTumbles() async {
+        guard auth.uid != nil, let team else { return }
+        loadingTumbles = true
+        defer { loadingTumbles = false }
+        do {
+            cloudRecordings = try await TumbleCloudSync.load(teamID: team.id.uuidString)
+            cloudError = nil
+        } catch {
+            cloudError = "Couldn't sync tumbling: \(error.localizedDescription)"
+        }
+    }
+
+    private func tumbleTrackPicker(archive: TumbleArchive, track: Int) -> some View {
+        let key = "\(archive.recordingID.uuidString):\(track)"
+        let selection = Binding<String>(
+            get: { effectiveTumbleAthletes[key] ?? "" },
+            set: { value in
+                if value.isEmpty { tumbleAthletes.removeValue(forKey: key) }
+                else { tumbleAthletes[key] = value }
+                UserDefaults.standard.set(tumbleAthletes, forKey: "tumbleAthleteIDs")
+            })
+        return Picker("\(archive.recordingTitle) · track \(track)", selection: selection) {
+            Text("Assign athlete").tag("")
+            ForEach(subjects.filter { $0.team?.id == team?.id && $0.deletedAt == nil }) { subject in
+                Text(subject.name).tag(subject.id.uuidString)
+            }
+        }
+    }
+
+    private func tumbleBlockRow(archive: TumbleArchive, block: TumbleArchive.Block) -> some View {
+        let key = "\(archive.recordingID.uuidString):\(block.trackID)"
+        let athlete = effectiveTumbleAthletes[key].flatMap { tumbleAthleteNames[$0] }
+            ?? "Track \(block.trackID)"
+        return TumbleBlockRow(block: block, athlete: athlete)
     }
 
     private func allActiveSkills(_ t: Team) -> Int {
