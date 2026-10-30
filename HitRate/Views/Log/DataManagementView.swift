@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// Backup + destructive data controls, pushed from the editor.
 ///
@@ -22,6 +23,7 @@ struct DataManagementView: View {
     @Query(sort: \Team.orderIndex) private var teams: [Team]
     @Query private var sessions: [PracticeSession]
     @Query private var attempts: [Attempt]
+    @Query private var subjects: [Subject]
     @Query private var customTallies: [CustomTally]
 
     @AppStorage("didOnboard") private var didOnboard = false
@@ -33,6 +35,10 @@ struct DataManagementView: View {
     @State private var confirm: Confirm?
     @State private var paywallOpen = false
     @State private var moreAppsOpen = false
+    @State private var importingTumble = false
+    @State private var tumbleArchives = TumbleArchive.all()
+    @State private var tumbleMessage: String?
+    @State private var tumbleAthletes = UserDefaults.standard.dictionary(forKey: "tumbleAthleteIDs") as? [String: String] ?? [:]
     @ObservedObject private var coach = CoachEntitlement.shared
     /// Trash-row "Delete permanently" awaiting confirmation (name shown + the
     /// hard-delete to run if the user confirms).
@@ -81,6 +87,53 @@ struct DataManagementView: View {
             } footer: {
                 Text("Save a spreadsheet of every rep before you delete anything below — these deletes can't be undone.")
             }
+            .listRowBackground(glassRow)
+
+            Section {
+                Button { importingTumble = true } label: {
+                    Label("Import tagged tumble data", systemImage: "square.and.arrow.down")
+                }
+                let spreadsheet = TumbleSpreadsheet(archives: tumbleArchives, athleteIDs: tumbleAthletes,
+                    athleteNamesByID: Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) }))
+                let poseSpreadsheet = TumblePoseSpreadsheet(archives: tumbleArchives, athleteIDs: tumbleAthletes,
+                    athleteNamesByID: Dictionary(uniqueKeysWithValues: subjects.map { ($0.id.uuidString, $0.name) }))
+                if spreadsheet.hasData {
+                    ForEach(tumbleArchives, id: \.recordingID) { archive in
+                        ForEach(Array(Set(archive.blocks.map(\.trackID))).sorted(), id: \.self) { track in
+                            let key = "\(archive.recordingID.uuidString):\(track)"
+                            Picker("\(archive.recordingTitle) · track \(track)", selection: Binding(
+                                get: { tumbleAthletes[key] ?? "" },
+                                set: { value in
+                                    if value.isEmpty { tumbleAthletes.removeValue(forKey: key) }
+                                    else { tumbleAthletes[key] = value }
+                                    UserDefaults.standard.set(tumbleAthletes, forKey: "tumbleAthleteIDs")
+                                })) {
+                                Text("Assign athlete").tag("")
+                                ForEach(subjects.filter { $0.deletedAt == nil }) { subject in
+                                    Text(subject.name).tag(subject.id.uuidString)
+                                }
+                            }
+                        }
+                    }
+                    if coach.isCoach {
+                        ShareLink(item: spreadsheet, preview: SharePreview("Tumbling skill blocks")) {
+                            Label("Export tumble spreadsheet", systemImage: "tablecells")
+                        }
+                        if poseSpreadsheet.hasData {
+                            ShareLink(item: poseSpreadsheet, preview: SharePreview("Tumbling pose frames")) {
+                                Label("Export pose frame spreadsheet", systemImage: "figure.stand")
+                            }
+                        }
+                    } else {
+                        Button { paywallOpen = true } label: {
+                            Label("Export tumble spreadsheet", systemImage: "tablecells")
+                        }
+                    }
+                    Text("\(tumbleArchives.count) imported video\(tumbleArchives.count == 1 ? "" : "s")")
+                        .foregroundStyle(.secondary)
+                }
+                if let tumbleMessage { Text(tumbleMessage).foregroundStyle(.secondary) }
+            } header: { Text("Tumbling analysis") }
             .listRowBackground(glassRow)
 
             Section {
@@ -188,6 +241,18 @@ struct DataManagementView: View {
         .background(FloorBackdrop().ignoresSafeArea())
         .navigationTitle("Manage Data")
         .navigationBarTitleDisplayMode(.inline)
+        .fileImporter(isPresented: $importingTumble, allowedContentTypes: [.json]) { result in
+            do {
+                let url = try result.get()
+                let granted = url.startAccessingSecurityScopedResource()
+                defer { if granted { url.stopAccessingSecurityScopedResource() } }
+                let archive = try TumbleArchive.importFile(url)
+                tumbleArchives = TumbleArchive.all()
+                tumbleMessage = "Imported \(archive.blocks.count) tagged blocks from \(archive.recordingTitle). Assign athlete names before comparing tracks across videos."
+            } catch {
+                tumbleMessage = "Import failed: \(error.localizedDescription)"
+            }
+        }
         .sheet(isPresented: $paywallOpen) {
             CoachPaywallView(reason: coach.isCoach ? .general : .csv)
         }
