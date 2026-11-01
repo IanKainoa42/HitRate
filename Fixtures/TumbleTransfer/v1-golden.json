@@ -1,0 +1,511 @@
+{
+  "blocks" : [
+    {
+      "firstFrame" : 2,
+      "inOutStroke" : {
+        "contactFrameIndex" : 2,
+        "inDegrees" : -24.5,
+        "outDegrees" : 15.25,
+        "paintedFrames" : 3,
+        "takeoffFrameIndex" : 3,
+        "zone" : {
+          "inBand" : [
+            -32,
+            -16
+          ],
+          "kind" : "handspring",
+          "outBand" : [
+            8,
+            24
+          ]
+        }
+      },
+      "lastFrame" : 5,
+      "launchDegrees" : 62.5,
+      "phases" : {
+        "checkpoints" : [
+
+        ],
+        "frameRate" : 30,
+        "kind" : "backHandspring",
+        "marks" : [
+          {
+            "boundary" : "set",
+            "frameIndex" : 3,
+            "note" : "feet left the floor",
+            "status" : "detected"
+          },
+          {
+            "boundary" : "firstHandDown",
+            "note" : "hands not visible",
+            "status" : "missing"
+          }
+        ],
+        "phases" : [
+
+        ]
+      },
+      "skill" : "backHandspring",
+      "tagID" : "5A1E0000-0000-4000-8000-000000000002",
+      "takeoffRatings" : [
+        {
+          "flip" : "strong",
+          "flipRPS" : 1.5,
+          "id" : "5A1E0000-0000-4000-8000-000000000003",
+          "recordingID" : "5A1E0000-0000-4000-8000-000000000001",
+          "skill" : "backHandspring",
+          "takeoffFrame" : 3,
+          "trackID" : 1,
+          "twist" : "weak",
+          "twistRPS" : 0.25,
+          "updatedAt" : 815000000
+        }
+      ],
+      "takeoffSpeeds" : [
+        {
+          "airtimeSeconds" : 0.0625,
+          "flagged" : false,
+          "flip" : 1.5,
+          "flipIsKeyed" : true,
+          "flipSamples" : 6,
+          "frameIndex" : 3,
+          "landingFrameIndex" : 5,
+          "twist" : 0.25,
+          "twistIsMarked" : false,
+          "twistSamples" : 4
+        }
+      ],
+      "trackID" : 1
+    }
+  ],
+  "framesPerSecond" : 30,
+  "poses" : [
+    {
+      "bodyAngleDegrees" : -63.43494882292201,
+      "frameIndex" : 2,
+      "skeleton" : {
+        "boundingBox" : [
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            300
+          ]
+        ],
+        "isCarriedForward" : false,
+        "keypoints" : [
+          {
+            "confidence" : 0.75,
+            "x" : 100.5,
+            "y" : 202
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 110.5,
+            "y" : 207
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 120.5,
+            "y" : 212
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 130.5,
+            "y" : 217
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 140.5,
+            "y" : 222
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 150.5,
+            "y" : 227
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 160.5,
+            "y" : 232
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 170.5,
+            "y" : 237
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 180.5,
+            "y" : 242
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 190.5,
+            "y" : 247
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 200.5,
+            "y" : 252
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 210.5,
+            "y" : 257
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 220.5,
+            "y" : 262
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 230.5,
+            "y" : 267
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 240.5,
+            "y" : 272
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 250.5,
+            "y" : 277
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 260.5,
+            "y" : 282
+          }
+        ],
+        "personIndex" : 1
+      },
+      "trackID" : 1
+    },
+    {
+      "bodyAngleDegrees" : -63.43494882292201,
+      "frameIndex" : 3,
+      "skeleton" : {
+        "boundingBox" : [
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            300
+          ]
+        ],
+        "isCarriedForward" : false,
+        "keypoints" : [
+          {
+            "confidence" : 0.75,
+            "x" : 100.5,
+            "y" : 203
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 110.5,
+            "y" : 208
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 120.5,
+            "y" : 213
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 130.5,
+            "y" : 218
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 140.5,
+            "y" : 223
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 150.5,
+            "y" : 228
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 160.5,
+            "y" : 233
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 170.5,
+            "y" : 238
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 180.5,
+            "y" : 243
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 190.5,
+            "y" : 248
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 200.5,
+            "y" : 253
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 210.5,
+            "y" : 258
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 220.5,
+            "y" : 263
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 230.5,
+            "y" : 268
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 240.5,
+            "y" : 273
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 250.5,
+            "y" : 278
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 260.5,
+            "y" : 283
+          }
+        ],
+        "personIndex" : 1
+      },
+      "trackID" : 1
+    },
+    {
+      "bodyAngleDegrees" : -63.43494882292201,
+      "frameIndex" : 4,
+      "skeleton" : {
+        "boundingBox" : [
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            300
+          ]
+        ],
+        "isCarriedForward" : false,
+        "keypoints" : [
+          {
+            "confidence" : 0.75,
+            "x" : 100.5,
+            "y" : 204
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 110.5,
+            "y" : 209
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 120.5,
+            "y" : 214
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 130.5,
+            "y" : 219
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 140.5,
+            "y" : 224
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 150.5,
+            "y" : 229
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 160.5,
+            "y" : 234
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 170.5,
+            "y" : 239
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 180.5,
+            "y" : 244
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 190.5,
+            "y" : 249
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 200.5,
+            "y" : 254
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 210.5,
+            "y" : 259
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 220.5,
+            "y" : 264
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 230.5,
+            "y" : 269
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 240.5,
+            "y" : 274
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 250.5,
+            "y" : 279
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 260.5,
+            "y" : 284
+          }
+        ],
+        "personIndex" : 1
+      },
+      "trackID" : 1
+    },
+    {
+      "bodyAngleDegrees" : -63.43494882292201,
+      "frameIndex" : 5,
+      "skeleton" : {
+        "boundingBox" : [
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            300
+          ]
+        ],
+        "isCarriedForward" : false,
+        "keypoints" : [
+          {
+            "confidence" : 0.75,
+            "x" : 100.5,
+            "y" : 205
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 110.5,
+            "y" : 210
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 120.5,
+            "y" : 215
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 130.5,
+            "y" : 220
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 140.5,
+            "y" : 225
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 150.5,
+            "y" : 230
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 160.5,
+            "y" : 235
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 170.5,
+            "y" : 240
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 180.5,
+            "y" : 245
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 190.5,
+            "y" : 250
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 200.5,
+            "y" : 255
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 210.5,
+            "y" : 260
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 220.5,
+            "y" : 265
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 230.5,
+            "y" : 270
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 240.5,
+            "y" : 275
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 250.5,
+            "y" : 280
+          },
+          {
+            "confidence" : 0.75,
+            "x" : 260.5,
+            "y" : 285
+          }
+        ],
+        "personIndex" : 1
+      },
+      "trackID" : 1
+    }
+  ],
+  "recordingID" : "5A1E0000-0000-4000-8000-000000000001",
+  "recordingTitle" : "RO BHS full",
+  "version" : 1
+}
