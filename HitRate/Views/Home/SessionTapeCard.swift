@@ -1,12 +1,17 @@
 import SwiftUI
+import SwiftData
 
 /// "LATEST SESSION" — the chronological tape: one thin bar per attempt,
 /// height/color by outcome, with a rough-patch bracket when one exists. A rep
 /// StuntScope scored from video gets a 1pt chalk-grey tick under its bar
 /// (`snapshot.videoScored`) — a marker, not a colour: green stays the hit signal.
+/// Tapping a video rep opens its StuntScope Telemetry sheet.
 struct SessionTapeCard: View {
     let snapshot: SessionSnapshot
     var kind: SkillKind = .stunt   // legend wording (FloorStats.aggregateKind)
+
+    @Query private var subjects: [Subject]
+    @State private var selectedAttempt: Attempt?
 
     private let heights: [Outcome: CGFloat] = [
         .hit: 34, .bobble: 26, .buildingFall: 22, .majorFall: 18,
@@ -26,21 +31,35 @@ struct SessionTapeCard: View {
             }
 
             // Tape — Canvas so any rep count stays visible (gap adapts to density)
-            Canvas { ctx, size in
+            GeometryReader { geo in
+                let size = geo.size
                 let n = snapshot.outcomes.count
-                guard n > 0 else { return }
-                let step = size.width / CGFloat(n)
-                let gap = min(2, max(0.4, step * 0.3))
-                let barW = max(0.6, step - gap)
-                for (i, o) in snapshot.outcomes.enumerated() {
-                    let h = heights[o] ?? 20
-                    let rect = CGRect(x: CGFloat(i) * step, y: size.height - tickInset - h,
-                                      width: barW, height: h)
-                    ctx.fill(Path(roundedRect: rect, cornerRadius: min(2, barW / 2)),
-                             with: .color(o.color.opacity(o.isHit ? 0.9 : 1)))
-                    if i < snapshot.videoScored.count, snapshot.videoScored[i] {
-                        let tick = CGRect(x: rect.minX, y: size.height - 1, width: barW, height: 1)
-                        ctx.fill(Path(tick), with: .color(Theme.label3))
+                Canvas { ctx, size in
+                    guard n > 0 else { return }
+                    let step = size.width / CGFloat(n)
+                    let gap = min(2, max(0.4, step * 0.3))
+                    let barW = max(0.6, step - gap)
+                    for (i, o) in snapshot.outcomes.enumerated() {
+                        let h = heights[o] ?? 20
+                        let rect = CGRect(x: CGFloat(i) * step, y: size.height - tickInset - h,
+                                          width: barW, height: h)
+                        ctx.fill(Path(roundedRect: rect, cornerRadius: min(2, barW / 2)),
+                                 with: .color(o.color.opacity(o.isHit ? 0.9 : 1)))
+                        if i < snapshot.videoScored.count, snapshot.videoScored[i] {
+                            let tick = CGRect(x: rect.minX, y: size.height - 1, width: barW, height: 1)
+                            ctx.fill(Path(tick), with: .color(Theme.accent))
+                        }
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    guard n > 0, location.x >= 0, location.x <= size.width else { return }
+                    let index = min(n - 1, max(0, Int((location.x / size.width) * CGFloat(n))))
+                    if index < snapshot.attempts.count {
+                        let attempt = snapshot.attempts[index]
+                        if attempt.hasStability {
+                            selectedAttempt = attempt
+                        }
                     }
                 }
             }
@@ -82,7 +101,7 @@ struct SessionTapeCard: View {
             }
             .padding(.top, 4)
 
-            // Outcome legend (+ the video tick, only when a rep in the tape has one)
+            // Outcome legend (+ video tick & quick inspector trigger)
             HStack(spacing: 12) {
                 ForEach(Outcome.allCases) { o in
                     HStack(spacing: 5) {
@@ -97,19 +116,29 @@ struct SessionTapeCard: View {
                     }
                 }
                 if hasVideo {
-                    HStack(spacing: 5) {
-                        Rectangle()
-                            .fill(Theme.label3)
-                            .frame(width: 8, height: 1)
-                        Text("Video")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.label2)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                    Button {
+                        if let firstVideo = snapshot.attempts.first(where: \.hasStability) {
+                            selectedAttempt = firstVideo
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Rectangle()
+                                .fill(Theme.accent)
+                                .frame(width: 8, height: 2)
+                            Text("Video (\(videoCount))")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 11)
+        }
+        .sheet(item: $selectedAttempt) { attempt in
+            StuntRepTelemetrySheet(attempt: attempt, subjects: subjects)
         }
     }
 

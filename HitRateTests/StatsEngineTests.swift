@@ -85,6 +85,7 @@ final class StatsEngineTests: XCTestCase {
         reps[0].onBasePercent = 90
         reps[0].wobbleCount = 0
         reps[0].holdSeconds = 2.0
+        reps[0].flightSeconds = [1.25]
         reps[1].onBasePercent = 70
         reps[1].wobbleCount = 2
         reps[1].holdSeconds = 3.5
@@ -101,6 +102,17 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(stability.groups[0].hitRate, 50)
         XCTAssertEqual(stability.groups[0].wobbles, 2)
         XCTAssertEqual(stability.groups[0].longestHoldSeconds, 3.5)
+        XCTAssertEqual(stability.groups[0].avgHoldSeconds, 2.75)
+        XCTAssertEqual(stability.groups[0].maxFlightSeconds, 1.25)
+        XCTAssertEqual(stability.groups[0].rockSolidCount, 1)
+        XCTAssertEqual(stability.avgHoldSeconds, 2.75)
+        XCTAssertEqual(stability.maxHoldSeconds, 3.5)
+        XCTAssertEqual(stability.totalWobbles, 2)
+        XCTAssertEqual(stability.wobblesPerRep, 1.0)
+        XCTAssertEqual(stability.maxFlightSeconds, 1.25)
+        XCTAssertEqual(stability.rockSolidCount, 1)
+        XCTAssertEqual(stability.rockSolidRate, 50)
+        XCTAssertEqual(stability.recentAttempts.count, 2)
         XCTAssertEqual(stability.trend, [80], "one session → one point, video reps only")
         XCTAssertEqual(stability.hitTrend, [84], "(100 + 67) / 2 over the same two reps")
         // The headline rate is untouched by the layer: all four reps, as before.
