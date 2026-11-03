@@ -42,6 +42,7 @@ struct CaptureView: View {
     /// The rep whose optional EXECUTION read (Feature B) is open, if any. Tapping a
     /// recent chip on a United-category skill sets this and presents the sheet.
     @State private var scoringAttempt: Attempt?
+    @State private var telemetryAttempt: Attempt?
 
     // 1-Tap Auto-Save Logging state: stores last logged rep for floating 3s undo toast.
     @State private var lastLoggedRep: Attempt? = nil
@@ -102,6 +103,7 @@ struct CaptureView: View {
                 }
                 .sheet(isPresented: $showGroupsEditor) { GroupsEditorView() }
                 .sheet(item: $scoringAttempt) { ExecutionSheet(attempt: $0) }
+                .sheet(item: $telemetryAttempt) { StuntRepTelemetrySheet(attempt: $0, subjects: subjects) }
                 .onAppear {
                     seedFirstSubjectIfNeeded()
                     syncSingleSubjectLock()
@@ -846,7 +848,20 @@ struct CaptureView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Theme.well.shadow(.inner(color: .black.opacity(0.5), radius: 3, y: 1)))
         )
-        if scorable {
+        if a.hasStability {
+            Button { telemetryAttempt = a } label: { body }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button { telemetryAttempt = a } label: {
+                        Label("StuntScope Telemetry", systemImage: "video.badge.waveform")
+                    }
+                    if scorable {
+                        Button { scoringAttempt = a } label: {
+                            Label("Score execution", systemImage: "shield.lefthalf.filled")
+                        }
+                    }
+                }
+        } else if scorable {
             Button { scoringAttempt = a } label: { body }
                 .buttonStyle(.plain)
         } else {

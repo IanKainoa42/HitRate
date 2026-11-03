@@ -116,6 +116,7 @@ struct SessionSnapshot {
     /// Parallel to `outcomes`: true where StuntScope scored that rep from video
     /// (`Attempt.hasStability`) — the tape marks those reps with a tick.
     let videoScored: [Bool]
+    var attempts: [Attempt] = []
 }
 
 /// One row of the EXECUTION breakdown (Feature B): how often a single United
@@ -147,10 +148,14 @@ struct StabilityGroupStat: Identifiable {
     let onBase: Int                // mean on-base %, 0–100
     let wobbles: Int               // total wobbles across those reps
     let longestHoldSeconds: Double
+    let avgHoldSeconds: Double
+    let maxFlightSeconds: Double?
+    let rockSolidCount: Int
 
     /// Clean-hit rate of the video-scored reps alone, 0–100.
     var hitRate: Int { reps > 0 ? Int((Double(hits) / Double(reps) * 100).rounded()) : 0 }
     var wobblesPerRep: Double { reps > 0 ? Double(wobbles) / Double(reps) : 0 }
+    var rockSolidRate: Int { reps > 0 ? Int((Double(rockSolidCount) / Double(reps) * 100).rounded()) : 0 }
 }
 
 /// The stability layer StuntScope writes onto attempts, aggregated. Mean
@@ -171,6 +176,15 @@ struct StabilityBreakdown {
     /// (`subject` non-nil); a whole-floor compute, or reps whose `rolesRaw`
     /// never named the athlete, leave it empty. `StuntRole.allCases` order.
     let byRole: [StabilityRoleStat]
+    /// StuntScope Telemetry additions
+    let avgHoldSeconds: Double
+    let maxHoldSeconds: Double
+    let totalWobbles: Int
+    let wobblesPerRep: Double
+    let maxFlightSeconds: Double?
+    let rockSolidCount: Int
+    let rockSolidRate: Int
+    let recentAttempts: [Attempt]
 }
 
 /// One stunt position's share of an athlete's video-scored reps.
@@ -400,12 +414,35 @@ enum StatsEngine {
         var rows: [StabilityGroupStat] = []
         var reps = 0
         var onBaseSum = 0
+        var holdDurationSum: Double = 0
+        var holdDurationCount = 0
+        var maxHold: Double = 0
+        var wobblesTotal = 0
+        var allFlights: [Double] = []
+        var rockSolidTotal = 0
+        var allScoredAttempts: [Attempt] = []
+
         for g in ordered {
             let scored = (currentAttempts[g.persistentModelID] ?? []).filter(\.hasStability)
             guard !scored.isEmpty else { continue }
+            allScoredAttempts.append(contentsOf: scored)
             let sum = scored.reduce(0) { $0 + ($1.onBasePercent ?? 0) }
+            let gWobbles = scored.reduce(0) { $0 + ($1.wobbleCount ?? 0) }
+            let gHolds = scored.compactMap(\.holdSeconds)
+            let gFlights = scored.flatMap(\.flightSeconds)
+            let gRockSolid = scored.filter { $0.isHitRep && ($0.onBasePercent ?? 0) >= 75 && ($0.wobbleCount ?? 0) == 0 }.count
+
             reps += scored.count
             onBaseSum += sum
+            wobblesTotal += gWobbles
+            if !gHolds.isEmpty {
+                holdDurationSum += gHolds.reduce(0, +)
+                holdDurationCount += gHolds.count
+                maxHold = max(maxHold, gHolds.max() ?? 0)
+            }
+            allFlights.append(contentsOf: gFlights)
+            rockSolidTotal += gRockSolid
+
             rows.append(StabilityGroupStat(
                 id: PersistentIdentifierBox(raw: "\(g.persistentModelID)"),
                 name: g.name, number: g.number,
@@ -413,8 +450,11 @@ enum StatsEngine {
                 reps: scored.count,
                 hits: scored.filter(\.isHitRep).count,
                 onBase: Int((Double(sum) / Double(scored.count)).rounded()),
-                wobbles: scored.reduce(0) { $0 + ($1.wobbleCount ?? 0) },
-                longestHoldSeconds: scored.compactMap(\.holdSeconds).max() ?? 0))
+                wobbles: gWobbles,
+                longestHoldSeconds: gHolds.max() ?? 0,
+                avgHoldSeconds: gHolds.isEmpty ? 0 : gHolds.reduce(0, +) / Double(gHolds.count),
+                maxFlightSeconds: gFlights.max(),
+                rockSolidCount: gRockSolid))
         }
         guard reps > 0 else { return nil }
 
@@ -438,6 +478,10 @@ enum StatsEngine {
                 onBase: Int((Double(bucket.sum) / Double(bucket.reps)).rounded()))
         }
 
+        let avgHold = holdDurationCount > 0 ? (holdDurationSum / Double(holdDurationCount)) : 0
+        let maxFlight = allFlights.max()
+        let rockSolidRate = reps > 0 ? Int((Double(rockSolidTotal) / Double(reps) * 100).rounded()) : 0
+
         return StabilityBreakdown(
             reps: reps,
             onBase: Int((Double(onBaseSum) / Double(reps)).rounded()),
@@ -448,7 +492,15 @@ enum StatsEngine {
                                   now: now, subject: subject, logger: logger,
                                   metric: { $0.hasStability ? $0.creditValue : nil }),
             groups: rows.sorted { $0.onBase > $1.onBase },
-            byRole: byRole)
+            byRole: byRole,
+            avgHoldSeconds: avgHold,
+            maxHoldSeconds: maxHold,
+            totalWobbles: wobblesTotal,
+            wobblesPerRep: reps > 0 ? Double(wobblesTotal) / Double(reps) : 0,
+            maxFlightSeconds: maxFlight,
+            rockSolidCount: rockSolidTotal,
+            rockSolidRate: rockSolidRate,
+            recentAttempts: allScoredAttempts.sorted { $0.timestamp > $1.timestamp })
     }
 
     // MARK: Execution breakdown (Feature B)
@@ -575,7 +627,8 @@ enum StatsEngine {
             start: attempts.first!.timestamp,
             end: last.endedAt ?? attempts.last!.timestamp,
             roughPatch: roughPatch(in: outcomes),
-            videoScored: attempts.map(\.hasStability))
+            videoScored: attempts.map(\.hasStability),
+            attempts: attempts)
     }
 
     /// Worst sliding window of 7 attempts; flagged if it has >=4 misses.

@@ -37,6 +37,7 @@ struct DataManagementView: View {
     @State private var confirm: Confirm?
     @State private var paywallOpen = false
     @State private var moreAppsOpen = false
+    @State private var stuntScopeHubOpen = false
     @State private var importingTumble = false
     @State private var tumbleArchives = TumbleArchive.all()
     @State private var cloudRecordings: [TumbleCloudSync.Recording] = []
@@ -111,6 +112,25 @@ struct DataManagementView: View {
                 Text("Backup")
             } footer: {
                 Text("Save a spreadsheet of every rep before you delete anything below — these deletes can't be undone.")
+            }
+            .listRowBackground(glassRow)
+
+            Section {
+                Button {
+                    stuntScopeHubOpen = true
+                } label: {
+                    HStack {
+                        Label("StuntScope integration", systemImage: "scope")
+                        Spacer()
+                        Text("Connected")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+            } header: {
+                Text("Integrations")
+            } footer: {
+                Text("StuntScope motion lab syncs flyer center-of-mass balance, hold durations, and tumbling kinematics into HitRate.")
             }
             .listRowBackground(glassRow)
 
@@ -285,6 +305,9 @@ struct DataManagementView: View {
         }
         .sheet(isPresented: $moreAppsOpen) {
             MoreCoachingAppsView()
+        }
+        .sheet(isPresented: $stuntScopeHubOpen) {
+            StuntScopeHubView()
         }
         .alert(
             "Clear history in \(folderName)?",

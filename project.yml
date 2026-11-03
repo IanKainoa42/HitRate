@@ -47,7 +47,7 @@ targets:
     dependencies:
       - target: HitRateWatch
         embed: true
-        platformFilters: [ios]
+        platformFilter: ios
       - package: CheerRulesKit
       - package: Firebase
         product: FirebaseAuth

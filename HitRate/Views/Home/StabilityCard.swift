@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// "STUNT STABILITY" — the video layer StuntScope writes onto reps. Headline is
 /// the mean on-base percent (where the flyer's centre of mass sat over her
@@ -15,39 +16,83 @@ import SwiftUI
 struct StabilityCard: View {
     let stats: FloorStats
 
+    @Query private var subjects: [Subject]
+    @State private var hubOpen = false
+    @State private var selectedAttempt: Attempt?
+
     var body: some View {
         if let s = stats.stability {
             FeedCard {
                 CardHead("STUNT STABILITY") {
-                    Text("\(s.reps) video rep\(s.reps == 1 ? "" : "s")")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.6)
-                        .foregroundStyle(Theme.label3)
+                    HStack(spacing: 8) {
+                        Button {
+                            hubOpen = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                                Text("STUNTSCOPE")
+                                    .font(.system(size: 9, weight: .heavy))
+                                    .tracking(0.8)
+                                    .foregroundStyle(Theme.accent)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .wellBackground(cornerRadius: 6)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text("\(s.reps) video rep\(s.reps == 1 ? "" : "s")")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.label3)
+                    }
                 }
 
-                HStack(alignment: .center, spacing: 12) {
-                    HStack(alignment: .lastTextBaseline, spacing: 2) {
-                        Text("\(s.onBase)")
-                            .font(Theme.barlow(44, .extrabold))
-                            .contentTransition(.numericText(value: Double(s.onBase)))
-                            .animation(.spring(duration: 0.5), value: s.onBase)
-                            .foregroundStyle(Theme.rateColor(s.onBase))
-                        Text("%")
-                            .font(Theme.barlow(20, .bold))
-                            .foregroundStyle(Theme.label2)
-                    }
-                    .lineLimit(1)
+                // Combo Telemetry 3-Up Row
+                HStack(spacing: 8) {
+                    telemetryTile(
+                        title: "ON BASE",
+                        val: "\(s.onBase)%",
+                        color: Theme.rateColor(s.onBase),
+                        caption: "center of mass"
+                    )
 
+                    telemetryTile(
+                        title: "LOCKED IN",
+                        val: "\(s.rockSolidRate)%",
+                        color: Theme.rateColor(s.rockSolidRate),
+                        caption: "hit · steady · 0 wobble"
+                    )
+
+                    telemetryTile(
+                        title: "AVG HOLD",
+                        val: String(format: "%.1fs", s.avgHoldSeconds),
+                        color: Theme.label,
+                        caption: s.maxHoldSeconds > 0 ? "max \(String(format: "%.1fs", s.maxHoldSeconds))" : "time in air"
+                    )
+                }
+                .padding(.bottom, 10)
+
+                // Subline explanation
+                HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("over her bases")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.label)
                         Text("share of each hold the flyer's weight sat inside the bases' span")
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundStyle(Theme.label3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
+
+                    if let maxFlight = s.maxFlightSeconds, maxFlight > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.and.line.horizontal.and.arrow.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Theme.accent)
+                            Text("\(String(format: "%.2f", maxFlight))s hangtime")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.label2)
+                        }
+                    }
                 }
                 .padding(.bottom, 8)
 
@@ -71,6 +116,31 @@ struct StabilityCard: View {
                     .padding(.bottom, 10)
                 }
 
+                // Recent filmed reps quick strip
+                if !s.recentAttempts.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("RECENT VIDEO REPS · TAP TO INSPECT")
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(1)
+                            .foregroundStyle(Theme.label3)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(s.recentAttempts.prefix(8), id: \.persistentModelID) { attempt in
+                                    Button {
+                                        selectedAttempt = attempt
+                                    } label: {
+                                        repPill(attempt)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .padding(.bottom, 10)
+                }
+
                 VStack(spacing: 0) {
                     ForEach(Array(s.groups.enumerated()), id: \.element.id) { i, row in
                         groupRow(row)
@@ -80,13 +150,73 @@ struct StabilityCard: View {
                     }
                 }
 
-                Text("Scored from StuntScope video only — it never changes the hit rate.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.label3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
+                HStack(spacing: 6) {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.label3)
+                    Text("Scored from StuntScope video only — it never changes the hit rate.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.label3)
+                    Spacer()
+                }
+                .padding(.top, 12)
+            }
+            .sheet(item: $selectedAttempt) { attempt in
+                StuntRepTelemetrySheet(attempt: attempt, subjects: subjects)
+            }
+            .sheet(isPresented: $hubOpen) {
+                StuntScopeHubView()
             }
         }
+    }
+
+    private func telemetryTile(title: String, val: String, color: Color, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(1)
+                .foregroundStyle(Theme.label3)
+            Text(val)
+                .font(Theme.barlow(22, .extrabold))
+                .monospacedDigit()
+                .foregroundStyle(color)
+            Text(caption)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.label3)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .wellBackground(cornerRadius: 8)
+    }
+
+    private func repPill(_ attempt: Attempt) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(attempt.outcome.color)
+                .frame(width: 6, height: 6)
+
+            Text("\(attempt.onBasePercent ?? 0)%")
+                .font(Theme.barlow(14, .bold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.rateColor(attempt.onBasePercent ?? 0))
+
+            if let hold = attempt.holdSeconds, hold > 0 {
+                Text(String(format: "%.1fs", hold))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.label2)
+            }
+
+            if (attempt.wobbleCount ?? 0) == 0 {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .wellBackground(cornerRadius: 6)
     }
 
     private func legendSwatch(_ color: Color, _ label: String, dashed: Bool) -> some View {
@@ -173,6 +303,9 @@ struct StabilityCard: View {
     /// "4 reps · 75% hit · 0.5 wobbles/rep · 3.4 s hold"
     private func detail(_ row: StabilityGroupStat) -> String {
         var parts = ["\(row.reps) rep\(row.reps == 1 ? "" : "s")", "\(row.hitRate)% hit"]
+        if row.rockSolidCount > 0 {
+            parts.append("\(row.rockSolidCount) locked-in")
+        }
         if row.wobbles > 0 {
             parts.append(String(format: "%.1f wobbles/rep", row.wobblesPerRep))
         } else {
