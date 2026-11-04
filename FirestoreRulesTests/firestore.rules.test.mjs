@@ -30,6 +30,19 @@ const memberBId = "member-b-uid";
 const joiningId = "joining-uid";
 const assignmentId = "5C1B9E44-7A21-4D6E-9C10-9F0B3A2E7C55";
 const tumbleId = "C934B11A-6290-4F1E-8EF5-C86DF630F145";
+const stuntId = "A934B11A-6290-4F1E-8EF5-C86DF630F145";
+
+function stuntDocument(loggerId = memberAId) {
+  return {
+    teamId, recordingTitle: "Full up hold", loggerId,
+    skillId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
+    stuntGroupId: null, athleteIds: [], rolesRaw: "",
+    onBasePercent: 82, holdSeconds: 3.4, wobbleCount: 1,
+    worstWobbleSecond: 1.2, flightSeconds: [],
+    framesPath: `teams/${teamId}/stuntAnalyses/${stuntId}/frames.json`,
+    ready: false, updatedAt: new Date("2026-11-03T00:00:00Z"),
+  };
+}
 
 function tumbleDocument(loggerId = memberAId) {
   return {
@@ -157,9 +170,9 @@ describe("HitRate Firestore team authorization", () => {
     assert.equal(attempt.data().loggerId, memberBId);
   });
 
-  it("lets a member log a StuntScope rep carrying stability fields", async () => {
+  it("rejects new StuntScope hit/miss reps", async () => {
     const db = firestoreFor(memberAId);
-    await assertSucceeds(setDoc(doc(db, "teams", teamId, "attempts", "stunt-rep"), {
+    await assertFails(setDoc(doc(db, "teams", teamId, "attempts", "stunt-rep"), {
       teamId,
       groupId: "0B0F2A56-9F4D-4B23-9B5B-2D30F0E7A111",
       subjectId: "6E2D1C9B-3F4A-4E5B-8C7D-1A2B3C4D5E6F",
@@ -179,6 +192,20 @@ describe("HitRate Firestore team authorization", () => {
       videoRef: `teams/${teamId}/stunts/stunt-rep/clip.mov`,
       updatedAt: serverTimestamp(),
     }));
+  });
+
+  it("shares stunt analysis without an attempt or outcome", async () => {
+    const ref = doc(firestoreFor(memberAId), "teams", teamId, "stuntAnalyses", stuntId);
+    await assertSucceeds(setDoc(ref, stuntDocument()));
+    await assertSucceeds(updateDoc(ref, { ready: true }));
+    const received = await getDoc(doc(firestoreFor(memberBId), "teams", teamId,
+      "stuntAnalyses", stuntId));
+    assert.equal(received.data().onBasePercent, 82);
+    await assertFails(setDoc(doc(firestoreFor(memberBId), "teams", teamId,
+      "stuntAnalyses", stuntId), stuntDocument(memberBId)));
+    await assertFails(updateDoc(ref, { framesPath: "teams/other/stuntAnalyses/x/frames.json" }));
+    await assertFails(setDoc(doc(firestoreFor(memberAId), "teams", teamId,
+      "stuntAnalyses", "invalid"), { ...stuntDocument(), outcomeRaw: 0 }));
   });
 
   it("still accepts a HitRate rep whose optional stunt fields are null", async () => {

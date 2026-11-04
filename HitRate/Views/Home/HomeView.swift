@@ -287,6 +287,8 @@ struct HomeView: View {
                     }
                     TumblingVideoCard(teamID: currentTeam?.id.uuidString,
                         ownerUID: currentTeam?.ownerUID, subjects: subjects)
+                    StuntAnalysisCard(teamID: currentTeam?.id.uuidString,
+                        groups: groups, subjects: subjects)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)

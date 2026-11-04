@@ -229,37 +229,15 @@ Key invariants:
   scored-reps-only, so an untracked practice can't inflate a driver to 100%);
   `ExecutionCard` renders it BELOW the analytics cards, hidden unless
   `stats.hasExecution`.
-- **STUNT STABILITY (StuntScope video layer)** — a second OPTIONAL per-rep
-  layer, written by StuntScope (the FlightFilter coach app) through the SHARED
-  Firestore, never by HitRate. It rides on the attempt itself: `Attempt`
-  carries additive fields (`sourceRaw`, `athleteIDsRaw`, `rolesRaw`,
-  `onBasePercent`, `holdSeconds`, `wobbleCount`, `worstWobbleSecond`,
-  `flightSecondsRaw`, `videoRef`; `hasStability` = `onBasePercent != nil`),
-  `FAttempt` mirrors them as optionals (nil decodes any older doc), and
-  `firestore.rules` type-checks each one when present (`stuntFieldsValid`;
-  absent AND null both pass — the Firestore encoder spells a nil optional as
-  null). NOT a sibling collection, on purpose: every listener, stat, card and
-  cup already reads `attempts`, and `requiredServerCollections` must never
-  grow. SyncEngine pushes AND imports the layer and both fingerprints carry
-  it — drop one side and HitRate's own re-upload of a StuntScope rep (same
-  uid, same logger) silently strips the video score. Like EXECUTION it never
-  touches `rate` / streaks / cards / tournament: `StatsEngine.stabilityBreakdown`
-  → `FloorStats.stability` (nil until a rep in range is video-scored) →
-  `StabilityCard` below `ExecutionCard`, counting ONLY `hasStability` reps so a
-  hand-logged practice can't read "steady". `athleteIDsRaw` (the stunt
-  group's `Subject.id`s, uppercase `uuidString`) feeds `Attempt.involves`, which
-  the person filter now uses — an athlete's roster line includes reps logged
-  against their stunt group when StuntScope tagged them. `StuntRole` raw values
-  are the wire spelling. Stats only, no video (Ian, 2026-10-30): the per-frame
-  JSON lives in Cloud Storage at `teams/{teamId}/stunts/{attemptId}/frames.json`
-  and `storage.rules` admits nothing else there (no clip upload, `videoRef`
-  stays absent) — don't re-open it to video. Folder-scoped reads;
-  a WRITE requires the Firestore attempt doc to already exist with
-  `loggerId` = the caller, so the attempt is written first and nobody can
-  plant or replace an object under another logger's rep; `videoRef` must sit
-  under its own attempt's folder);
-  `firestore.indexes.json` holds the one composite index (`athleteIds`
-  array-contains + `timestamp` desc) the per-athlete query needs.
+- **STUNT STABILITY (stats-only StuntScope sync)** — StuntScope writes a separate
+  `teams/{teamId}/stuntAnalyses/{recordingId}` Firestore manifest and
+  `teams/{teamId}/stuntAnalyses/{recordingId}/frames.json` Storage object. Its
+  `ready` flag is set only after the JSON upload succeeds. `StuntCloudSync` reads
+  these into `StuntAnalysisCard` without creating an `Attempt` or changing hit
+  rates. Legacy `sourceRaw == "stuntscope"` attempts are excluded from stats,
+  trends, tape, and streaks; do not create new ones. Firestore rules reject new
+  StuntScope attempts; Storage admits only JSON, never video. Keep roster
+  mappings and role spellings aligned with StuntScope's `HRStuntDocument`.
 - **SHARED IDENTITY (keychain access group)** — `Auth/SharedIdentity.swift`:
   HitRate and StuntScope share a keychain access group
   (`$(AppIdentifierPrefix)com.ianrichardson.shared`, `keychain-access-groups`

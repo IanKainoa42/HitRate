@@ -34,6 +34,19 @@ service firebase.storage {
       return firestore.exists(path)
         && firestore.get(path).data.loggerId == request.auth.uid;
     }
+    function stuntAnalysisLoggedByCaller(teamId, recordingId) {
+      let path = /databases/(default)/documents/teams/$(teamId)/stuntAnalyses/$(recordingId);
+      return firestore.exists(path)
+        && firestore.get(path).data.loggerId == request.auth.uid;
+    }
+    match /teams/{teamId}/stuntAnalyses/{recordingId}/frames.json {
+      allow read: if inTeam(teamId);
+      allow write: if inTeam(teamId)
+        && stuntAnalysisLoggedByCaller(teamId, recordingId)
+        && (request.resource == null ||
+            (request.resource.size < 100 * 1024 * 1024
+             && request.resource.contentType == 'application/json'));
+    }
     match /teams/{teamId}/stunts/{attemptId}/frames.json {
       allow read:   if inTeam(teamId);
       allow write:  if inTeam(teamId)

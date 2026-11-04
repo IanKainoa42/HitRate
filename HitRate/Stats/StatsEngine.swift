@@ -564,6 +564,7 @@ enum StatsEngine {
             for s in sessions {
                 for a in s.attempts
                     where a.group.map({ allowed.contains($0.persistentModelID) }) ?? false {
+                    if a.sourceRaw == "stuntscope" { continue }
                     if let interval, !interval.contains(a.timestamp) { continue }
                     guard subjectMatch(a, subject), logger.matches(a) else { continue }
                     guard let value = metric(a) else { continue }
@@ -613,6 +614,7 @@ enum StatsEngine {
         // (a mixed session viewed under a kind filter shows just that kind's tape).
         func inKind(_ s: PracticeSession) -> [Attempt] {
             s.sortedAttempts.filter {
+                $0.sourceRaw != "stuntscope" &&
                 ($0.group.map { allowed.contains($0.persistentModelID) } ?? false)
                     && subjectMatch($0, subject)
                     && logger.matches($0)
@@ -656,6 +658,7 @@ enum StatsEngine {
         var result: [PersistentIdentifier: [Attempt]] = [:]
         for session in sessions {
             for attempt in session.attempts {
+                if attempt.sourceRaw == "stuntscope" { continue }
                 guard let group = attempt.group,
                       allowed.contains(group.persistentModelID) else { continue }
                 if let interval, !interval.contains(attempt.timestamp) { continue }
@@ -703,6 +706,7 @@ enum StatsEngine {
     static func currentLandingStreak(in attempts: [Attempt]) -> Int {
         var run = 0
         for attempt in attempts.reversed() {
+            if attempt.sourceRaw == "stuntscope" { continue }
             guard attempt.isLandingRep else { break }
             run += 1
         }

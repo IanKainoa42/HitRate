@@ -24,6 +24,8 @@ const framesPath = `teams/${teamId}/stunts/${attemptId}/frames.json`;
 const clipPath = `teams/${teamId}/stunts/${attemptId}/clip.mov`;
 const tumbleId = "C934B11A-6290-4F1E-8EF5-C86DF630F145";
 const tumblePath = `teams/${teamId}/tumbles/${tumbleId}/analysis.json`;
+const stuntId = "A934B11A-6290-4F1E-8EF5-C86DF630F145";
+const stuntPath = `teams/${teamId}/stuntAnalyses/${stuntId}/frames.json`;
 
 const clipBytes = new Uint8Array([0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70]);
 
@@ -78,6 +80,9 @@ describe("HitRate Storage rules — StuntScope stunt stats", () => {
         loggerId: memberAId,
         ready: false,
         storagePath: tumblePath,
+      });
+      await setDoc(doc(db, "teams", teamId, "stuntAnalyses", stuntId), {
+        teamId, loggerId: memberAId, ready: false, framesPath: stuntPath,
       });
     });
   });
@@ -145,6 +150,14 @@ describe("HitRate Storage rules — StuntScope stunt stats", () => {
   it("lets the logger upload tumble JSON and the team read it", async () => {
     await assertSucceeds(upload(memberAId, tumblePath, "application/json"));
     await assertSucceeds(getBytes(ref(storageFor(memberBId), tumblePath)));
+  });
+
+  it("lets the stunt logger upload stats and folder members read them", async () => {
+    await assertSucceeds(upload(memberAId, stuntPath));
+    await assertSucceeds(getBytes(ref(storageFor(memberBId), stuntPath)));
+    await assertFails(upload(memberBId, stuntPath));
+    await assertFails(upload(memberAId, stuntPath, "video/quicktime"));
+    await assertFails(upload(memberAId, `teams/${teamId}/stuntAnalyses/${stuntId}/clip.mov`, "video/quicktime"));
   });
 
   it("denies another member or a wrong type for tumble data", async () => {

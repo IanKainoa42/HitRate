@@ -130,6 +130,20 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertFalse(stats.hasStability)
     }
 
+    func testLegacyStuntScopeAttemptDoesNotChangeHitRate() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .majorFall])
+        let legacy = fixture.session.sortedAttempts.first { $0.outcome == .majorFall }!
+        legacy.sourceRaw = "stuntscope"
+        legacy.onBasePercent = 50
+        try fixture.container.mainContext.save()
+
+        let stats = StatsEngine.compute(sessions: [fixture.session], groups: [fixture.group], timeframe: .all)
+        XCTAssertEqual(stats.total, 1)
+        XCTAssertEqual(stats.hits, 1)
+        XCTAssertEqual(stats.rate, 100)
+        XCTAssertNil(stats.stability)
+    }
+
     func testAthleteTaggedInAStuntGroupRepSeesItUnderTheirOwnFilter() throws {
         let fixture = try makeFixture(outcomes: [.hit, .majorFall, .hit])
         let context = fixture.container.mainContext

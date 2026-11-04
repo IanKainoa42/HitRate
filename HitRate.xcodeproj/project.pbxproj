@@ -11,7 +11,8 @@
 		01C8958C0E1BD69D3AE70AC9 /* TumblingVideoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34BABAA49DCF2A0151FE05B /* TumblingVideoCard.swift */; };
 		01D8CC26007D6735221DD2AB /* HomeworkEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B0C5F58901E1800C488A9E /* HomeworkEngine.swift */; };
 		067C72BD1A1BAB32C0BD03C3 /* StuntScopeHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BEDFCBC4AE76CAB56FB3B7C /* StuntScopeHubView.swift */; };
-		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		078482B390C39A8E0B17EE36 /* StuntCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D29A8748F62D9F7CB1ABA31 /* StuntCloudSync.swift */; };
+		10757E7F931CDCA4A35580C2 /* HitRateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 49A344CA1D109DBBE1B63C8B /* HitRateWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		14C31D70B78C11075ADB2741 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CACDF028181ABDC147D68BB /* Theme.swift */; };
 		14E11B68CB4C222CEC82341D /* ExecutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0545801EE9DA971ED89EDBCD /* ExecutionSheet.swift */; };
 		17D7A22D63EAD48ADFC5EF13 /* WatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 947B74ECEEF2FEB425CA60F3 /* WatchWorkoutManager.swift */; };
@@ -32,6 +33,7 @@
 		491D8F08BC6290470666B3A8 /* TrendCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79288C2661DD00CF6B1AF541 /* TrendCard.swift */; };
 		496462BFF77B1A32CA67A84F /* PracticePages.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8DDD484DCA986170B97C1DD /* PracticePages.swift */; };
 		4A2264B0343EFAB8B8AA10D2 /* ExecutionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7E3006F9D9D6763DFA5E8D /* ExecutionCard.swift */; };
+		4AED2BE78DB131D15BE5C866 /* StuntAnalysisCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C12F84204681BE472BD351 /* StuntAnalysisCard.swift */; };
 		4BEB8CB891D7DCA1DAB355B9 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B06141B674607C1343BF33B /* TrophyRoomView.swift */; };
 		5038FDFB070FD8D7FBC78E7B /* StuntRepTelemetrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6222E5856342A4A9766CA168 /* StuntRepTelemetrySheet.swift */; };
 		5069C1AD971B8FF63B7647A1 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479BEBEF04BE023E079A9BEC /* AuthViewModel.swift */; };
@@ -60,6 +62,7 @@
 		8F886ACBD963B15BCBB4EB86 /* MinBuildGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F298FD21B0F9D975766C0E /* MinBuildGate.swift */; };
 		908E1F5AB0E4AA7286FAEB82 /* WatchSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */; };
 		916D36C697A540BE1DB4E043 /* MoreCoachingAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D6FF81ECB5EA96E4A803F5E /* MoreCoachingAppsView.swift */; };
+		923A3C8BE4B6164EA4A29FEB /* StuntCloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91AC00AD2791687E9FFD2DD /* StuntCloudSyncTests.swift */; };
 		92A4FFBDBFC2AC3DB323195A /* WeeklyTournamentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B235302AA1E4AC8671D2C890 /* WeeklyTournamentCard.swift */; };
 		93717E4A1256D30689B6263D /* InteractiveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE66EEEDA9CBDD4722F5FD0 /* InteractiveCardView.swift */; };
 		977B508665FEF8C1BF9C2188 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D10E02645FF41504749C81 /* CaptureView.swift */; };
@@ -146,6 +149,7 @@
 		0545801EE9DA971ED89EDBCD /* ExecutionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionSheet.swift; sourceTree = "<group>"; };
 		077D727936408ADB4E21F2EA /* CardCatalogRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCatalogRenderer.swift; sourceTree = "<group>"; };
 		0B271F43B06539CD8C90123E /* SyncPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPolicyTests.swift; sourceTree = "<group>"; };
+		0D29A8748F62D9F7CB1ABA31 /* StuntCloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StuntCloudSync.swift; sourceTree = "<group>"; };
 		0D38CC95579D03E442BBE042 /* WatchSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionBridge.swift; sourceTree = "<group>"; };
 		0D6FF81ECB5EA96E4A803F5E /* MoreCoachingAppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreCoachingAppsView.swift; sourceTree = "<group>"; };
 		0D99133EDC1350A67D9E311B /* CoachPaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachPaywallView.swift; sourceTree = "<group>"; };
@@ -199,6 +203,7 @@
 		7BACD3E1E790BC7805EB8B02 /* PageRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageRunView.swift; sourceTree = "<group>"; };
 		7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncDataModelTests.swift; sourceTree = "<group>"; };
 		80A7898A15BD7AD15CC0BE38 /* TumbleBlockRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumbleBlockRow.swift; sourceTree = "<group>"; };
+		82C12F84204681BE472BD351 /* StuntAnalysisCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StuntAnalysisCard.swift; sourceTree = "<group>"; };
 		84D10E02645FF41504749C81 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		8CACDF028181ABDC147D68BB /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngineTests.swift; sourceTree = "<group>"; };
@@ -235,6 +240,7 @@
 		E2CFB6DBABEB6CAB6C095E0E /* HitRate.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HitRate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E395B01A27985068F63EB80F /* CoachGrandfatherPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachGrandfatherPolicy.swift; sourceTree = "<group>"; };
 		E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesTests.swift; sourceTree = "<group>"; };
+		E91AC00AD2791687E9FFD2DD /* StuntCloudSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StuntCloudSyncTests.swift; sourceTree = "<group>"; };
 		E93E656F08481A443786C4C5 /* AssignmentEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentEditorSheet.swift; sourceTree = "<group>"; };
 		E9E44179D5053D6F83EB6FA0 /* WatchPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPayloads.swift; sourceTree = "<group>"; };
 		EDD99E08D7FCE2602733C7EF /* CSVExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExport.swift; sourceTree = "<group>"; };
@@ -302,6 +308,7 @@
 				3EBA24253C18C3A061639CD5 /* SessionTapeCard.swift */,
 				245A16BF4F138991F6F68E88 /* SkillInsightsCard.swift */,
 				5FB76854195A54FB7C03C154 /* StabilityCard.swift */,
+				82C12F84204681BE472BD351 /* StuntAnalysisCard.swift */,
 				6222E5856342A4A9766CA168 /* StuntRepTelemetrySheet.swift */,
 				6BEDFCBC4AE76CAB56FB3B7C /* StuntScopeHubView.swift */,
 				BC4A053415866660A35A4745 /* SummaryCard.swift */,
@@ -453,6 +460,7 @@
 				5AADBC1DFD230FC799CCAC29 /* HomeworkEngineTests.swift */,
 				E67E9A8605A201C85BBF2234 /* MilestonesTests.swift */,
 				8F20FF73BD27160706DD46C8 /* StatsEngineTests.swift */,
+				E91AC00AD2791687E9FFD2DD /* StuntCloudSyncTests.swift */,
 				C793D2555C99FAC1FF8ECBBA /* SyncAttemptBatchPlannerTests.swift */,
 				7CA4DBAE161111B108A2DE9C /* SyncDataModelTests.swift */,
 				0B271F43B06539CD8C90123E /* SyncPolicyTests.swift */,
@@ -508,6 +516,7 @@
 				5EA7B2BD10F99B2C321986F3 /* DeepLink.swift */,
 				D047AEE6F79270EE4548869F /* SeededRNG.swift */,
 				138B89E3489E75197EA700F8 /* Sounds.swift */,
+				0D29A8748F62D9F7CB1ABA31 /* StuntCloudSync.swift */,
 				D6D3201BB2A300816864BB46 /* TumbleArchive.swift */,
 				ABF294E89AE4C1B9BAB64AAD /* TumbleCloudSync.swift */,
 			);
@@ -722,6 +731,8 @@
 				A51AD4449C3D528BA7FD9EBF /* Sounds.swift in Sources */,
 				9A7F5EC88FBF3595D22295AA /* StabilityCard.swift in Sources */,
 				E0EC05C354B32AA1F7382C3F /* StatsEngine.swift in Sources */,
+				4AED2BE78DB131D15BE5C866 /* StuntAnalysisCard.swift in Sources */,
+				078482B390C39A8E0B17EE36 /* StuntCloudSync.swift in Sources */,
 				5038FDFB070FD8D7FBC78E7B /* StuntRepTelemetrySheet.swift in Sources */,
 				067C72BD1A1BAB32C0BD03C3 /* StuntScopeHubView.swift in Sources */,
 				6191D2160C8531F5F7BF7DA7 /* SummaryCard.swift in Sources */,
@@ -756,6 +767,7 @@
 				1A7F98E7C46D927597534F8B /* HomeworkEngineTests.swift in Sources */,
 				A08D665455BD81B531DAAB06 /* MilestonesTests.swift in Sources */,
 				C4F07D077575ADD19AB759C4 /* StatsEngineTests.swift in Sources */,
+				923A3C8BE4B6164EA4A29FEB /* StuntCloudSyncTests.swift in Sources */,
 				F8411DE7A143AFA500D29918 /* SyncAttemptBatchPlannerTests.swift in Sources */,
 				C526FBC06047E0872C731348 /* SyncDataModelTests.swift in Sources */,
 				18A3263E1908E1F473615478 /* SyncPolicyTests.swift in Sources */,

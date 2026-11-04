@@ -102,6 +102,31 @@ service cloud.firestore {
         && d.ready is bool && d.updatedAt is timestamp;
     }
 
+    function stuntAnalysisFieldsValid(teamId, recordingId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['teamId', 'recordingTitle', 'loggerId', 'skillId',
+          'stuntGroupId', 'athleteIds', 'rolesRaw', 'onBasePercent', 'holdSeconds',
+          'wobbleCount', 'worstWobbleSecond', 'flightSeconds', 'framesPath',
+          'ready', 'updatedAt'])
+        && d.keys().hasAll(['teamId', 'recordingTitle', 'loggerId', 'skillId',
+          'athleteIds', 'rolesRaw', 'onBasePercent', 'holdSeconds', 'wobbleCount',
+          'flightSeconds', 'framesPath', 'ready', 'updatedAt'])
+        && d.teamId == teamId
+        && d.recordingTitle is string && d.recordingTitle.size() <= 200
+        && d.skillId is string && d.skillId.size() > 0
+        && (absentOrNull(d, 'stuntGroupId') || d.stuntGroupId is string)
+        && d.athleteIds is list && d.athleteIds.size() <= 8
+        && d.rolesRaw is string && d.rolesRaw.size() <= 1000
+        && d.onBasePercent is int && d.onBasePercent >= 0 && d.onBasePercent <= 100
+        && d.holdSeconds is number && d.holdSeconds >= 0
+        && d.wobbleCount is int && d.wobbleCount >= 0
+        && (absentOrNull(d, 'worstWobbleSecond')
+            || (d.worstWobbleSecond is number && d.worstWobbleSecond >= 0))
+        && d.flightSeconds is list && d.flightSeconds.size() <= 1000
+        && d.framesPath == 'teams/' + teamId + '/stuntAnalyses/' + recordingId + '/frames.json'
+        && d.ready is bool && d.updatedAt is timestamp;
+    }
+
     function canReviewTumble(teamId, recordingId) {
       let manifest = /databases/$(database)/documents/teams/$(teamId)/tumbles/$(recordingId);
       return inTeam(teamId) && exists(manifest)
@@ -191,6 +216,8 @@ service cloud.firestore {
       match /attempts/{docId} {
         allow read:   if inTeam(teamId);
         allow create: if inTeam(teamId) && request.resource.data.loggerId == uid()
+          && (absentOrNull(request.resource.data, 'source')
+              || request.resource.data.source != 'stuntscope')
           && stuntFieldsValid(teamId, docId);
         // Attribution is immutable. Only the original logger can edit or
         // tombstone a rep; a folder owner cannot rewrite a member's history.
@@ -211,6 +238,18 @@ service cloud.firestore {
           && resource.data.loggerId == uid()
           && request.resource.data.loggerId == resource.data.loggerId
           && tumbleFieldsValid(teamId, docId);
+        allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
+      }
+      // Analysis has no outcome field and never contributes a hit/miss attempt.
+      match /stuntAnalyses/{docId} {
+        allow read: if inTeam(teamId);
+        allow create: if inTeam(teamId)
+          && request.resource.data.loggerId == uid()
+          && stuntAnalysisFieldsValid(teamId, docId);
+        allow update: if inTeam(teamId)
+          && resource.data.loggerId == uid()
+          && request.resource.data.loggerId == resource.data.loggerId
+          && stuntAnalysisFieldsValid(teamId, docId);
         allow delete: if inTeam(teamId) && resource.data.loggerId == uid();
       }
       match /tumbleEdits/{docId} {
