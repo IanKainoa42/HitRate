@@ -15,6 +15,7 @@ rules_version = '2';
 //   teams/{teamId}/tumbles/{recordingId}     StuntScope tumbling analysis manifest
 //   teams/{teamId}/tumbleEdits/{recordingId}  HitRate coach review of that analysis
 //   joinCodes/{code}                        { teamId } — public code→team lookup
+//   modelCorrections/{id}                   StuntScope opted-in fixes (create-only)
 //
 // Roster is OWNER-authoritative; attempts are append-only and tagged with the
 // logger's uid. A joiner resolves one exact, non-listable code via joinCodes/,
@@ -257,6 +258,25 @@ service cloud.firestore {
         allow create, update: if canReviewTumble(teamId, docId) && tumbleReviewFieldsValid();
         allow delete: if false;
       }
+    }
+
+    // StuntScope "Share Fixes & Stats" (ModelImprovementService.swift): an opted-in
+    // coach's correction to a skill / phase / stroke reading — labels, frames and angles,
+    // never video. Write-once from the app, never readable from any client; the training
+    // pipeline reads it with admin credentials.
+    match /modelCorrections/{docId} {
+      allow read, update, delete: if false;
+      allow create: if signedIn()
+        && request.resource.data.id == docId
+        && request.resource.data.keys().hasOnly(['id', 'timestamp', 'appVersion', 'buildNumber',
+             'platform', 'type', 'anonymousUID', 'skillCorrection', 'skillDismissal',
+             'phaseCorrection', 'phaseClear', 'strokeCorrection', 'orientationCorrection'])
+        && request.resource.data.keys().hasAll(['id', 'timestamp', 'type'])
+        && request.resource.data.type in ['skillCorrection', 'skillDismissal', 'phaseCorrection',
+             'phaseClear', 'strokeCorrection', 'orientationCorrection']
+        && request.resource.data.keys().hasAll([request.resource.data.type])
+        && request.resource.data[request.resource.data.type] is map
+        && (!('anonymousUID' in request.resource.data) || request.resource.data.anonymousUID == uid());
     }
 
     // Remote kill switch (`config/ios` → { minBuild }). Every client reads it on

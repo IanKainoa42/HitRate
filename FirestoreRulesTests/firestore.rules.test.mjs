@@ -595,3 +595,82 @@ describe("HitRate Firestore team authorization", () => {
     }));
   });
 });
+
+describe("StuntScope modelCorrections (Share Fixes & Stats)", () => {
+  const correctionId = "9F3C2B1A-1111-4E6D-9C10-9F0B3A2E7C55";
+  const coachId = "stuntscope-anon-uid";
+
+  function correction(overrides = {}) {
+    return {
+      id: correctionId,
+      timestamp: new Date("2026-11-07T00:00:00Z"),
+      appVersion: "1.0.1",
+      buildNumber: "72",
+      platform: "iOS",
+      type: "phaseCorrection",
+      anonymousUID: coachId,
+      phaseCorrection: { boundary: "landing", correctedFrame: 88, isSet: false },
+      ...overrides,
+    };
+  }
+
+  before(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId,
+      firestore: {
+        rules: await readFile(new URL("../firestore.rules", import.meta.url), "utf8"),
+      },
+    });
+  });
+
+  after(async () => { await testEnv.cleanup(); });
+
+  beforeEach(async () => { await testEnv.clearFirestore(); });
+
+  it("allows a signed-in app user to create a correction", async () => {
+    const db = firestoreFor(coachId);
+    await assertSucceeds(setDoc(doc(db, "modelCorrections", correctionId), correction()));
+  });
+
+  it("allows a correction without anonymousUID", async () => {
+    const db = firestoreFor(coachId);
+    const { anonymousUID, ...rest } = correction();
+    await assertSucceeds(setDoc(doc(db, "modelCorrections", correctionId), rest));
+  });
+
+  it("denies unauthenticated writes", async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, "modelCorrections", correctionId), correction()));
+  });
+
+  it("denies a forged anonymousUID", async () => {
+    const db = firestoreFor("someone-else");
+    await assertFails(setDoc(doc(db, "modelCorrections", correctionId), correction()));
+  });
+
+  it("denies an id that does not match the document", async () => {
+    const db = firestoreFor(coachId);
+    await assertFails(setDoc(doc(db, "modelCorrections", "other-id"), correction()));
+  });
+
+  it("denies unknown types, missing detail maps and extra fields", async () => {
+    const db = firestoreFor(coachId);
+    const ref = doc(db, "modelCorrections", correctionId);
+    await assertFails(setDoc(ref, correction({ type: "videoUpload" })));
+    await assertFails(setDoc(ref, correction({ type: "skillCorrection" })));
+    await assertFails(setDoc(ref, correction({ videoURL: "gs://x" })));
+  });
+
+  it("denies reads, updates and deletes from any client", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "modelCorrections", correctionId), correction());
+    });
+    const db = firestoreFor(coachId);
+    const ref = doc(db, "modelCorrections", correctionId);
+    await assertFails(getDoc(ref));
+    await assertFails(getDocs(collection(db, "modelCorrections")));
+    await assertFails(setDoc(ref, correction({ appVersion: "9" })));
+    await assertFails(updateDoc(ref, { appVersion: "9" }));
+    await assertFails(deleteDoc(ref));
+  });
+});
