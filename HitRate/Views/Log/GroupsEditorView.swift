@@ -16,6 +16,7 @@ struct GroupsEditorView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @Query(sort: \StuntGroup.orderIndex) private var allGroups: [StuntGroup]
     @Query(sort: \Team.orderIndex) private var teams: [Team]
+    @Query(sort: \Subject.orderIndex) private var allSubjects: [Subject]
 
     @AppStorage("appMode") private var appModeRaw = AppMode.athlete.rawValue
     @AppStorage("athleteName") private var athleteName = ""
@@ -29,6 +30,8 @@ struct GroupsEditorView: View {
 
     // Swipe-deleted group/team awaiting confirmation (only when it has reps).
     @State private var pendingDelete: StuntGroup?
+    // Swipe-deleted athlete / stunt group awaiting confirmation (only with reps).
+    @State private var pendingSubjectDelete: Subject?
     @State private var editingOutcomesFor: StuntGroup?
     @State private var editingTemplate: OutcomeTemplate?
     @State private var paywallOpen = false
@@ -39,6 +42,13 @@ struct GroupsEditorView: View {
     /// The active team and its roster — the editor edits this team.
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
     private var groups: [StuntGroup] { allGroups.inTeam(currentTeam) }
+
+    /// WHO the reps are logged for in this folder — the second axis of the
+    /// capture matrix (subject × skill). Same wording rule as Capture/Home:
+    /// coach mode calls them stunt groups, athlete mode athletes.
+    private var subjects: [Subject] { allSubjects.inTeam(currentTeam) }
+    private var subjectKind: SubjectKind { mode == .coach ? .group : .person }
+    private var subjectsTitle: String { subjectKind == .person ? "Athletes" : "Stunt Groups" }
 
     /// The active folder's user-created outcomes, in display order.
     private var customOutcomes: [CustomOutcome] {
@@ -177,6 +187,8 @@ struct GroupsEditorView: View {
                 }
                 .listRowBackground(glassRow)
 
+                subjectsSection
+
                 // Outcomes are now per-skill (label + color + credit), edited via
                 // the slider icon on each skill row → SkillOutcomesEditor. The old
                 // global per-kind rename sections were retired with that change.
@@ -280,6 +292,20 @@ struct GroupsEditorView: View {
             } message: { g in
                 Text("This \(noun) and its \(g.attempts.count) logged reps move to the Trash. Restore them anytime from Data Management.")
             }
+            .alert(
+                "Remove \(pendingSubjectDelete?.displayName ?? "")?",
+                isPresented: Binding(
+                    get: { pendingSubjectDelete != nil },
+                    set: { if !$0 { pendingSubjectDelete = nil } }),
+                presenting: pendingSubjectDelete
+            ) { s in
+                Button("Remove", role: .destructive) {
+                    withAnimation { softDelete(s) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { s in
+                Text("Its \(s.attempts.count) logged reps are kept and still count in the team totals — they just stop showing under this \(subjectKind.label.lowercased()).")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { EditButton() }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -332,6 +358,80 @@ struct GroupsEditorView: View {
     /// Soft-delete: the skill + its reps move to the Trash, kept and restorable.
     private func softDelete(_ g: StuntGroup) {
         g.deletedAt = .now
+        try? context.save()
+    }
+
+    // MARK: Athletes / stunt groups (who the reps are logged for)
+
+    /// The folder's subjects, manageable OUTSIDE a live practice. Before this
+    /// section the only way to add one was the unlabeled person+ icon inside
+    /// CaptureView, so a coach setting up a deck never met the concept.
+    @ViewBuilder
+    private var subjectsSection: some View {
+        Section {
+            ForEach(subjects) { s in
+                HStack(spacing: 10) {
+                    Image(systemName: s.kind.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.label3)
+                        .frame(width: 20)
+                    RenameField(prompt: s.kind.label, value: s.name) { new in
+                        s.name = new
+                        try? context.save()
+                    }
+                }
+                // Same non-destructive-role swipe as the skill rows above: a
+                // repped subject goes through the confirm alert first.
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button("Remove") { requestDelete(s) }.tint(.red)
+                }
+            }
+            .onDelete { idx in   // edit-mode minus button path
+                guard let i = idx.first else { return }
+                requestDelete(subjects[i])
+            }
+            .onMove { from, to in
+                var arr = subjects
+                arr.move(fromOffsets: from, toOffset: to)
+                for (i, s) in arr.enumerated() { s.orderIndex = i }
+                try? context.save()
+            }
+
+            Button { addSubject() } label: {
+                Label("Add \(subjectKind.label.lowercased())", systemImage: "plus")
+            }
+        } header: {
+            Text(subjectsTitle)
+        } footer: {
+            Text(subjectKind == .person
+                 ? "Add each athlete you log for. In practice, pin a skill and every athlete gets a row — tap the outcome for each."
+                 : "Add each stunt group on this team. In practice, pin a skill and every stunt group gets a row — tap the outcome for each. No separate deck per group.")
+        }
+        .listRowBackground(glassRow)
+    }
+
+    private func addSubject() {
+        guard let team = currentTeam else { return }
+        let next = (subjects.map(\.orderIndex).max() ?? -1) + 1
+        let s = Subject(name: "\(subjectKind.label) \(subjects.count + 1)",
+                        kind: subjectKind, orderIndex: next)
+        s.team = team
+        context.insert(s)
+        try? context.save()
+    }
+
+    /// Unrepped subjects go on the spot; repped ones confirm first.
+    private func requestDelete(_ s: Subject) {
+        if s.attempts.isEmpty {
+            withAnimation { softDelete(s) }
+        } else {
+            pendingSubjectDelete = s
+        }
+    }
+
+    /// Soft-delete (tombstone syncs like any other subject edit); reps are kept.
+    private func softDelete(_ s: Subject) {
+        s.deletedAt = .now
         try? context.save()
     }
 

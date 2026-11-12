@@ -371,6 +371,11 @@ Key invariants:
   person filter and roster overview won't see them (known v1 gap). Undo
   pairs `SyncEngine.queueDeletion` with delete. New @Models must be added to
   BOTH `Schema([...])` lists in HitRateApp.swift.
+  **Subjects (athletes / stunt groups) are managed in TWO places**: Capture's
+  add buttons (capture-first, unnamed) and the editor's Athletes / Stunt
+  Groups section (`GroupsEditorView.subjectsSection` — add / rename / reorder /
+  soft-delete outside a live practice; a repped subject confirms first, its
+  reps are kept). Wording follows `subjectKind` (coach = stunt group).
   **Editor rename fields use `RenameField`** (local @State buffer,
   commits on blur/submit/disappear) — never bind a TextField directly through
   `OutcomeNames` (@Observable) or a SwiftData @Model, or each keystroke
