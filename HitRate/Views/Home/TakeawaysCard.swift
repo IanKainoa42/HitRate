@@ -31,9 +31,9 @@ struct TakeawaysCard: View {
                              : "\(Text(worst.name).fontWeight(.bold)) owns \(Text("\(worst.falls) of \(stats.falls)").fontWeight(.bold)) floor falls — spot it next.")
                     }
                 }
-                if let miss = stats.topMiss {
+                if let miss = stats.topMissRow {
                     InsightRow(icon: "flame", color: Theme.accent, divider: false) {
-                        Text("\(Text(miss.label(stats.aggregateKind)).fontWeight(.bold)) is your top miss at \(Text("\(stats.overall[miss.rawValue])").fontWeight(.bold)) reps — most fixable error.")
+                        Text("\(Text(miss.label).fontWeight(.bold)) is your top miss at \(Text("\(miss.count)").fontWeight(.bold)) reps — most fixable error.")
                     }
                 }
             }

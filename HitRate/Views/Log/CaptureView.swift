@@ -49,6 +49,12 @@ struct CaptureView: View {
     @State private var lastLoggedToastText: String = ""
     @State private var toastResetTask: Task<Void, Never>? = nil
 
+    /// The deductions-only FULL-OUT run (`FullOutView`), and the batch it last
+    /// wrote — every rep of one run shares a `waveID`, which is what lets the
+    /// toast's Undo take the whole run back in one tap.
+    @State private var showFullOut = false
+    @State private var lastFullOut: (wave: UUID, reps: Int, deductions: Int)? = nil
+
     private var mode: AppMode { AppMode(rawValue: appModeRaw) ?? .athlete }
     private var currentTeam: Team? { teams.current(id: currentTeamID) }
 
@@ -104,6 +110,10 @@ struct CaptureView: View {
                 .sheet(isPresented: $showGroupsEditor) { GroupsEditorView() }
                 .sheet(item: $scoringAttempt) { ExecutionSheet(attempt: $0) }
                 .sheet(item: $telemetryAttempt) { StuntRepTelemetrySheet(attempt: $0, subjects: subjects) }
+                .sheet(isPresented: $showFullOut) {
+                    FullOutView(rows: subjects, skills: groups) { commitFullOut($0) }
+                        .presentationDetents([.large])
+                }
                 .onAppear {
                     seedFirstSubjectIfNeeded()
                     syncSingleSubjectLock()
@@ -195,6 +205,27 @@ struct CaptureView: View {
                     .foregroundStyle(Theme.label2)
             }
             Spacer()
+            if canRunFullOut {
+                Button {
+                    showFullOut = true
+                    hapticTrigger += 1
+                } label: {
+                    Text("FULL OUT")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Theme.iconTile)
+                                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .stroke(Theme.accent.opacity(0.5), lineWidth: 1)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Log a whole run by marking only the deductions")
+            }
             Button {
                 if !session.attempts.isEmpty {
                     session.endedAt = .now
@@ -453,6 +484,7 @@ struct CaptureView: View {
     private func skillPinnedMatrix(_ attempts: [Attempt]) -> some View {
         if let skill = pinnedSkill {
             let defs = skill.outcomeDefs
+            let compact = usesCompactLabels(defs)
             VStack(spacing: 8) {
                 RenameField(prompt: "Name this skill", value: skill.name) { new in
                     skill.name = new
@@ -467,7 +499,7 @@ struct CaptureView: View {
                 HStack(spacing: 6) {
                     Color.clear.frame(width: rowLabelWidth, height: 1)
                     ForEach(Array(defs.enumerated()), id: \.offset) { _, def in
-                        Text(def.label.uppercased())
+                        Text(padLabel(def, compact: compact))
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(def.color)
                             .frame(maxWidth: .infinity)
@@ -486,7 +518,7 @@ struct CaptureView: View {
                                     subjectRowLabel(s, streak: streakN)
                                     ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                         let v = counts(group: skill, subject: s, in: attempts)[safe: slot] ?? 0
-                                        matrixCell(group: skill, subject: s, slot: slot, def: def, v: v)
+                                        matrixCell(group: skill, subject: s, slot: slot, def: def, v: v, compact: compact)
                                     }
                                 }
                                 .frame(minHeight: 58)
@@ -527,7 +559,8 @@ struct CaptureView: View {
                                 skillRowLabel(g, streak: streakN)
                                 ForEach(Array(defs.enumerated()), id: \.offset) { slot, def in
                                     let v = counts(group: g, subject: subject, in: attempts)[safe: slot] ?? 0
-                                    matrixCell(group: g, subject: subject, slot: slot, def: def, v: v)
+                                    matrixCell(group: g, subject: subject, slot: slot, def: def, v: v,
+                                               compact: usesCompactLabels(defs))
                                 }
                             }
                             .frame(minHeight: 58)
@@ -592,8 +625,9 @@ struct CaptureView: View {
 
     /// One matrix cell — 1-TAP DIRECT AUTO-SAVE LOGGING.
     @ViewBuilder
-    private func matrixCell(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef, v: Int) -> some View {
-        cellVisual(v: v, def: def)
+    private func matrixCell(group: StuntGroup, subject: Subject, slot: Int, def: OutcomeDef, v: Int,
+                            compact: Bool = false) -> some View {
+        cellVisual(v: v, def: def, compact: compact)
             .onTapGesture {
                 logDirect(group: group, subject: subject, slot: slot, def: def)
             }
@@ -602,8 +636,18 @@ struct CaptureView: View {
             .accessibilityHint("1-tap to log immediately")
     }
 
+    /// Past five outcome columns a cell is too narrow for whole words — the
+    /// stunt preset's sixth column would squeeze "BUILDING FALL" under 5pt —
+    /// so that row switches to the short codes the tape legend already uses
+    /// (BF, MF, B/M, OOR). Five or fewer keep their full words, unchanged.
+    private func usesCompactLabels(_ defs: [OutcomeDef]) -> Bool { defs.count > 5 }
+
+    private func padLabel(_ def: OutcomeDef, compact: Bool) -> String {
+        compact ? def.short : def.label.uppercased()
+    }
+
     /// Engraved cell face with explicit outcome label.
-    private func cellVisual(v: Int, def: OutcomeDef) -> some View {
+    private func cellVisual(v: Int, def: OutcomeDef, compact: Bool = false) -> some View {
         VStack(spacing: 1) {
             Text("\(v)")
                 .font(Theme.barlow(20, .extrabold))
@@ -611,7 +655,7 @@ struct CaptureView: View {
                 .foregroundStyle(v == 0 ? Theme.label3 : Theme.label)
                 .contentTransition(.numericText(value: Double(v)))
                 .animation(.spring(duration: 0.3), value: v)
-            Text(def.label.uppercased())
+            Text(padLabel(def, compact: compact))
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(def.color.opacity(0.9))
                 .lineLimit(1).minimumScaleFactor(0.5)
@@ -635,7 +679,26 @@ struct CaptureView: View {
 
     private var autoSaveToastBar: some View {
         HStack(spacing: 10) {
-            if let lastRep = lastLoggedRep {
+            if let run = lastFullOut {
+                HStack(spacing: 6) {
+                    Circle().fill(Theme.accent).frame(width: 8, height: 8)
+                    Text("FULL OUT · \(run.reps) REP\(run.reps == 1 ? "" : "S") · \(run.deductions) DEDUCTION\(run.deductions == 1 ? "" : "S")")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.label)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Spacer()
+                Button {
+                    undoFullOut()
+                } label: {
+                    Label("Undo all", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else if let lastRep = lastLoggedRep {
                 HStack(spacing: 6) {
                     Circle().fill(lastRep.outcomeDef?.color ?? Theme.accent).frame(width: 8, height: 8)
                     Text(lastLoggedToastText)
@@ -675,6 +738,7 @@ struct CaptureView: View {
         .wellBackground()
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: lastLoggedRep != nil)
+        .animation(.easeInOut(duration: 0.2), value: lastFullOut?.wave)
     }
 
     // MARK: Direct 1-Tap Auto-Save Logic
@@ -693,6 +757,7 @@ struct CaptureView: View {
         let targetName = subject.displayName.isEmpty ? group.displayName : subject.displayName
         lastLoggedToastText = "\(def.label.uppercased()) · \(targetName)"
         lastLoggedRep = a
+        lastFullOut = nil   // the toast now belongs to this rep
 
         toastResetTask?.cancel()
         toastResetTask = Task {
@@ -713,6 +778,75 @@ struct CaptureView: View {
         context.delete(rep)
         try? context.save()
         lastLoggedRep = nil
+        toastResetTask?.cancel()
+        hapticTrigger += 1
+        Sounds.shared.play(.undo)
+    }
+
+    // MARK: Full-out run (deductions-only — see FullOutView)
+
+    /// Worth offering once the grid is more than a single cell.
+    private var canRunFullOut: Bool {
+        !groups.isEmpty && !subjects.isEmpty && groups.count * subjects.count > 1
+    }
+
+    /// Write one full-out run: a rep per resolved cell, attributed to its row,
+    /// all sharing one `waveID`. Same contract as `logDirect` — stamp the
+    /// logger, clear `isDemo`, save immediately. A cell the coach marked DNA
+    /// (or whose skill couldn't take its mark) is simply not in `run.reps`, so
+    /// nothing is written for it. Timestamps step 1 ms apart, row-major, so the
+    /// tape and CSV keep the run in grid order instead of an arbitrary tie.
+    private func commitFullOut(_ run: FullOutPlan.Resolution) {
+        guard !run.reps.isEmpty else { return }
+        let skillByID = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let subjectByID = Dictionary(subjects.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let wave = UUID()
+        let start = Date.now
+        var written = 0
+        var deductions = 0
+        for rep in run.reps {
+            // Re-check against the live roster: the sheet resolved against the
+            // lists it was opened with.
+            guard let skill = skillByID[rep.skill], let subject = subjectByID[rep.row],
+                  let def = skill.outcomeDef(at: rep.slot) else { continue }
+            let a = Attempt(slot: rep.slot, group: skill, session: session, subject: subject,
+                            timestamp: start.addingTimeInterval(Double(written) * 0.001), waveID: wave)
+            a.loggerID = auth.uid ?? ""
+            context.insert(a)
+            written += 1
+            if !def.isHit { deductions += 1 }
+        }
+        guard written > 0 else { return }
+        currentTeam?.isDemo = false
+        try? context.save()
+
+        hapticTrigger += 1
+        Sounds.shared.play(.outcome(.hit))
+
+        lastLoggedRep = nil
+        withAnimation { lastFullOut = (wave, written, deductions) }
+        toastResetTask?.cancel()
+        // Longer than a single rep's 3.5s: this Undo is worth a whole run.
+        toastResetTask = Task {
+            try? await Task.sleep(for: .seconds(12))
+            if !Task.isCancelled {
+                await MainActor.run { withAnimation { lastFullOut = nil } }
+            }
+        }
+    }
+
+    /// Take back the whole run the toast is showing — every rep that shares
+    /// its `waveID`, each paired with a queued cloud deletion like any undo.
+    private func undoFullOut() {
+        guard let run = lastFullOut else { return }
+        // Snapshot first — deleting mutates the relationship being walked.
+        let reps = session.attempts.filter { $0.waveID == run.wave }
+        for rep in reps {
+            SyncEngine.shared.queueDeletion(of: rep, in: context)
+            context.delete(rep)
+        }
+        try? context.save()
+        withAnimation { lastFullOut = nil }
         toastResetTask?.cancel()
         hapticTrigger += 1
         Sounds.shared.play(.undo)

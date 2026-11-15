@@ -51,9 +51,9 @@ enum Milestones {
             let attempts = sessions.flatMap(\.attempts).filter(inTeam)
                 .sorted { $0.timestamp < $1.timestamp }
             let total = attempts.count
-            let falls = attempts.filter {
-                $0.tierOutcome == .buildingFall || $0.tierOutcome == .majorFall
-            }.count
+            // `isFallRep`, not the raw tier: an appended outcome (balk, out of
+            // range) can share a fall's credit without being a fall.
+            let falls = attempts.filter(\.isFallRep).count
 
             var bestHitRun = 0, bestMissRun = 0
             var hitRun = 0, missRun = 0
@@ -78,9 +78,7 @@ enum Milestones {
                 let n = reps.count
                 guard n > 0 else { return nil }
                 let hits = reps.filter(\.isHitRep).count
-                let f = reps.filter {
-                    $0.tierOutcome == .buildingFall || $0.tierOutcome == .majorFall
-                }.count
+                let f = reps.filter(\.isFallRep).count
                 return SessionShape(reps: n,
                                     rate: Int((Double(hits) / Double(n) * 100).rounded()),
                                     falls: f,

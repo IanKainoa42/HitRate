@@ -28,7 +28,12 @@ struct CSVExportItem: Transferable {
                     Row(timestamp: $0.timestamp, sessionStart: s.startedAt,
                         group: $0.group?.name ?? "",
                         subject: $0.subject?.name ?? "",
-                        outcome: $0.outcome.label($0.group?.kind ?? .stunt))
+                        // The rep's OWN outcome word. `Attempt.outcome` only
+                        // knows the four legacy slots and falls back to .hit,
+                        // which exported every appended outcome (slot 4+: a
+                        // balk, out of range, a coach-made extra) as "Hit".
+                        outcome: $0.outcomeDef?.label
+                            ?? $0.outcome.label($0.group?.kind ?? .stunt))
                 }
             }
             .sorted { $0.timestamp < $1.timestamp }

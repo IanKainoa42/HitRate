@@ -76,6 +76,53 @@ struct LoggerFilter: Equatable {
 
 // MARK: - Derived stat shapes (mirrors buildData() in the handoff prototype)
 
+/// One APPENDED outcome's reps in a slice — a balk, out of range, or a
+/// coach-made extra (`Attempt.isExtraOutcomeRep`). These reps are ALSO inside
+/// the tier `counts` (that's what keeps the weighted rate right); this row is
+/// what lets a view name them truthfully instead of borrowing the tier's
+/// stock word ("Major fall" for anything worth 0%).
+struct ExtraOutcomeStat: Identifiable, Equatable {
+    let def: OutcomeDef     // label + color + credit as the skill defines it
+    let count: Int
+
+    var id: String { Self.key(def) }
+    /// The credit tier (0 = hit … 3 = miss) these reps were bucketed into.
+    var tier: Int { def.creditTier.tierIndex }
+
+    /// Same name AND same credit = the same outcome across skills. Credit is
+    /// part of the key so a merged row always sits in exactly one tier.
+    static func key(_ def: OutcomeDef) -> String {
+        "\(def.label.trimmingCharacters(in: .whitespaces).lowercased())|\(def.creditTier.tierIndex)"
+    }
+
+    /// Roll per-skill rows up to the floor: same-key rows sum (first-seen
+    /// label/color wins), ordered good → bad, first-seen within a tier.
+    static func merged(_ rows: [ExtraOutcomeStat]) -> [ExtraOutcomeStat] {
+        var order: [String] = []
+        var byKey: [String: ExtraOutcomeStat] = [:]
+        for row in rows where row.count > 0 {
+            if let existing = byKey[row.id] {
+                byKey[row.id] = ExtraOutcomeStat(def: existing.def, count: existing.count + row.count)
+            } else {
+                byKey[row.id] = row
+                order.append(row.id)
+            }
+        }
+        return order.compactMap { byKey[$0] }
+            .enumerated()
+            .sorted { $0.element.tier != $1.element.tier ? $0.element.tier < $1.element.tier : $0.offset < $1.offset }
+            .map(\.element)
+    }
+}
+
+/// Appended-outcome counts per credit tier, for subtracting out of a
+/// tier-indexed `counts` array.
+private func extraTierCounts(_ extras: [ExtraOutcomeStat]) -> [Int] {
+    var c = [0, 0, 0, 0]
+    for e in extras where e.tier >= 0 && e.tier < c.count { c[e.tier] += e.count }
+    return c
+}
+
 struct GroupStat: Identifiable {
     let id: PersistentIdentifierBox
     let name: String
@@ -89,8 +136,16 @@ struct GroupStat: Identifiable {
     let hits: Int
     let rate: Int          // 0–100
     let delta: Int?        // vs previous comparable period; nil if no prior data
+    /// This skill's appended-outcome reps by name (already inside `counts`).
+    var extras: [ExtraOutcomeStat] = []
 
-    var falls: Int { counts[Outcome.buildingFall.rawValue] + counts[Outcome.majorFall.rawValue] }
+    /// Actual falls: the two fall tiers MINUS appended outcomes that merely
+    /// share their credit (a balk or out-of-range is not a fall).
+    var falls: Int {
+        let extra = extraTierCounts(extras)
+        return max(0, counts[Outcome.buildingFall.rawValue] - extra[Outcome.buildingFall.rawValue])
+            + max(0, counts[Outcome.majorFall.rawValue] - extra[Outcome.majorFall.rawValue])
+    }
     var bobbles: Int { counts[Outcome.bobble.rawValue] }
 
     // Clean-hit lens remains available alongside the weighted headline rate.
@@ -222,12 +277,39 @@ struct FloorStats {
     let stability: StabilityBreakdown?
     var hasStability: Bool { stability != nil }
 
-    var falls: Int { overall[Outcome.buildingFall.rawValue] + overall[Outcome.majorFall.rawValue] }
+    /// Appended-outcome reps across the floor, by name (already inside
+    /// `overall` — see `ExtraOutcomeStat`). Empty when every rep in range sits
+    /// on one of the four severity slots, which is every pre-existing store.
+    var extras: [ExtraOutcomeStat] = []
+
+    /// The four severity rows as a legend should SHOW them: `overall` with the
+    /// appended outcomes taken back out, so "Major fall" counts major falls
+    /// and nothing else. `coreCounts` + `extras` always re-sums to `total`.
+    var coreCounts: [Int] {
+        let extra = extraTierCounts(extras)
+        return overall.enumerated().map { i, n in max(0, n - (i < extra.count ? extra[i] : 0)) }
+    }
+
+    var falls: Int {
+        let core = coreCounts
+        return core[Outcome.buildingFall.rawValue] + core[Outcome.majorFall.rawValue]
+    }
     var best: GroupStat? { ranked.first }
     var worstFalls: GroupStat? { ranked.max { $0.falls < $1.falls } }
     var topMiss: Outcome? {
-        let miss = Outcome.allCases.filter { !$0.isHit }.max { overall[$0.rawValue] < overall[$1.rawValue] }
-        return (miss.map { overall[$0.rawValue] } ?? 0) > 0 ? miss : nil
+        let core = coreCounts
+        let miss = Outcome.allCases.filter { !$0.isHit }.max { core[$0.rawValue] < core[$1.rawValue] }
+        return (miss.map { core[$0.rawValue] } ?? 0) > 0 ? miss : nil
+    }
+    /// The most common non-hit BY NAME — a severity row or an appended outcome,
+    /// whichever has more reps (a tie keeps the severity row).
+    var topMissRow: (label: String, count: Int)? {
+        let core = coreCounts
+        var best: (label: String, count: Int)? = topMiss.map { ($0.label(aggregateKind), core[$0.rawValue]) }
+        for e in extras where !e.def.isHit && e.count > (best?.count ?? 0) {
+            best = (e.def.label, e.count)
+        }
+        return best
     }
     var hasData: Bool { total > 0 }
 
@@ -339,7 +421,8 @@ enum StatsEngine {
         var groupStats: [GroupStat] = []
         var prevOverall = [0, 0, 0, 0]
         for g in ordered {
-            let counts = outcomeCounts(currentAttempts[g.persistentModelID] ?? [])
+            let reps = currentAttempts[g.persistentModelID] ?? []
+            let counts = outcomeCounts(reps)
             let total = counts.reduce(0, +)
             let hits = counts[Outcome.hit.rawValue]
             let rate = weightedRate(counts)
@@ -358,7 +441,8 @@ enum StatsEngine {
                 name: g.name, number: g.number,
                 colorIndex: (g.number - 1) % Theme.groupRainbow.count,
                 kind: g.kind, category: g.category, tierDefs: g.tierOutcomeDefs,
-                counts: counts, total: total, hits: hits, rate: rate, delta: delta))
+                counts: counts, total: total, hits: hits, rate: rate, delta: delta,
+                extras: extraOutcomeStats(reps)))
         }
 
         // Floor rollup.
@@ -396,7 +480,8 @@ enum StatsEngine {
             latest: latestSnapshot(sorted: sorted, allowed: allowed,
                                    subject: subject, logger: logger),
             execution: execution, executionScoredReps: executionScoredReps,
-            stability: stability)
+            stability: stability,
+            extras: ExtraOutcomeStat.merged(groupStats.flatMap(\.extras)))
     }
 
     // MARK: Stability breakdown (StuntScope video layer)
@@ -677,6 +762,19 @@ enum StatsEngine {
             counts[attempt.tierOutcome.rawValue] += 1
         }
         return counts
+    }
+
+    /// One skill's appended-outcome reps (`Attempt.isExtraOutcomeRep`), one row
+    /// per outcome slot in slot order. These reps stay in `outcomeCounts` too.
+    private static func extraOutcomeStats(_ attempts: [Attempt]) -> [ExtraOutcomeStat] {
+        var bySlot: [Int: (def: OutcomeDef, count: Int)] = [:]
+        for attempt in attempts where attempt.isExtraOutcomeRep {
+            guard let def = attempt.outcomeDef else { continue }
+            bySlot[attempt.outcomeRaw] = (def, (bySlot[attempt.outcomeRaw]?.count ?? 0) + 1)
+        }
+        return bySlot.keys.sorted().compactMap { slot in
+            bySlot[slot].map { ExtraOutcomeStat(def: $0.def, count: $0.count) }
+        }
     }
 
     /// Cross-cutting person filter: nil subject = everyone; otherwise the rep

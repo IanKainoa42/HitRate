@@ -252,8 +252,17 @@ extension SkillCategory {
     var defaultOutcomeDefs: [OutcomeDef] {
         switch self {
         case .stunts, .pyramid:
+            // Two counted NON-FALL deductions ride after the four severity
+            // slots (appended, so every existing rep keeps its slot): a balk /
+            // missed skill (didn't throw it) and out of range. Both are real
+            // attempts that cost score — Ian: "equal to a fall, sometimes equal
+            // to a major fall" — so they default to the building-fall and
+            // major-fall credits; the per-skill editor can move either.
+            // "Did not attempt / absent" is deliberately NOT here: it is not an
+            // attempt, so it is never an Attempt row (see FullOutMark.skipped).
             return [.init("Hit", .green, .hit), .init("Bobble", .yellow, .decent),
-                    .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss)]
+                    .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss),
+                    .init("Balk / Missed", .blue, .rough), .init("Out of range", .purple, .miss)]
         case .standingTumbling, .runningTumbling:
             // Tumbling is land / didn't / balk: only Stuck (100) and Stepped out
             // (67) are landings. A touchdown is a fall — credit 0 (orange keeps it
@@ -967,6 +976,25 @@ final class Attempt {
     /// crash-safe regardless of how many outcomes the skill defines.
     var tierOutcome: Outcome {
         Outcome(rawValue: outcomeDef?.creditTier.tierIndex ?? OutcomeCredit.miss.tierIndex) ?? .majorFall
+    }
+
+    /// True when this rep logged an outcome APPENDED after the four
+    /// legacy-aligned severity slots — a balk, out of range, or anything a
+    /// coach added in the outcome editor. It still CREDITS by its tier (the
+    /// rate is unchanged), but it is its own thing by NAME: aggregate views
+    /// must not relabel it with the tier's stock word. That relabel is how 14
+    /// "Missed skill" reps (credit 0) showed up as 14 "Major fall" on the
+    /// all-groups summary.
+    var isExtraOutcomeRep: Bool {
+        outcomeRaw >= Outcome.allCases.count && outcomeDef != nil
+    }
+
+    /// A FALL: a building-fall / major-fall tier rep on one of the four
+    /// severity slots. An appended outcome (balk, out of range) can cost as
+    /// much as a fall without anyone hitting the mat, so it never counts here.
+    var isFallRep: Bool {
+        guard !isExtraOutcomeRep else { return false }
+        return tierOutcome == .buildingFall || tierOutcome == .majorFall
     }
 }
 
