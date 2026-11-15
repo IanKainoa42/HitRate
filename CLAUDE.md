@@ -77,6 +77,22 @@ Key invariants:
     now INCLUDES zero-rep skills as minted cards. Tests: `CardStageTests`.
 - Outcome enum order is load-bearing: hit, bobble, buildingFall, majorFall —
   `counts` arrays are indexed by `Outcome.rawValue` everywhere.
+- **APPENDED OUTCOMES are named, never relabeled** (2026-11-15). A skill's
+  outcome list can run past the four severity slots: the stunt/pyramid preset
+  appends `Balk / Missed` (33) and `Out of range` (0), tumbling appends `Balk`,
+  and the editor lets a coach add their own. A rep on slot ≥ 4 is an
+  `Attempt.isExtraOutcomeRep`: it still CREDITS by tier (so `counts`/`overall`
+  and every rate are unchanged) but aggregate views must show it by its own
+  name. `FloorStats.extras` / `GroupStat.extras` (`ExtraOutcomeStat`) carry
+  those reps by name and `FloorStats.coreCounts` is `overall` with them taken
+  back out — the summary legend/bar, `falls`, and `topMissRow` read THOSE, not
+  raw `overall`. Folding them into the tier's stock word is the bug that showed
+  14 "Missed skill" reps as 14 "Major fall". `Attempt.isFallRep` is the one
+  definition of a fall (fall tier AND not appended) — Milestones use it.
+  Appending to a preset is safe (existing reps keep their slots); inserting or
+  reordering is not. Known gaps: `PageRunView`'s armed bar and the watch still
+  only reach slots 0–3, and a build older than this one resolves slot 4/5 on a
+  preset skill to nil (credit 0) until it updates.
 - Outcome labels are renameable per skill kind (UserDefaults keys
   `outcomeLabel0–3` for stunt, `tumblingOutcomeLabel0–3` for tumbling; blank =
   default), but slots/severity/colors are fixed and shared across kinds.
@@ -210,6 +226,23 @@ Key invariants:
   milestones have no storage of their own, "earned" is recomputed from the
   attempts every time. Good milestones (volume/streak/session quality/skill
   mastery) + "DUBIOUS HONOR" bad ones (falls, cold streaks). Tier = difficulty.
+- **FULL-OUT RUN (deductions-only logging, 2026-11-15)** —
+  `Stats/FullOutPlan.swift` (pure) + `Views/Log/FullOutView.swift`, opened from
+  CaptureView's header FULL OUT button. The original speed idea: a grid of
+  rows (subjects) × skills where EVERY cell is an assumed hit and the coach
+  marks only what went wrong — arm a mark, tap cells, hold a row/skill name to
+  stamp a whole line. One commit writes a rep per cell
+  (`CaptureView.commitFullOut`, same contract as `logDirect`: stamp
+  `loggerID`, clear `isDemo`, save), all sharing a `waveID` so the toast's
+  "Undo all" takes the run back. Marks are `FullOutMark`: `.hit`,
+  `.deduction(name)` (resolved per skill BY NAME to that skill's own slot — a
+  skill that lacks the outcome dims and no-ops, never falls back to a hit), and
+  `.skipped` = did not attempt / absent. **DNA is deliberately NOT an outcome
+  and writes NO Attempt** — an Attempt row means "a rep happened" to ~40 call
+  sites, sync, the watch and older builds, so the only way a non-attempt counts
+  neither for nor against is to never write one. Don't add a "not counted"
+  outcome to `OutcomeDef` without auditing every `.attempts` consumer.
+  `FullOutView` is pure UI (no model context); tests: `FullOutPlanTests`.
 - **EXECUTION drivers ("Feature B")** — an OPTIONAL, advanced, per-rep layer of
   BINARY held/lost tags. NEVER point math (the kit's `ExecutionDriver.maxDeduction`
   is deliberately ignored). Drivers come from the United `SkillCategory`

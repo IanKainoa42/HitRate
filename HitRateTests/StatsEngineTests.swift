@@ -223,6 +223,142 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertFalse(rep.hasStability)
     }
 
+    // MARK: Appended outcomes (balk / out of range / coach-made extras)
+
+    /// The reported bug: a coach added a 0%-credit "Missed skill" outcome,
+    /// logged 14 of them and zero major falls, and the all-groups summary said
+    /// "Major fall 14". The reps must keep crediting as misses (rate) while
+    /// being NAMED as what they are (legend, falls, top miss).
+    func testAppendedZeroCreditOutcomeIsNotReportedAsMajorFalls() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let group = StuntGroup(name: "Stretch to arabesque", number: 1, orderIndex: 0)
+        group.setOutcomeDefs([
+            .init("Hit", .green, .hit), .init("Bobble", .yellow, .decent),
+            .init("Building fall", .orange, .rough), .init("Major fall", .red, .miss),
+            .init("Missed skill", .gray, .miss)
+        ])
+        let session = PracticeSession(startedAt: Date(timeIntervalSince1970: 1_000))
+        context.insert(group)
+        context.insert(session)
+        let slots = Array(repeating: 0, count: 6) + Array(repeating: 4, count: 14)
+        for (index, slot) in slots.enumerated() {
+            context.insert(Attempt(slot: slot, group: group, session: session,
+                                   timestamp: Date(timeIntervalSince1970: 1_000 + Double(index))))
+        }
+        try context.save()
+
+        let stats = StatsEngine.compute(sessions: [session], groups: [group], timeframe: .all)
+
+        XCTAssertEqual(stats.total, 20)
+        XCTAssertEqual(stats.overall, [6, 0, 0, 14], "tier counts still carry the misses — the rate depends on it")
+        XCTAssertEqual(stats.rate, 30, "6 hits of 20 at full credit, 14 at zero")
+        XCTAssertEqual(stats.coreCounts, [6, 0, 0, 0], "no major fall was logged, so none is shown")
+        XCTAssertEqual(stats.extras.map(\.def.label), ["Missed skill"])
+        XCTAssertEqual(stats.extras.map(\.count), [14])
+        XCTAssertEqual(stats.falls, 0)
+        XCTAssertEqual(stats.groups.first?.falls, 0)
+        XCTAssertEqual(stats.topMissRow?.label, "Missed skill")
+        XCTAssertEqual(stats.topMissRow?.count, 14)
+        XCTAssertEqual(stats.coreCounts.reduce(0, +) + stats.extras.reduce(0) { $0 + $1.count }, stats.total)
+    }
+
+    /// The stunt preset's two appended deductions credit like the fall they
+    /// default to, without being counted AS falls.
+    func testStuntPresetBalkAndOutOfRangeCreditLikeFallsButAreNotFalls() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let group = StuntGroup(name: "Rewinds", number: 1, orderIndex: 0)
+        let session = PracticeSession(startedAt: Date(timeIntervalSince1970: 1_000))
+        context.insert(group)
+        context.insert(session)
+
+        let defs = group.outcomeDefs
+        XCTAssertEqual(defs.map(\.label),
+                       ["Hit", "Bobble", "Building fall", "Major fall", "Balk / Missed", "Out of range"])
+        XCTAssertEqual(defs.map(\.credit), [100, 67, 33, 0, 33, 0],
+                       "slots 0-3 must stay put — every existing rep indexes them")
+
+        // 2 hits, 1 major fall, 1 balk (33), 3 out of range (0).
+        for (index, slot) in [0, 0, 3, 4, 5, 5, 5].enumerated() {
+            context.insert(Attempt(slot: slot, group: group, session: session,
+                                   timestamp: Date(timeIntervalSince1970: 1_000 + Double(index))))
+        }
+        try context.save()
+
+        let stats = StatsEngine.compute(sessions: [session], groups: [group], timeframe: .all)
+
+        XCTAssertEqual(stats.overall, [2, 0, 1, 4])
+        XCTAssertEqual(stats.rate, 33, "(200 + 33) / 7")
+        XCTAssertEqual(stats.coreCounts, [2, 0, 0, 1])
+        XCTAssertEqual(stats.extras.map(\.def.label), ["Balk / Missed", "Out of range"])
+        XCTAssertEqual(stats.extras.map(\.count), [1, 3])
+        XCTAssertEqual(stats.falls, 1, "only the major fall is a fall")
+        XCTAssertEqual(stats.topMissRow?.label, "Out of range")
+
+        let attempts = session.sortedAttempts
+        XCTAssertEqual(attempts.map(\.isFallRep), [false, false, true, false, false, false, false])
+        XCTAssertEqual(attempts.map(\.isExtraOutcomeRep), [false, false, false, true, true, true, true])
+        XCTAssertFalse(attempts[3].isLandingRep, "a balk breaks a streak like any sub-50% rep")
+    }
+
+    /// A store with no appended outcomes reads exactly as it did before.
+    func testFourSlotStoreHasNoExtrasAndUnchangedCoreCounts() throws {
+        let fixture = try makeFixture(outcomes: [.hit, .bobble, .buildingFall, .majorFall, .majorFall])
+
+        let stats = StatsEngine.compute(sessions: [fixture.session], groups: [fixture.group], timeframe: .all)
+
+        XCTAssertTrue(stats.extras.isEmpty)
+        XCTAssertEqual(stats.coreCounts, stats.overall)
+        XCTAssertEqual(stats.falls, 3)
+        XCTAssertEqual(stats.topMissRow?.label, "Major fall")
+        XCTAssertEqual(stats.topMissRow?.count, 2)
+    }
+
+    /// Same-named extras on two skills roll up into one floor row.
+    func testSameNamedExtrasMergeAcrossSkills() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let a = StuntGroup(name: "A", number: 1, orderIndex: 0)
+        let b = StuntGroup(name: "B", number: 2, orderIndex: 1)
+        let session = PracticeSession(startedAt: Date(timeIntervalSince1970: 1_000))
+        context.insert(a); context.insert(b); context.insert(session)
+        var t = 1_000.0
+        for (group, slot) in [(a, 5), (a, 5), (b, 5), (b, 0)] {
+            context.insert(Attempt(slot: slot, group: group, session: session,
+                                   timestamp: Date(timeIntervalSince1970: t)))
+            t += 1
+        }
+        try context.save()
+
+        let stats = StatsEngine.compute(sessions: [session], groups: [a, b], timeframe: .all)
+
+        XCTAssertEqual(stats.extras.count, 1)
+        XCTAssertEqual(stats.extras.first?.def.label, "Out of range")
+        XCTAssertEqual(stats.extras.first?.count, 3)
+        XCTAssertEqual(stats.coreCounts, [1, 0, 0, 0])
+    }
+
+    /// `Attempt.outcome` only knows four slots and falls back to .hit, so the
+    /// CSV used to export every appended outcome as "Hit".
+    func testCSVExportsAppendedOutcomeByItsOwnName() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let group = StuntGroup(name: "Rewinds", number: 1, orderIndex: 0)
+        let session = PracticeSession(startedAt: Date(timeIntervalSince1970: 1_000))
+        context.insert(group)
+        context.insert(session)
+        for (index, slot) in [0, 3, 4, 5].enumerated() {
+            context.insert(Attempt(slot: slot, group: group, session: session,
+                                   timestamp: Date(timeIntervalSince1970: 1_000 + Double(index))))
+        }
+        try context.save()
+
+        let csv = CSVExportItem(sessions: [session])
+
+        XCTAssertEqual(csv.rows.map(\.outcome), ["Hit", "Major fall", "Balk / Missed", "Out of range"])
+    }
+
     private func makeFixture(
         outcomes: [Outcome],
         loggerIDs: [String]? = nil

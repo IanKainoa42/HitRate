@@ -235,15 +235,31 @@ struct StackedBar: View {
     let total: Int
     var height: CGFloat = 13
     var background: Color = Theme.fill
+    /// Appended-outcome reps (`ExtraOutcomeStat`) that are INSIDE `counts`.
+    /// When passed, each is carved out of its tier's segment and drawn in its
+    /// own color right after it, so a blue "Balk" doesn't paint as a red fall.
+    /// Default empty = the plain four-tier bar every other caller draws.
+    var extras: [ExtraOutcomeStat] = []
+
+    private var segments: [(color: Color, count: Int)] {
+        var out: [(color: Color, count: Int)] = []
+        for o in Outcome.allCases {
+            let mine = extras.filter { $0.tier == o.rawValue }
+            let carved = mine.reduce(0) { $0 + $1.count }
+            out.append((color: o.color, count: max(0, counts[o.rawValue] - carved)))
+            for e in mine { out.append((color: e.def.color, count: e.count)) }
+        }
+        return out
+    }
 
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
                 if total > 0 {
-                    ForEach(Outcome.allCases) { o in
-                        let w = CGFloat(counts[o.rawValue]) / CGFloat(total)
+                    ForEach(Array(segments.enumerated()), id: \.offset) { _, seg in
+                        let w = CGFloat(seg.count) / CGFloat(total)
                         if w > 0 {
-                            o.color.frame(width: w * geo.size.width)
+                            seg.color.frame(width: w * geo.size.width)
                         }
                     }
                 }

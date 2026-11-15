@@ -53,34 +53,47 @@ struct SummaryCard: View {
             }
             .padding(.bottom, 10)
 
-            StackedBar(counts: stats.overall, total: stats.total, height: 12)
+            StackedBar(counts: stats.overall, total: stats.total, height: 12, extras: stats.extras)
                 .padding(.bottom, 12)
 
             // 2-column outcome legend
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible())],
                       alignment: .leading, spacing: 8) {
+                // The four severity rows count ONLY their own slot's reps
+                // (`coreCounts`). An appended outcome — a balk, out of range,
+                // a coach-made extra — gets its own named row below instead of
+                // being folded into whichever severity shares its credit; that
+                // fold is what showed 14 missed skills as 14 major falls.
                 ForEach(Outcome.allCases) { o in
-                    HStack(spacing: 8) {
-                        Circle().fill(o.color).frame(width: 8, height: 8)
-                        Text(o.label(stats.aggregateKind))
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(Theme.label)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)   // "Building fall" must not truncate beside big counts
-                        Spacer(minLength: 4)
-                        Text("\(stats.overall[o.rawValue])")
-                            .font(Theme.barlow(16, .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.label)
-                        Text(stats.total > 0
-                             ? "\(Int((Double(stats.overall[o.rawValue]) / Double(stats.total) * 100).rounded()))%"
-                             : "–")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(Theme.label3)
-                            .frame(width: 30, alignment: .trailing)
-                    }
+                    legendRow(color: o.color, label: o.label(stats.aggregateKind),
+                              count: stats.coreCounts[o.rawValue])
+                }
+                ForEach(stats.extras) { e in
+                    legendRow(color: e.def.color, label: e.def.label, count: e.count)
                 }
             }
+        }
+    }
+
+    private func legendRow(color: Color, label: String, count: Int) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)   // "Building fall" must not truncate beside big counts
+            Spacer(minLength: 4)
+            Text("\(count)")
+                .font(Theme.barlow(16, .bold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.label)
+            Text(stats.total > 0
+                 ? "\(Int((Double(count) / Double(stats.total) * 100).rounded()))%"
+                 : "–")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Theme.label3)
+                .frame(width: 30, alignment: .trailing)
         }
     }
 }
