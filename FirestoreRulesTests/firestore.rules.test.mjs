@@ -57,6 +57,11 @@ function tumbleDocument(loggerId = memberAId) {
   };
 }
 
+// IAN-618: the golden manifest StuntScope writes, shared with HitRateTests/StuntCloudSyncTests.
+const goldenStuntDoc = JSON.parse(await readFile(
+  new URL("../Fixtures/StuntAnalysis/v1-golden-doc.json", import.meta.url), "utf8"));
+const goldenStuntId = goldenStuntDoc.framesPath.split("/")[3];
+
 let testEnv;
 
 function firestoreFor(uid) {
@@ -206,6 +211,20 @@ describe("HitRate Firestore team authorization", () => {
     await assertFails(updateDoc(ref, { framesPath: "teams/other/stuntAnalyses/x/frames.json" }));
     await assertFails(setDoc(doc(firestoreFor(memberAId), "teams", teamId,
       "stuntAnalyses", "invalid"), { ...stuntDocument(), outcomeRaw: 0 }));
+  });
+
+  it("accepts the golden StuntScope manifest exactly as fixtured", async () => {
+    const ref = doc(firestoreFor(memberAId), "teams", goldenStuntDoc.teamId,
+      "stuntAnalyses", goldenStuntId);
+    const body = { ...goldenStuntDoc, updatedAt: new Date(goldenStuntDoc.updatedAt) };
+    await assertSucceeds(setDoc(ref, body));
+    // A writer type change (Int -> Double) or an added key must be rejected here.
+    const other = doc(firestoreFor(memberAId), "teams", goldenStuntDoc.teamId,
+      "stuntAnalyses", "A934B11A-6290-4F1E-8EF5-C86DF630F146");
+    await assertFails(setDoc(other, { ...body, onBasePercent: 82.5,
+      framesPath: body.framesPath.replace(goldenStuntId, "A934B11A-6290-4F1E-8EF5-C86DF630F146") }));
+    await assertFails(setDoc(other, { ...body, newKey: 1,
+      framesPath: body.framesPath.replace(goldenStuntId, "A934B11A-6290-4F1E-8EF5-C86DF630F146") }));
   });
 
   it("still accepts a HitRate rep whose optional stunt fields are null", async () => {

@@ -1,0 +1,1 @@
+{"flights":[{"catchFrame":19,"release":7}],"fps":30,"frameHeight":1080,"frameWidth":1920,"frames":[{"com":[100.3,200.7],"drop":[101.1,300],"i":7,"m":0.123,"s":"edge","span":[[90,300],[130,300]],"t":0.233},{"com":[100.8,201.2],"drop":[101.4,300],"i":8,"m":0.31,"s":"stable","span":[[90,300],[130,300]],"t":0.267}],"version":1,"wobbles":[{"end":9,"peakMargin":0.05,"start":7}]}
