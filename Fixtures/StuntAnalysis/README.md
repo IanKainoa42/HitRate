@@ -10,9 +10,8 @@ HitRate asserts both fixtures in three places, so a rename or type change fails 
 `HitRateTests/StuntCloudSyncTests.swift` (reader), and `FirestoreRulesTests/firestore.rules.test.mjs`
 (the rules accept this exact doc).
 
-Provenance: hand-built from the writer's Codable definitions, NOT yet recorded by a FlightFilter test.
-Follow-up: have FlightFilter record these via an encoder test (as `TumbleExchangeTests` does),
-mirror byte-for-byte, and pin the same SHA-256s there.
+Provenance: hand-built from the writer's Codable definitions; FlightFilter's `StuntContractGoldenTests` (branch `ian-618-stunt-golden`)
+re-encodes the writer types and asserts byte/field equality against its identical copy.
 
 ```
 56f21f247a86ff342a0473beba21e1c9375bc51afeb37204f9f29658919f5b89  v1-golden-doc.json
