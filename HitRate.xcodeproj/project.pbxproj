@@ -826,7 +826,7 @@
 				CURRENT_PROJECT_VERSION = 47;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = watchos;
@@ -844,7 +844,7 @@
 				CURRENT_PROJECT_VERSION = 47;
 				DEVELOPMENT_TEAM = WC46K49VFA;
 				INFOPLIST_FILE = HitRateWatch/Info.plist;
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate.watchkitapp;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = watchos;
@@ -993,7 +993,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = iphoneos;
@@ -1051,7 +1051,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ianrichardson.HitRate;
 				PRODUCT_NAME = HitRate;
 				SDKROOT = iphoneos;
