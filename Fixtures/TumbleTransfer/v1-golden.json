@@ -10,13 +10,13 @@
         "takeoffFrameIndex" : 3,
         "zone" : {
           "inBand" : [
-            -32,
-            -16
+            -18,
+            0
           ],
           "kind" : "handspring",
           "outBand" : [
-            8,
-            24
+            26,
+            31
           ]
         }
       },

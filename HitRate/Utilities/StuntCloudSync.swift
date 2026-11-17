@@ -30,11 +30,30 @@ enum StuntCloudSync {
             let drop: [Double]
             let span: [[Double]]
         }
+        struct Wobble: Decodable {
+            let start: Int
+            let end: Int
+            let peakMargin: Double
+        }
+        struct Flight: Decodable {
+            let release: Int
+            let catchFrame: Int?
+        }
         let version: Int
         let fps: Double
         let frameWidth: Int
         let frameHeight: Int
         let frames: [Frame]
+        /// Optional so a writer that omits them still decodes.
+        let wobbles: [Wobble]?
+        let flights: [Flight]?
+
+        /// The only accepted version is 1; anything else is rejected, never half-read.
+        static func decode(_ data: Data) throws -> FrameArchive {
+            let archive = try JSONDecoder().decode(FrameArchive.self, from: data)
+            guard archive.version == 1 else { throw CocoaError(.fileReadCorruptFile) }
+            return archive
+        }
     }
 
     static func load(teamID: String) async throws -> [Analysis] {
@@ -75,8 +94,6 @@ enum StuntCloudSync {
                 else { continuation.resume(throwing: CocoaError(.fileReadUnknown)) }
             }
         }
-        let archive = try JSONDecoder().decode(FrameArchive.self, from: data)
-        guard archive.version == 1 else { throw CocoaError(.fileReadCorruptFile) }
-        return archive
+        return try FrameArchive.decode(data)
     }
 }
