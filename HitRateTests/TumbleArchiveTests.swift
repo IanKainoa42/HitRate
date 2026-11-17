@@ -8,7 +8,7 @@ import XCTest
 /// (see `Fixtures/TumbleTransfer/README.md`). If the hash test fails, the copies drifted: update
 /// the fixture and `goldenSHA256` in FlightFilter AND HitRate together. (IAN-612)
 final class TumbleArchiveTests: XCTestCase {
-    static let goldenSHA256 = "f18af990901ecd9016cbd639412d413dbe7b65c691b1f7389b4f7343a27c29b4"
+    static let goldenSHA256 = "f3672647a54afb3ef1d1a77487bc860937ccb9a71b501fc2bc163f61db17bc24"
 
     static var goldenURL: URL {
         URL(fileURLWithPath: #filePath)
