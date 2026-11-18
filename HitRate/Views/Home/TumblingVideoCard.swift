@@ -69,8 +69,12 @@ struct TumblingVideoCard: View {
 
     private func summary(for recording: TumbleCloudSync.Recording) -> String {
         if recording.review.hiddenRecording { return "Hidden from stats · Tap to restore" }
-        let blocks = recording.reviewedArchive.blocks
-        let excluded = recording.review.excludedBlockKeys.count
+        // Visible blocks only (the recording isn't hidden past the guard above).
+        // `reviewedArchive` would also re-filter every pose frame, on each
+        // Home render, for a line that reads just the block count and tracks.
+        let excludedKeys = recording.review.excludedBlockKeys
+        let blocks = recording.archive.blocks.filter { !excludedKeys.contains($0.reviewKey) }
+        let excluded = excludedKeys.count
         let athletes = Set(blocks.compactMap { recording.athleteIDs[String($0.trackID)] })
         let athleteText = athletes.count == 1 ? "1 athlete" : "\(athletes.count) athletes"
         return "\(blocks.count) skill block\(blocks.count == 1 ? "" : "s") · \(athleteText)" +
