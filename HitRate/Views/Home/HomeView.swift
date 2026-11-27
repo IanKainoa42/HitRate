@@ -222,7 +222,7 @@ struct HomeView: View {
     var body: some View {
         let d = stats
         VStack(spacing: 9) {
-            header
+            header(hasData: d.hasData)
 
             // Timeframe — the global filter; every number below scales to it.
             timeframeTabs
@@ -669,7 +669,9 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
-    private var header: some View {
+    /// `hasData` comes from the `FloorStats` body already computed — reading
+    /// `stats` here would re-run the whole `StatsEngine.compute` pass.
+    private func header(hasData: Bool) -> some View {
         HStack(spacing: 10) {
             // Back to the folder list (when Home was opened from it).
             if let onExit {
@@ -744,8 +746,8 @@ struct HomeView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(!stats.hasData)
-            .opacity(stats.hasData ? 1 : 0.4)
+            .disabled(!hasData)
+            .opacity(hasData ? 1 : 0.4)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)

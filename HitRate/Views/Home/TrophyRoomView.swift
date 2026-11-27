@@ -29,6 +29,10 @@ struct TrophyRoomView: View {
 
     var body: some View {
         let t = tournament
+        // Evaluate the lifetime replays once per render: each read of the
+        // computed properties re-runs cupHistory / Milestones.evaluate.
+        let cups = self.cups
+        let earned = self.earned
         VStack(spacing: 9) {
             header
             ScrollView {
@@ -36,8 +40,8 @@ struct TrophyRoomView: View {
                     // The live competition leads the room; analytics stay on Home.
                     WeeklyTournamentCard(tournament: t, weekOnly: true)
                     if !t.league.isEmpty { seasonSection(t.league) }
-                    if !cups.isEmpty { cupsSection }
-                    if !earned.isEmpty { accoladesSection }
+                    if !cups.isEmpty { cupsSection(cups) }
+                    if !earned.isEmpty { accoladesSection(earned) }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -114,7 +118,7 @@ struct TrophyRoomView: View {
 
     // MARK: Cups shelf
 
-    private var cupsSection: some View {
+    private func cupsSection(_ cups: [WeeklyCup]) -> some View {
         FeedCard {
             CardHead("CUPS WON") {
                 Text("\(cups.count)")
@@ -132,7 +136,7 @@ struct TrophyRoomView: View {
 
     // MARK: Accolades (earned milestone cards)
 
-    private var accoladesSection: some View {
+    private func accoladesSection(_ earned: [Milestone]) -> some View {
         FeedCard {
             CardHead("ACCOLADES") {
                 Text("\(earned.count)")
